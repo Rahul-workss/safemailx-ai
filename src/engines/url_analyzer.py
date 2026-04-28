@@ -14,7 +14,7 @@ except ImportError:
     WHOIS_AVAILABLE = False
 
 # Set your API Key here, or as an environment variable
-SAFE_BROWSING_API_KEY = os.getenv("SAFE_BROWSING_API_KEY", "AIzaSyBypl1Q-bIIV8d6V46IGEWiZ89bJ_lpZQo")
+SAFE_BROWSING_API_KEY = os.getenv("SAFE_BROWSING_API_KEY", "")
 
 # Maximum seconds to wait for a WHOIS response.
 # python-whois has no built-in timeout; slow/firewalled networks
