@@ -21,9 +21,9 @@ It watches your Gmail inbox in real time, runs every suspicious email through th
 
 When a new email lands in your inbox, SafeMail-X puts it through three independent checks simultaneously:
 
-**1. 🔍 Rule Engine** — Inspects the email's structure and headers for classic red flags: spoofed sender domains, tampered routing headers, brand impersonation tricks.
+**1. 🔍 Custom Rule Engine** — A proprietary, deterministic module custom-developed to inspect the email's structure and headers for classic red flags: spoofed sender domains, tampered routing headers, and brand impersonation tricks.
 
-**2. 🧠 ML Language Model** — A locally-trained text analysis model reads the email's wording, looking for linguistic patterns that consistently show up in phishing and social engineering attempts.
+**2. 🧠 Proprietary TF-IDF Machine Learning Model** — A custom, locally-trained statistical NLP model (TF-IDF + Logistic Regression) that reads the email's wording, looking for subtle linguistic patterns that consistently show up in phishing and social engineering attempts.
 
 **3. 🤖 Local AI Analyzer (Qwen 2.5 7B)** — A full large language model running on your own hardware reads the email the way a human analyst would, identifying psychological manipulation tactics like manufactured urgency, fear, or false authority.
 
