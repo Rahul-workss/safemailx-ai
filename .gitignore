@@ -1,0 +1,33 @@
+# Environments
+venv/
+env/
+.env
+
+# Google API Credentials (CRITICAL - DO NOT UPLOAD)
+src/credentials.json
+src/token.pickle
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE / Editor folders
+.vscode/
+.idea/
+
+# Reports and Temp Data
+reports/*.json
+reports/*.pdf
+src/temp_images/*
+!reports/.gitkeep
+
+# Machine Learning Models and Datasets (Too large for GitHub)
+models/*.joblib
+data/*.csv
+data/splits/*
+!models/.gitkeep
+
+# OS generated files
+.DS_Store
+Thumbs.db
