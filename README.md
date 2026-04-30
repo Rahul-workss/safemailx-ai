@@ -21,11 +21,11 @@ It watches your Gmail inbox in real time, runs every suspicious email through th
 
 When a new email lands in your inbox, SafeMail-X puts it through three independent checks simultaneously:
 
-**1. 🔍 Custom Rule Engine** — A proprietary, deterministic module custom-developed to inspect the email's structure and headers for classic red flags: spoofed sender domains, tampered routing headers, and brand impersonation tricks.
+**1. Custom Rule Engine** — A proprietary, deterministic module custom-developed to inspect the email's structure and headers for classic red flags: spoofed sender domains, tampered routing headers, and brand impersonation tricks.
 
-**2. 🧠 Proprietary TF-IDF Machine Learning Model** — A custom, locally-trained statistical NLP model (TF-IDF + Logistic Regression) that reads the email's wording, looking for subtle linguistic patterns that consistently show up in phishing and social engineering attempts.
+**2. Proprietary TF-IDF Machine Learning Model** — A custom, locally-trained statistical NLP model (TF-IDF + Logistic Regression) that reads the email's wording, looking for subtle linguistic patterns that consistently show up in phishing and social engineering attempts.
 
-**3. 🤖 Local AI Analyzer (Qwen 2.5 7B)** — A full large language model running on your own hardware reads the email the way a human analyst would, identifying psychological manipulation tactics like manufactured urgency, fear, or false authority.
+**3. Local AI Analyzer (Qwen 2.5 7B)** — A full large language model running on your own hardware reads the email the way a human analyst would, identifying psychological manipulation tactics like manufactured urgency, fear, or false authority.
 
 All three verdicts are then weighed by a **Smart Veto** fusion engine. Here's the clever part: even if an email has a valid security certificate (SPF/DKIM pass), the system can still flag it if the AI detects manipulative intent. Attackers know how to pass technical checks — this catches them anyway.
 
@@ -44,7 +44,7 @@ You'll need four things installed. None of them are complicated — just follow 
 | **LM Studio** | Runs the local AI model | [lmstudio.ai](https://lmstudio.ai/) |
 | **Qwen 2.5 7B model** | The brain behind behavioral analysis | Download inside LM Studio → search `Qwen2.5-7B-Instruct-GGUF`, pick the `Q4_K_M` version |
 
-> 💡 **Not sure about Tesseract on Windows?** After installing, search for "Environment Variables" in the Start menu → Edit the system environment variables → find `Path` → add the folder where Tesseract was installed (usually `C:\Program Files\Tesseract-OCR`).
+>  **Not sure about Tesseract on Windows?** After installing, search for "Environment Variables" in the Start menu → Edit the system environment variables → find `Path` → add the folder where Tesseract was installed (usually `C:\Program Files\Tesseract-OCR`).
 
 ---
 
@@ -90,7 +90,7 @@ SafeMail-X needs read-only access to your Gmail inbox (it never modifies or dele
 1. Drop your `credentials.json` file into the `src/` folder.
 2. Drop your `token.pickle` file into the `src/` folder.
 
-> 🔐 **No `token.pickle` yet?** No problem. Just run the system — on first launch it'll open a browser window and walk you through a standard Google sign-in. The token file gets created automatically after that.
+> **No `token.pickle` yet?** No problem. Just run the system — on first launch it'll open a browser window and walk you through a standard Google sign-in. The token file gets created automatically after that.
 
 ---
 
@@ -121,7 +121,7 @@ cd src
 python forwarding_bot.py
 ```
 
-You should see startup messages as each engine initializes, followed by the bot starting to poll your inbox. That's it — SafeMail-X is now running. 🎉
+You should see startup messages as each engine initializes, followed by the bot starting to poll your inbox. That's it — SafeMail-X is now running. 
 
 ---
 
