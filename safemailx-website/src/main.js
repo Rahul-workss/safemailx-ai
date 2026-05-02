@@ -63,44 +63,45 @@ app.innerHTML = `
             </div>
           </div>
 
-          <div class="hero-copy">
-            <p class="eyebrow">Coming soon</p>
-            <h1>
-              SafeMail-X
-              <span>AI</span>
-            </h1>
-            <p class="hero-summary">
-              Next-gen email security that actually respects your privacy. Our on-device AI rips through sophisticated phishing attempts to give you the exact "who, what, and how" before you ever click a link.
-            </p>
 
-            <div class="hero-actions">
-              <a class="primary-button" href="#waitlist">Join the waitlist</a>
-              <button class="ghost-button" type="button" data-scroll-target="#story">
-                See how it works
-              </button>
-            </div>
+        </div>
 
-            <div class="hero-metrics">
-              <div class="metric">
-                <span class="metric-value metric-value--accent">99.2%</span>
-                <span class="metric-label">phishing catch rate</span>
-              </div>
-              <div class="metric">
-                <span class="metric-value">3-Layer</span>
-                <span class="metric-label">AI + Rules + ML</span>
-              </div>
-              <div class="metric">
-                <span class="metric-value metric-value--green">0 Cloud</span>
-                <span class="metric-label">fully local analysis</span>
-              </div>
-            </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Coming soon</p>
+          <h1>
+            SafeMail-X
+            <span>AI</span>
+          </h1>
+          <p class="hero-summary">
+            Next-gen email security that actually respects your privacy. Our on-device AI rips through sophisticated phishing attempts to give you the exact "who, what, and how" before you ever click a link.
+          </p>
+
+          <div class="hero-actions">
+            <a class="primary-button" href="#waitlist">Join the waitlist</a>
+            <button class="ghost-button" type="button" data-scroll-target="#story">
+              See how it works
+            </button>
           </div>
 
-          <div class="scroll-cue">
-            <span>Scroll</span>
-            <span class="scroll-line"><span></span></span>
+          <div class="hero-metrics">
+            <div class="metric">
+              <span class="metric-value metric-value--accent">99.2%</span>
+              <span class="metric-label">phishing catch rate</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">3-Layer</span>
+              <span class="metric-label">AI + Rules + ML</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value metric-value--green">0 Cloud</span>
+              <span class="metric-label">fully local analysis</span>
+            </div>
           </div>
+        </div>
 
+        <div class="scroll-cue">
+          <span>Scroll</span>
+          <span class="scroll-line"><span></span></span>
         </div>
       </section>
 
@@ -459,17 +460,19 @@ const hudConnectors = document.querySelectorAll('.hud-connector-fill');
 const hudLogs = document.querySelector('.hud-logs');
 window.lastActiveStep = -2;
 
-// Initial state: whole HUD slides up from below, steps staggered
-gsap.set(".hero-hud", { autoAlpha: 0, y: 80, scale: 0.96 });
-gsap.set(".hud-step", { autoAlpha: 0, y: 22 });
-gsap.set(".hud-connector-fill", { scaleX: 0, transformOrigin: "left center" });
-
 // Slide HUD in on scroll start
+// On mobile, show it almost immediately
+const hudStart = isMobile ? "top+=1% top" : "top+=5% top";
+const hudEnd = isMobile ? "top+=10% top" : "top+=22% top";
+const hudY = isMobile ? 30 : 80;
+
+gsap.set(".hero-hud", { autoAlpha: 0, y: hudY, scale: 0.96 });
+
 gsap.timeline({
   scrollTrigger: {
     trigger: heroSection,
-    start: "top+=5% top",
-    end: "top+=22% top",
+    start: hudStart,
+    end: hudEnd,
     scrub: true,
   }
 })

@@ -976,48 +976,54 @@ main {
 
   /* ── PIPELINE HUD — compact but clearly visible ── */
   .hero-hud {
-    bottom: 1.5vh;
-    padding: 0.7rem 0.7rem 0.6rem;
-    border-radius: 14px;
-    width: calc(100vw - 1.2rem);
-    /* High-contrast so it stands out from the dark bottom scrim */
-    background: rgba(4, 14, 32, 0.92);
-    border: 1px solid rgba(142, 240, 255, 0.35);
+    bottom: 8vh; /* Move up to avoid mobile OS bars */
+    padding: 0.8rem 0.6rem;
+    border-radius: 12px;
+    width: calc(100vw - 1rem);
+    background: rgba(4, 18, 38, 0.95);
+    border: 1px solid rgba(142, 240, 255, 0.45);
     box-shadow:
-      0 0 0 1px rgba(142, 240, 255, 0.12) inset,
-      0 0 20px rgba(142, 240, 255, 0.08),
-      0 6px 24px rgba(0, 0, 0, 0.5);
+      0 0 0 1px rgba(142, 240, 255, 0.15) inset,
+      0 0 30px rgba(142, 240, 255, 0.12),
+      0 8px 32px rgba(0, 0, 0, 0.6);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 
   .hud-header {
-    font-size: 0.5rem;
-    letter-spacing: 0.12em;
-    margin-bottom: 0.65rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.8rem;
+    opacity: 0.9;
   }
 
   .hud-pipeline {
-    margin-bottom: 0.65rem;
+    margin-bottom: 0.8rem;
+    gap: 2px;
   }
 
   .hud-step-icon {
-    width: 1.7rem;
-    height: 1.7rem;
+    width: 2rem;
+    height: 2rem;
+    border-width: 1px;
   }
 
   .hud-step-icon span {
-    font-size: 0.52rem;
+    font-size: 0.65rem;
   }
 
   .hud-step-label {
-    font-size: 0.4rem;
-    letter-spacing: 0.02em;
+    font-size: 0.52rem;
+    margin-top: 0.4rem;
+    line-height: 1.1;
+    letter-spacing: 0;
   }
 
   .hud-connector {
-    margin: 0 0.08rem;
-    margin-bottom: 1.3rem;
+    margin: 0 0.05rem;
+    margin-bottom: 1.6rem;
+    height: 1px;
+    flex: 1;
   }
 
   .hud-logs {
