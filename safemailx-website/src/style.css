@@ -915,7 +915,7 @@ main {
   /* ── HERO: keep sticky architecture, just scale content down ── */
   /* Keep hero-sequence at full height so scroll animation plays properly */
   .hero-sequence {
-    min-height: 380vh;
+    min-height: 260vh;
   }
 
   /* Keep stage at 100vh — canvas must fill screen */
@@ -923,10 +923,11 @@ main {
     height: 100vh;
   }
 
-  /* hero-copy stays absolute inside the stage, shifted down a bit */
+  /* hero-copy is now inside hero-stage (sticky) — keep it absolute, just scale it */
   .hero-copy {
-    top: 4.5rem;
+    top: 4rem;
     padding: 0 1rem;
+    width: calc(100% - 2rem);
   }
 
   .hero-copy h1 {

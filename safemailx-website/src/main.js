@@ -63,45 +63,44 @@ app.innerHTML = `
             </div>
           </div>
 
+          <div class="hero-copy">
+            <p class="eyebrow">Coming soon</p>
+            <h1>
+              SafeMail-X
+              <span>AI</span>
+            </h1>
+            <p class="hero-summary">
+              Next-gen email security that actually respects your privacy. Our on-device AI rips through sophisticated phishing attempts to give you the exact "who, what, and how" before you ever click a link.
+            </p>
 
-        </div>
-
-        <div class="hero-copy">
-          <p class="eyebrow">Coming soon</p>
-          <h1>
-            SafeMail-X
-            <span>AI</span>
-          </h1>
-          <p class="hero-summary">
-            Next-gen email security that actually respects your privacy. Our on-device AI rips through sophisticated phishing attempts to give you the exact "who, what, and how" before you ever click a link.
-          </p>
-
-          <div class="hero-actions">
-            <a class="primary-button" href="#waitlist">Join the waitlist</a>
-            <button class="ghost-button" type="button" data-scroll-target="#story">
-              See how it works
-            </button>
-          </div>
-
-          <div class="hero-metrics">
-            <div class="metric">
-              <span class="metric-value metric-value--accent">99.2%</span>
-              <span class="metric-label">phishing catch rate</span>
+            <div class="hero-actions">
+              <a class="primary-button" href="#waitlist">Join the waitlist</a>
+              <button class="ghost-button" type="button" data-scroll-target="#story">
+                See how it works
+              </button>
             </div>
-            <div class="metric">
-              <span class="metric-value">3-Layer</span>
-              <span class="metric-label">AI + Rules + ML</span>
-            </div>
-            <div class="metric">
-              <span class="metric-value metric-value--green">0 Cloud</span>
-              <span class="metric-label">fully local analysis</span>
+
+            <div class="hero-metrics">
+              <div class="metric">
+                <span class="metric-value metric-value--accent">99.2%</span>
+                <span class="metric-label">phishing catch rate</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value">3-Layer</span>
+                <span class="metric-label">AI + Rules + ML</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value metric-value--green">0 Cloud</span>
+                <span class="metric-label">fully local analysis</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="scroll-cue">
-          <span>Scroll</span>
-          <span class="scroll-line"><span></span></span>
+          <div class="scroll-cue">
+            <span>Scroll</span>
+            <span class="scroll-line"><span></span></span>
+          </div>
+
         </div>
       </section>
 
