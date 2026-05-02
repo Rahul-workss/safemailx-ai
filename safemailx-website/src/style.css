@@ -912,60 +912,72 @@ main {
     display: none;
   }
 
-  /* ── MOBILE HERO LAYOUT ──────────────────────────────── */
-  /* Let the hero section just be a normal scroll height on mobile */
+  /* ── HERO: keep sticky architecture, just scale content down ── */
+  /* Keep hero-sequence at full height so scroll animation plays properly */
   .hero-sequence {
-    min-height: 300vh;
+    min-height: 380vh;
   }
 
-  /* The sticky stage takes up 60% of viewport height on mobile */
+  /* Keep stage at 100vh — canvas must fill screen */
   .hero-stage {
-    height: 55vh;
-    min-height: 280px;
+    height: 100vh;
   }
 
-  /* Re-anchor hero-copy below the canvas stage instead of overlapping it */
-  .hero-copy,
-  .scroll-cue {
-    position: static;
-    left: auto;
-    transform: none;
-  }
-
+  /* hero-copy stays absolute inside the stage, shifted down a bit */
   .hero-copy {
-    top: auto;
-    width: 100%;
-    padding: 1.5rem 1rem 0;
-    z-index: 1;
+    top: 4.5rem;
+    padding: 0 1rem;
   }
 
   .hero-copy h1 {
-    font-size: clamp(2.8rem, 12vw, 4.5rem);
+    font-size: clamp(2.6rem, 11vw, 4rem);
     max-width: 100%;
+    line-height: 0.96;
   }
 
   .hero-summary {
-    font-size: 0.95rem;
-    margin-top: 0.8rem;
+    font-size: 0.88rem;
+    margin-top: 0.7rem;
+    max-width: 100%;
+    line-height: 1.6;
   }
 
   .hero-actions {
     display: flex;
     flex-direction: column;
-    gap: 0.7rem;
-    margin-top: 1.2rem;
-  }
-
-  .hero-metrics {
-    margin-top: 1.2rem;
     gap: 0.6rem;
+    margin-top: 1rem;
   }
 
-  /* ── MOBILE HUD FIX ─────────────────────────────── */
-  /* On mobile, show the HUD pinned at the bottom of the canvas stage */
+  .primary-button,
+  .ghost-button {
+    padding: 0.75rem 1.1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Compact metrics so they fit below the buttons */
+  .hero-metrics {
+    margin-top: 0.8rem;
+    gap: 0.5rem;
+  }
+
+  .metric-value {
+    font-size: 1.4rem;
+  }
+
+  .metric-label {
+    font-size: 0.68rem;
+  }
+
+  /* Hide side info-rail — no room on mobile */
+  .hero-info-rail {
+    display: none;
+  }
+
+  /* ── PIPELINE HUD — compact but visible ── */
   .hero-hud {
-    bottom: 1vh;
-    padding: 0.7rem 0.6rem 0.6rem;
+    bottom: 1.5vh;
+    padding: 0.7rem 0.7rem 0.6rem;
     border-radius: 14px;
     width: calc(100vw - 1.2rem);
   }
@@ -973,43 +985,48 @@ main {
   .hud-header {
     font-size: 0.5rem;
     letter-spacing: 0.12em;
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.65rem;
   }
 
   .hud-pipeline {
-    margin-bottom: 0.7rem;
-    gap: 0;
+    margin-bottom: 0.65rem;
   }
 
   .hud-step-icon {
-    width: 1.8rem;
-    height: 1.8rem;
+    width: 1.7rem;
+    height: 1.7rem;
   }
 
   .hud-step-icon span {
-    font-size: 0.54rem;
+    font-size: 0.52rem;
   }
 
   .hud-step-label {
-    font-size: 0.42rem;
-    letter-spacing: 0.03em;
+    font-size: 0.4rem;
+    letter-spacing: 0.02em;
   }
 
   .hud-connector {
-    margin: 0 0.1rem;
-    margin-bottom: 1.4rem;
+    margin: 0 0.08rem;
+    margin-bottom: 1.3rem;
   }
 
   .hud-logs {
-    font-size: 0.55rem;
-    height: 1.1rem;
+    font-size: 0.52rem;
+    height: 1rem;
   }
 
-  /* Hide the side info-rail on mobile (not enough space) */
-  .hero-info-rail {
-    display: none;
+  /* ── PERFORMANCE: disable GPU-heavy blur on mobile ── */
+  .story-card,
+  .feature-panel,
+  .waitlist-card,
+  .hero-hud {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(4, 10, 22, 0.88);
   }
 
+  /* ── BELOW-HERO SECTIONS ── */
   .waitlist-fields {
     grid-template-columns: 1fr;
   }

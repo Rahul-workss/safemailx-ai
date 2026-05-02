@@ -214,7 +214,17 @@ app.innerHTML = `
   </div>
 `;
 
-const frameCount = 240;
+const TOTAL_FRAMES = 240;
+// On mobile: load every 4th frame (60 frames) for 75% less memory usage
+const isMobile = window.innerWidth <= 720;
+const frameStep = isMobile ? 4 : 1;
+// Build the list of actual frame indices we will load (0, 4, 8, ... or 0, 1, 2, ...)
+const frameIndices = [];
+for (let i = 0; i < TOTAL_FRAMES; i += frameStep) {
+  frameIndices.push(i);
+}
+const frameCount = frameIndices.length;
+
 const canvas = document.querySelector("#sequence-canvas");
 const context = canvas.getContext("2d");
 const heroSection = document.querySelector(".hero-sequence");
@@ -224,8 +234,11 @@ const formMessage = document.querySelector("#form-message");
 const formNote = document.querySelector("#form-note");
 const submitButton = document.querySelector("#submit-button");
 
-const framePath = (index) =>
-  `/images/ezgif-frame-${String(index + 1).padStart(3, "0")}.jpg`;
+// framePath maps our reduced index back to the actual original filename
+const framePath = (reducedIndex) => {
+  const actualIndex = frameIndices[reducedIndex];
+  return `/images/ezgif-frame-${String(actualIndex + 1).padStart(3, "0")}.jpg`;
+};
 
 const imageSequence = Array.from({ length: frameCount }, (_, index) => {
   const image = new Image();
@@ -237,8 +250,10 @@ const playhead = { frame: 0 };
 
 function sizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
-  const width = Math.floor(window.innerWidth * ratio);
-  const height = Math.floor(window.innerHeight * ratio);
+  // On mobile, cap ratio at 1 to reduce canvas resolution and save GPU memory
+  const cappedRatio = isMobile ? Math.min(ratio, 1) : ratio;
+  const width = Math.floor(window.innerWidth * cappedRatio);
+  const height = Math.floor(window.innerHeight * cappedRatio);
 
   canvas.width = width;
   canvas.height = height;
@@ -270,7 +285,7 @@ function drawCoverImage(image) {
 
   context.clearRect(0, 0, canvasWidth, canvasHeight);
   context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
+  context.imageSmoothingQuality = isMobile ? "medium" : "high";
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 }
 
@@ -292,7 +307,8 @@ gsap.to(playhead, {
     trigger: heroSection,
     start: "top top",
     end: "bottom bottom",
-    scrub: 0.35,
+    // Higher scrub value on mobile = smoother, less janky
+    scrub: isMobile ? 1.2 : 0.35,
   },
 });
 
