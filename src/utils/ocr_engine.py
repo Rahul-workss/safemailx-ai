@@ -2,8 +2,11 @@ import cv2
 import pytesseract
 import os
 
-# Set Tesseract path for Windows users if it's not in your PATH
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+from utils.config import TESSERACT_CMD, debug_log
+
+
+if TESSERACT_CMD:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
 
 def extract_text_from_image(image_path):
@@ -41,7 +44,7 @@ def extract_text_from_image(image_path):
         # 4. PSM 3 = Fully automatic page segmentation
         config = "--oem 3 --psm 3"
         text = pytesseract.image_to_string(gray, config=config)
-        print("OCR extracted text:", text)
+        debug_log(f"[OCR DEBUG] Extracted text:\n{text}")
         
         return text.strip()
 

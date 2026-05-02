@@ -6,6 +6,8 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from utils.config import GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_PATH
+
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -17,8 +19,8 @@ def get_gmail_service():
 
     creds = None
 
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
+    if GMAIL_TOKEN_PATH.exists():
+        with open(GMAIL_TOKEN_PATH, "rb") as token:
             creds = pickle.load(token)
 
     if not creds or not creds.valid:
@@ -28,13 +30,13 @@ def get_gmail_service():
 
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
+                str(GMAIL_CREDENTIALS_PATH),
                 SCOPES
             )
 
             creds = flow.run_local_server(port=0)
 
-        with open("token.pickle", "wb") as token:
+        with open(GMAIL_TOKEN_PATH, "wb") as token:
             pickle.dump(creds, token)
 
     service = build("gmail", "v1", credentials=creds)

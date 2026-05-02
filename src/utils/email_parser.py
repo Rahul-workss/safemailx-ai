@@ -97,6 +97,34 @@ def _extract_parts(service, message_id, parts, body_list, images_list, attachmen
     """
     for part in parts:
         mime_type = part.get("mimeType", "")
+        filename_hdr = part.get("filename") or ""
+
+        if filename_hdr and not mime_type.startswith("image/") and not mime_type.startswith("multipart/"):
+            body_data = part.get("body", {})
+            data_raw = None
+            if "attachmentId" in body_data:
+                att_id = body_data["attachmentId"]
+                print(f"[PARSER] Found file attachment '{filename_hdr}' ({mime_type}). Downloading...")
+                try:
+                    att = service.users().messages().attachments().get(
+                        userId='me', messageId=message_id, id=att_id
+                    ).execute()
+                    data_raw = att.get("data", "")
+                except Exception as e:
+                    print(f"[ERROR] Failed downloading file attachment '{filename_hdr}': {e}")
+            elif "data" in body_data:
+                data_raw = body_data["data"]
+
+            if data_raw:
+                standard_b64 = data_raw.replace("-", "+").replace("_", "/")
+                pad = len(standard_b64) % 4
+                if pad:
+                    standard_b64 += "=" * (4 - pad)
+                attachments_list.append({
+                    "filename": filename_hdr,
+                    "bytes":    base64.b64decode(standard_b64),
+                })
+            continue
         
         if mime_type == "text/plain":
             data = part.get("body", {}).get("data")

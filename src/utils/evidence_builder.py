@@ -19,6 +19,10 @@ def _extract_sender_forensics(sender_raw: str, security_headers: dict) -> dict:
         raw_address  = m.group(2).strip()
 
     domain = security_headers.get("from_domain", "")
+    if not domain:
+        m_domain = re.search(r"@([\w.-]+)", raw_address)
+        if m_domain:
+            domain = m_domain.group(1).lower()
 
     return {
         "display_name":       display_name,
@@ -50,7 +54,9 @@ def _extract_top_keywords(email_body: str) -> list:
 
 def build_forensic_evidence(email_subject, email_body, hybrid_result,
                              attachment_result=None, security_headers=None,
-                             sender_raw="", url_details=None):
+                             sender_raw="", url_details=None,
+                             forwarder_headers=None, forwarder_raw="",
+                             auth_context="unknown"):
 
     sec_hdrs = security_headers or {}
     sender_forensics = _extract_sender_forensics(sender_raw, sec_hdrs)
@@ -105,6 +111,11 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
 
         # Transmission & sender security
         "security_headers":  sec_hdrs,
+        "forwarder_headers": forwarder_headers or {},
+        "auth_context":      auth_context,
+        "forwarder": {
+            "raw_address": forwarder_raw,
+        },
         "sender_forensics":  sender_forensics,
 
         # Structured URL details (list of dicts, one per URL found)
@@ -117,4 +128,4 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
         }
     }
 
-    return evidence
+    return evidence

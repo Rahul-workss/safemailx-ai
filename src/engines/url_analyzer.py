@@ -1,20 +1,17 @@
 import requests
-import os
-import sys
 import io
 import threading
 import contextlib
 from datetime import datetime
 from urllib.parse import urlparse
 
+from utils.config import SAFE_BROWSING_API_KEY, is_configured_secret
+
 try:
     import whois as _whois_lib
     WHOIS_AVAILABLE = True
 except ImportError:
     WHOIS_AVAILABLE = False
-
-# Set your API Key here, or as an environment variable
-SAFE_BROWSING_API_KEY = os.getenv("SAFE_BROWSING_API_KEY", "")
 
 # Maximum seconds to wait for a WHOIS response.
 # python-whois has no built-in timeout; slow/firewalled networks
@@ -65,12 +62,17 @@ def analyze_urls(urls):
     # -----------------------------------
     # 1. FAST LOCAL HEURISTICS (INSTANT)
     # -----------------------------------
-    for url in urls:
+    normalized_urls = []
+    for item in urls:
+        url = item.get("normalized_url") if isinstance(item, dict) else str(item)
+        if not url:
+            continue
+        normalized_urls.append(url)
         try:
             parsed = urlparse(url)
-            domain = parsed.netloc.lower()
+            domain = (parsed.hostname or parsed.netloc).lower()
 
-            if "bit.ly" in domain or "tinyurl" in domain:
+            if any(short in domain for short in ["bit.ly", "tinyurl", "t.co", "ow.ly", "is.gd", "t.ly"]):
                 suspicious.append("shortened_url")
             elif WHOIS_AVAILABLE:
                 w = _whois_with_timeout(domain)
@@ -96,12 +98,12 @@ def analyze_urls(urls):
     # -----------------------------------
     # 2. LIVE GOOGLE SAFE BROWSING CHECK
     # -----------------------------------
-    if not urls or SAFE_BROWSING_API_KEY == "YOUR_API_KEY_HERE":
+    if not normalized_urls or not is_configured_secret(SAFE_BROWSING_API_KEY):
         return suspicious
 
     # Build the massive JSON payload for the API
     # We batch every url so it only costs 1 HTTP request!
-    threat_entries = [{"url": u} for u in set(urls)]
+    threat_entries = [{"url": u} for u in set(normalized_urls)]
 
     payload = {
         "client": {

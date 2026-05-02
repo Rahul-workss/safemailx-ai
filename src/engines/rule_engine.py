@@ -7,6 +7,8 @@
 import re
 from urllib.parse import urlparse
 
+from utils.url_extractor import extract_urls
+
 
 # -------- REAL-WORLD URGENCY PHRASES --------
 
@@ -134,7 +136,8 @@ def analyze_rules(email_text: str, sender: str = "unknown_origin"):
     # URL detection
     # -------------------------
 
-    urls = URL_PATTERN.findall(text)
+    url_records = extract_urls(text)
+    urls = [record["normalized_url"] for record in url_records]
 
     for url in urls:
 

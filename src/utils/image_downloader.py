@@ -6,6 +6,8 @@ from io import BytesIO
 import warnings
 import base64
 
+from utils.config import TEMP_IMAGES_DIR
+
 # suppress PIL transparency warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="PIL")
 
@@ -14,7 +16,7 @@ def download_images(image_urls):
 
     saved_images = []
 
-    os.makedirs("temp_images", exist_ok=True)
+    os.makedirs(TEMP_IMAGES_DIR, exist_ok=True)
 
     MAX_IMAGES = 5
 
@@ -54,7 +56,7 @@ def download_images(image_urls):
 
             img = img.convert("RGB")
 
-            filename = f"temp_images/{uuid4()}.png"
+            filename = str(TEMP_IMAGES_DIR / f"{uuid4()}.png")
 
             img.save(filename, "PNG")
 

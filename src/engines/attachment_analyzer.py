@@ -18,9 +18,14 @@ DOCX_EXTENSIONS  = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt",
 
 import hashlib
 import requests
-import os
 
-VT_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "")
+from utils.config import VIRUSTOTAL_API_KEY, is_configured_secret
+
+
+HIGH_RISK_EXTENSIONS = {".exe", ".scr", ".bat", ".cmd", ".com", ".ps1"}
+SCRIPT_EXTENSIONS = {".js", ".vbs", ".jse", ".wsf", ".hta"}
+CONTAINER_EXTENSIONS = {".zip", ".rar", ".7z"}
+CONTENT_EXTENSIONS = {".html", ".htm", ".eml"}
 
 def _check_magic_bytes(file_bytes: bytes, ext: str):
     """Inspects raw hex header to catch RTLO or extension spoofing (e.g. .exe renamed to .pdf)."""
@@ -42,11 +47,12 @@ def _check_magic_bytes(file_bytes: bytes, ext: str):
 
 def _check_virustotal_hash(file_bytes: bytes) -> tuple:
     """Calculates SHA-256 entirely in RAM and checks VirusTotal reputation."""
-    if not VT_API_KEY: return None, []
+    if not is_configured_secret(VIRUSTOTAL_API_KEY):
+        return None, []
     sha256_hash = hashlib.sha256(file_bytes).hexdigest()
     try:
         url = f"https://www.virustotal.com/api/v3/files/{sha256_hash}"
-        headers = {"x-apikey": VT_API_KEY}
+        headers = {"x-apikey": VIRUSTOTAL_API_KEY}
         r = requests.get(url, headers=headers, timeout=2.0)
         if r.status_code == 200:
             stats = r.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
@@ -88,6 +94,42 @@ def analyze_attachments(attachments: list) -> dict:
                 "file_type": ext.replace(".", ""),
                 "threat_score": 1.0,
                 "indicators": vt_inds
+            })
+            continue
+
+        if ext in HIGH_RISK_EXTENSIONS:
+            findings.append({
+                "filename": filename,
+                "file_type": ext.replace(".", "") or "executable",
+                "threat_score": 0.95,
+                "indicators": [f"high_risk_executable_attachment:{ext}"]
+            })
+            continue
+
+        if ext in SCRIPT_EXTENSIONS:
+            findings.append({
+                "filename": filename,
+                "file_type": ext.replace(".", "") or "script",
+                "threat_score": 0.85,
+                "indicators": [f"script_attachment:{ext}"]
+            })
+            continue
+
+        if ext in CONTENT_EXTENSIONS:
+            findings.append({
+                "filename": filename,
+                "file_type": ext.replace(".", "") or "content",
+                "threat_score": 0.55,
+                "indicators": [f"active_content_or_forwarded_mail_attachment:{ext}"]
+            })
+            continue
+
+        if ext in CONTAINER_EXTENSIONS:
+            findings.append({
+                "filename": filename,
+                "file_type": ext.replace(".", "") or "archive",
+                "threat_score": 0.45,
+                "indicators": [f"archive_attachment_requires_manual_review:{ext}"]
             })
             continue
 

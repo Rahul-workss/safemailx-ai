@@ -1,6 +1,6 @@
 # =============================================
-# SafeMail-X Professional Forensic PDF Engine
-# Version 3.0 — 10-Section Incident Report
+# SafeMail-X PDF Report Generator
+# Version 3.0
 # =============================================
 
 import os
@@ -10,6 +10,13 @@ from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
+
+from utils.config import (
+    REPORTS_DIR,
+    SAFE_BROWSING_API_KEY,
+    VIRUSTOTAL_API_KEY,
+    is_configured_secret,
+)
 
 
 # ── Colour palette ────────────────────────────────────────────────────────────
@@ -60,7 +67,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # ── Prevent ReportLab Unicode Crashes ──────────────────────────────────────
     def _sanitize_unicode(obj):
         if isinstance(obj, str):
-            # Encode to ascii/latin-1 to strip emojis and unsupported chars for ReportLab
+            # Strip unsupported characters before rendering with ReportLab.
             return obj.encode('latin-1', 'ignore').decode('latin-1')
         elif isinstance(obj, dict):
             return {k: _sanitize_unicode(v) for k, v in obj.items()}
@@ -71,12 +78,10 @@ def generate_pdf_report(evidence: dict) -> str:
     evidence = _sanitize_unicode(evidence)
 
     # ── Setup ─────────────────────────────────────────────────────────────────
-    base_dir    = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-    reports_dir = os.path.join(base_dir, "reports")
-    os.makedirs(reports_dir, exist_ok=True)
+    os.makedirs(REPORTS_DIR, exist_ok=True)
 
     timestamp_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filepath      = os.path.join(reports_dir, f"forensic_report_{timestamp_str}.pdf")
+    filepath      = os.path.join(REPORTS_DIR, f"forensic_report_{timestamp_str}.pdf")
 
     c     = canvas.Canvas(filepath, pagesize=letter)
     width, height = letter
@@ -153,7 +158,7 @@ def generate_pdf_report(evidence: dict) -> str:
 
     c.setFillColor(COL_BLUE)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(40, height - 20, "SAFEMAIL-X  ·  AUTOMATED INCIDENT RESPONSE SYSTEM  ·  CONFIDENTIAL")
+    c.drawString(40, height - 20, "SAFEMAIL-X  ·  EMAIL ANALYSIS SYSTEM  ·  CONFIDENTIAL")
 
     c.setFillColor(COL_WHITE)
     c.setFont("Helvetica-Bold", 20)
@@ -162,7 +167,7 @@ def generate_pdf_report(evidence: dict) -> str:
     c.setFillColor(COL_GREY)
     c.setFont("Helvetica", 8)
     c.drawCentredString(width / 2, height - 65,
-                        f"Case ID: {case_id}   |   Analyst: SafeMail-X Engine v3.0   |   UTC: {utc_ts[:19]}")
+                        f"Case ID: {case_id}   |   System: SafeMail-X v3.0   |   UTC: {utc_ts[:19]}")
 
     y = height - 110
 
@@ -179,7 +184,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # Texts
     c.setFillColor(COL_PALE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(55, y - 25, "AUTOMATED FORENSIC VERDICT")
+    c.drawString(55, y - 25, "ANALYSIS VERDICT")
     
     c.setFillColor(COL_WHITE)
     c.setFont("Helvetica-Bold", 24)
@@ -245,7 +250,7 @@ def generate_pdf_report(evidence: dict) -> str:
         ("Analysis Time",    utc_ts[:19] + " UTC"),
         ("Subject Line",     subj[:90]),
         ("Body Size",        f"{evidence['email_metadata'].get('body_length', 0):,} bytes"),
-        ("Analyst Engine",   "SafeMail-X v3.0 — TF-IDF Logistic Regression + Rule Heuristics"),
+        ("Analysis Stack",   "SafeMail-X v3.0 - TF-IDF Logistic Regression + Rule Heuristics"),
     ]
     for label, val in rows1:
         y = check_space(y, 18)
@@ -294,7 +299,13 @@ def generate_pdf_report(evidence: dict) -> str:
                               sec.get("message_id_domain") or "Not present"),
     ]
 
-    note = "* Headers extracted from the forwarded copy. TLS status reflects delivery chain as seen by original recipient."
+    auth_context = evidence.get("auth_context", "unknown")
+    if auth_context == "original_headers":
+        note = "* Original authentication headers were found in the forwarded payload and used for trust decisions."
+    elif auth_context == "forwarder_only":
+        note = "* Authentication headers belong to the forwarding email only; they were not used to trust the original sender."
+    else:
+        note = "* Original authentication headers were unavailable; sender trust was evaluated conservatively."
     y = draw_text(note, 50, y, size=7, color=COL_GREY, max_chars=100)
     y -= 4
 
@@ -317,20 +328,23 @@ def generate_pdf_report(evidence: dict) -> str:
     y = section_header("SECTION 3  SENDER IDENTITY FORENSICS", y)
 
     sf = evidence.get("sender_forensics", {})
+    forwarder = evidence.get("forwarder", {})
 
     sender_rows = [
-        ("Display Name",     sf.get("display_name") or "— not set —"),
+        ("Forwarded By",      forwarder.get("raw_address") or "unknown"),
+        ("Auth Context",      evidence.get("auth_context", "unknown")),
+        ("Display Name",     sf.get("display_name") or "not set"),
         ("Raw Email Address", sf.get("raw_address", "unknown")),
         ("Sender Domain",    sf.get("sender_domain", "unknown")),
-        ("Reply-To Address", sf.get("reply_to") or "— not set —"),
+        ("Reply-To Address", sf.get("reply_to") or "not set"),
         ("Reply-To Mismatch",
-            "⚠  YES — Reply-To points to a DIFFERENT domain than From" if sf.get("reply_to_mismatch")
-            else "✓  No — Reply-To matches From domain"),
-        ("X-Mailer Tool",    sf.get("x_mailer") or "— not declared —"),
-        ("Message-ID Domain", sf.get("msg_id_domain") or "— not present —"),
+            "YES - Reply-To points to a different domain than From" if sf.get("reply_to_mismatch")
+            else "No - Reply-To matches From domain"),
+        ("X-Mailer Tool",    sf.get("x_mailer") or "not declared"),
+        ("Message-ID Domain", sf.get("msg_id_domain") or "not present"),
         ("MsgID / From Mismatch",
-            "⚠  YES — Message-ID domain differs from From domain" if sf.get("msg_id_mismatch")
-            else "✓  No — Message-ID domain consistent"),
+            "YES - Message-ID domain differs from From domain" if sf.get("msg_id_mismatch")
+            else "No - Message-ID domain consistent"),
     ]
 
     for label, val in sender_rows:
@@ -338,7 +352,7 @@ def generate_pdf_report(evidence: dict) -> str:
         c.setFont("Helvetica-Bold", 9)
         c.setFillColor(COL_GREY)
         c.drawString(50, y, f"{label}:")
-        col = COL_RED if "⚠" in str(val) else COL_WHITE
+        col = COL_RED if str(val).startswith("YES -") else COL_WHITE
         c.setFont("Helvetica", 9)
         c.setFillColor(col)
         c.drawString(220, y, str(val)[:70])
@@ -366,10 +380,10 @@ def generate_pdf_report(evidence: dict) -> str:
     y -= 6
 
     # ──────────────────────────────────────────────────────────────────────────
-    # SECTION 5 — DEEP SEMANTIC AI ANALYSIS
+    # SECTION 5 — TF-IDF TEXT MODEL ANALYSIS
     # ──────────────────────────────────────────────────────────────────────────
     ai_score_pct = int(evidence["ai_analysis"]["ai_score"] * 100)
-    y = section_header(f"SECTION 5  DEEP SEMANTIC AI ANALYSIS  (AI Score: {ai_score_pct}/100)", y)
+    y = section_header(f"SECTION 5  TF-IDF TEXT MODEL ANALYSIS  (Score: {ai_score_pct}/100)", y)
 
     ai_reasons = evidence["ai_analysis"].get("ai_reasons", [])
     if not ai_reasons:
@@ -379,7 +393,7 @@ def generate_pdf_report(evidence: dict) -> str:
             y = check_space(y, 30)
             c.setFillColor(COL_RED)
             c.setFont("Helvetica-Bold", 9)
-            c.drawString(50, y, ">> THREAT VECTOR:")
+            c.drawString(50, y, ">> SIGNAL:")
             explanation = _explain_ai(reason)
             y = draw_text(explanation, 175, y, max_chars=68, color=COL_WHITE, line_h=13)
             y -= 4
@@ -409,12 +423,12 @@ def generate_pdf_report(evidence: dict) -> str:
     y -= 6
 
     # ──────────────────────────────────────────────────────────────────────
-    # SECTION 5.5 — LLM DEEP BEHAVIOURAL ANALYSIS
+    # SECTION 5.5 — LLM CONTENT ANALYSIS
     # ──────────────────────────────────────────────────────────────────────
     llm_data  = evidence.get("llm_analysis", {})
     llm_avail = llm_data.get("llm_available", False)
 
-    y = section_header("SECTION 5.5  LLM DEEP BEHAVIOURAL ANALYSIS", y)
+    y = section_header("SECTION 5.5  LLM CONTENT ANALYSIS", y)
 
     if not llm_avail:
         # ── LLM was offline ──────────────────────────────────────────────
@@ -425,7 +439,7 @@ def generate_pdf_report(evidence: dict) -> str:
         c.setFont("Helvetica-Oblique", 9)
         c.drawCentredString(
             width / 2, y - 8,
-            "LLM Deep Analysis was unavailable for this scan. "
+            "LLM analysis was unavailable for this scan. "
             "Results based on TF-IDF + Rule Engine only.")
         y -= 36
     else:
@@ -437,7 +451,7 @@ def generate_pdf_report(evidence: dict) -> str:
         y = check_space(y, 30)
         c.setFont("Helvetica-Bold", 9)
         c.setFillColor(COL_PALE)
-        c.drawString(50, y, "LLM Threat Probability:")
+        c.drawString(50, y, "LLM Threat Score:")
         c.setFillColor(llm_col)
         c.setFont("Helvetica-Bold", 12)
         c.drawString(210, y, f"{llm_score_pct}%")
@@ -539,7 +553,7 @@ def generate_pdf_report(evidence: dict) -> str:
         c.setFont("Helvetica-Oblique", 7)
         c.setFillColor(COL_GREY)
         c.drawString(50, y,
-                     "Analysis performed by local AI — 100% private, "
+                     "Analysis performed locally, "
                      "zero data transmitted externally.")
         y -= 14
 
@@ -589,13 +603,13 @@ def generate_pdf_report(evidence: dict) -> str:
         y -= 16
         draw_engine_bar("TF-IDF ML", a_score, "(25%)", y, _score_color(a_score))
         y -= 16
-        draw_engine_bar("LLM Deep AI", l_score, "(50%)", y, _score_color(l_score))
+        draw_engine_bar("LLM Analysis", l_score, "(50%)", y, _score_color(l_score))
     else:
         draw_engine_bar("Rule Engine", r_score, "(40%)", y, _score_color(r_score))
         y -= 16
         draw_engine_bar("TF-IDF ML", a_score, "(60%)", y, _score_color(a_score))
         y -= 16
-        draw_engine_bar("LLM Deep AI", 0.0, "(0%)", y, COL_GREY, active=False)
+        draw_engine_bar("LLM Analysis", 0.0, "(0%)", y, COL_GREY, active=False)
 
     y -= 16
     c.setStrokeColor(COL_GREY)
@@ -655,13 +669,13 @@ def generate_pdf_report(evidence: dict) -> str:
     
     if conflict:
         badge_color = COL_AMBER
-        badge_text  = "CONFLICT DETECTED — LLM weighted as contextual authority"
+        badge_text  = "CONFLICT DETECTED - LLM weighted as contextual authority"
     elif (r_score > 0.7 and a_score > 0.7) or (r_score < 0.3 and a_score < 0.3):
         badge_color = COL_GREEN
-        badge_text  = "ALL ENGINES AGREE — High confidence consensus"
+        badge_text  = "ALL ENGINES AGREE - High confidence consensus"
     else:
         badge_color = COL_BLUE
-        badge_text  = "NORMAL BLEND — Weighted average applied"
+        badge_text  = "NORMAL BLEND - Weighted average applied"
 
     c.setFillColorRGB(0.12, 0.12, 0.14)
     c.roundRect(50, y - 8, width - 100, 20, 4, fill=1, stroke=0)
@@ -703,16 +717,17 @@ def generate_pdf_report(evidence: dict) -> str:
         c.setFont("Helvetica-Bold", 8)
         c.setFillColor(COL_BLUE)
         c.drawString(48, y + 2, "URL")
-        c.drawString(310, y + 2, "IP-Based")
-        c.drawString(370, y + 2, "Shortener")
-        c.drawString(430, y + 2, "Safe Browsing")
+        c.drawString(300, y + 2, "IP")
+        c.drawString(345, y + 2, "Short")
+        c.drawString(400, y + 2, "Threat Intel")
+        c.drawString(485, y + 2, "Flags")
         y -= 22
 
         for ud in url_details:
             y = check_space(y, 20)
             c.setFont("Helvetica", 7)
             c.setFillColor(COL_WHITE)
-            c.drawString(48, y, ud.get("raw_url", "")[:58])
+            c.drawString(48, y, (ud.get("normalized_url") or ud.get("raw_url", ""))[:55])
 
             def _yesno_col(val, danger_on_true=True):
                 col = COL_RED if (val and danger_on_true) else COL_GREEN
@@ -723,9 +738,11 @@ def generate_pdf_report(evidence: dict) -> str:
             sb_lbl,  sb_col  = _yesno_col(ud.get("safebrowsing_hit", False))
 
             c.setFont("Helvetica-Bold", 7)
-            c.setFillColor(ip_col);  c.drawString(310, y, ip_lbl)
-            c.setFillColor(sh_col);  c.drawString(370, y, sh_lbl)
-            c.setFillColor(sb_col);  c.drawString(430, y, sb_lbl)
+            c.setFillColor(ip_col);  c.drawString(300, y, ip_lbl)
+            c.setFillColor(sh_col);  c.drawString(345, y, sh_lbl)
+            c.setFillColor(sb_col);  c.drawString(400, y, sb_lbl)
+            c.setFillColor(COL_GREY)
+            c.drawString(485, y, ", ".join(ud.get("flags", []))[:22] or "none")
 
             # thin separator line
             c.setStrokeColorRGB(0.20, 0.20, 0.22)
@@ -815,13 +832,13 @@ def generate_pdf_report(evidence: dict) -> str:
                 y = draw_text(f"MD5: {md5}", 60, y, size=7, color=COL_GREY)
 
             if not inds:
-                y = draw_text("No threat indicators detected — file appears clean.", 60, y, size=8, color=COL_GREEN)
+                y = draw_text("No threat indicators detected - file appears clean.", 60, y, size=8, color=COL_GREEN)
             else:
                 for ind in inds:
                     y = check_space(y, 14)
                     c.setFillColor(COL_AMBER)
                     c.setFont("Helvetica-Bold", 8)
-                    c.drawString(60, y, "▶")
+                    c.drawString(60, y, ">")
                     c.setFont("Helvetica", 8)
                     c.setFillColor(COL_WHITE)
                     c.drawString(72, y, ind.replace("_", " ").title())
@@ -838,7 +855,7 @@ def generate_pdf_report(evidence: dict) -> str:
     y = section_header("SECTION 10  VERDICT & ACTIONABLE RECOMMENDATIONS", y)
 
     if final_label.lower() == "phishing":
-        rec_title = "⚠  THREAT CONFIRMED — IMMEDIATE ACTION REQUIRED"
+        rec_title = "THREAT CONFIRMED - IMMEDIATE ACTION REQUIRED"
         rec_color = (0.50, 0.08, 0.08)
         recs = [
             "DO NOT click any links or download any attachments from this email.",
@@ -848,7 +865,7 @@ def generate_pdf_report(evidence: dict) -> str:
             "Consider filing a report with the Anti-Phishing Working Group: reportphishing@apwg.org",
         ]
     elif final_score_pct >= 45:
-        rec_title = "⚡  SUSPICIOUS — EXERCISE EXTREME CAUTION"
+        rec_title = "SUSPICIOUS - EXERCISE EXTREME CAUTION"
         rec_color = (0.45, 0.25, 0.02)
         recs = [
             "Do not click links until you have verified the sender through a secondary channel (phone call).",
@@ -857,10 +874,10 @@ def generate_pdf_report(evidence: dict) -> str:
             "If in doubt, forward this report to your IT department before taking any action.",
         ]
     else:
-        rec_title = "✓  EMAIL APPEARS LEGITIMATE — LOW RISK"
+        rec_title = "EMAIL APPEARS LEGITIMATE - LOW RISK"
         rec_color = (0.07, 0.35, 0.12)
         recs = [
-            "No significant threat indicators were detected by the AI or Rule Engine.",
+            "No significant threat indicators were detected by the current analysis pipeline.",
             "Always exercise general caution when clicking links or downloading attachments.",
             "If this email feels unexpected, verify the sender through an independent channel.",
         ]
@@ -884,21 +901,31 @@ def generate_pdf_report(evidence: dict) -> str:
     # ──────────────────────────────────────────────────────────────────────────
     y = section_header("SECTION 11  LEGAL CHAIN OF CUSTODY  &  DISCLOSURE", y)
 
+    external_services = []
+    if is_configured_secret(SAFE_BROWSING_API_KEY):
+        external_services.append("Google Safe Browsing URL reputation")
+    if is_configured_secret(VIRUSTOTAL_API_KEY):
+        external_services.append("VirusTotal attachment hash reputation")
+    external_note = (
+        "Optional external checks enabled: " + ", ".join(external_services) + "."
+        if external_services else
+        "Optional external reputation checks were disabled for this scan."
+    )
+
     legal_lines = [
         f"Case Reference:   {case_id}",
         f"Analysis Date:    {utc_ts[:19]} UTC",
-        f"System:           SafeMail-X Automated Engine v3.0",
+        f"System:           SafeMail-X v3.0",
         f"Method:           TF-IDF Logistic Regression (83,000-sample Kaggle corpus) + Rule-Based Heuristics",
         "",
-        "DATA RETENTION:   Original email content was permanently and irrecoverably deleted from the",
-        "                  SafeMail-X processing server immediately after this report was generated,",
-        "                  in accordance with our Zero Data Retention Policy.",
+        "DATA RETENTION:   Report handling follows the project workflow defined in the running bot.",
+        "                  Review deployment settings before relying on this behaviour in production.",
         "",
-        "PRIVACY:          The LLM behavioural analysis was performed entirely on-device using LM Studio.",
-        "                  No email content was transmitted to any external API, cloud service, or",
-        "                  third-party system. 100% local processing was maintained throughout.",
+        "PRIVACY:          LLM analysis was performed locally through LM Studio when available.",
+        f"                  {external_note}",
+        "                  Full email bodies are not sent to third-party LLM services by this module.",
         "",
-        "DISCLAIMER:       This report was generated autonomously by an AI-assisted system. Findings",
+        "DISCLAIMER:       This report was generated automatically by the application. Findings",
         "                  should be reviewed by a qualified cybersecurity professional before being",
         "                  used as sole basis for legal, disciplinary, or regulatory action.",
         "",
@@ -906,7 +933,7 @@ def generate_pdf_report(evidence: dict) -> str:
         "                  incident report, IT security audit, or law enforcement referral.",
         "",
         "E-DISCOVERY:      Report generated in compliance with standard digital forensic chain-of-custody",
-        "                  practices. No email content is stored or transmitted to third-party systems.",
+        "                  practices. No full email body is transmitted to third-party systems.",
     ]
     for line in legal_lines:
         y = check_space(y, 14)
@@ -919,7 +946,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # Final footer
     c.setFont("Helvetica-Oblique", 7)
     c.setFillColor(COL_GREY)
-    c.drawCentredString(width / 2, 25, f"SafeMail-X  |  Case {case_id}  |  100% Local AI  |  Zero Data Retention  |  {utc_ts[:10]}")
+    c.drawCentredString(width / 2, 25, f"SafeMail-X  |  Case {case_id}  |  Local Analysis  |  {utc_ts[:10]}")
 
     c.save()
     return filepath
@@ -967,47 +994,4 @@ def _explain_rule(reason):
         return "Threat Intelligence Hit: Google Safe Browsing API classifies the embedded URL infrastructure as globally malicious."
     elif "financial" in r:
         return "Financial Pretexting: The email solicits financial transactions, consistent with Business Email Compromise (BEC) patterns."
-    return reason
-    
-    # Subtitle
-    c.setFont("Helvetica", 10)
-    c.setFillColorRGB(0.6, 0.6, 0.6)
-    case_id = f"CAS-{str(uuid.uuid4())[:8].upper()}"
-    timestamp_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    c.drawCentredString(width / 2, y - 10, f"Case ID: {case_id}  |  Generated Analyst: Automated  |  UTC: {timestamp_str}")
-    
-    return y - 80
-
-
-def explain_ai_reason(reason):
-    reason_map = {
-        "strong phishing language patterns": "The Deep Semantic Engine identified highly coercive linguistic structures. Threat actors utilize engineered syntax explicitly designed to bypass cognitive filters and force immediate user compliance. The semantic vector density aligns identically with known malicious campaigns logged in the database.",
-        "verification language": "Urgency Masking Detected: The text demands the user 'verify' their identity or account quickly. This is a primary social engineering tactic used in Credential Harvesting, artificially pressuring targets by threatening service suspension.",
-        "login related wording": "Authentication Request Detected: The email attempts to abruptly route the user toward a credential submission portal. When combined with other spatial risk indicators, this strongly mathematically implies the presence of an unauthorized credential harvesting infrastructure."
-    }
-    for key, explanation in reason_map.items():
-        if key.lower() in reason.lower():
-            return explanation
-    return reason
-
-
-def explain_rule_reason(reason):
-    r = reason.lower()
-    trigger = reason.split(":")[1] if ":" in reason else "suspicious formatting"
-    
-    if "urgency" in r:
-        return f"Psychological Manipulation ('{trigger}'): The sender maliciously deployed urgency framing via the phrase '{trigger}'. This artificially compresses the victim's decision-making timeline to force critical errors before rational logic is applied."
-    elif "mismatch" in r or "link obfuscation" in r:
-        return "Link Obfuscation Detected: The visible display text of a hyperlink maliciously hides a completely different destination URL. This is a hallmark deception tactic of classic Phishing architecture."
-    elif "shortened" in r:
-        short_service = trigger if ":" in reason else "a shortened URL service"
-        return f"Redirection Evasion ('{short_service}'): The use of URL shorteners within the payload actively attempts to mathematically mask the true destination domain from automated security scanners."
-    elif "domain_age" in r or "newly registered" in r:
-        return f"Burner Infrastructure ('{trigger}'): The sender's architecture is hosted on a newly registered zero-day domain. Threat actors constantly burn and rotate domain infrastructure to completely evade historic blacklists."
-    elif "brand_spoof" in r:
-        return f"Brand Spoofing Deception ('{trigger}'): The text aggressively leverages corporate infrastructure trust, but the structural sender domain mathematically isolates to a completely mismatched external server."
-    elif "safebrowsing" in r:
-        return "Threat Intelligence Hit! The live Google Safe Browsing API actively classifies the embedded payload infrastructure as globally malicious and dangerous."
-    elif "financial" in r:
-        return "Financial Pretexting: The email aggressively attempts to solicit or discuss financial transactions, artificially establishing a classic wire-fraud/BEC (Business Email Compromise) operational scenario."
     return reason

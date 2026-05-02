@@ -38,7 +38,7 @@ model = Pipeline([
 
 
 # -------- Train model --------
-print("Training AI model...")
+print("Training text classification model...")
 model.fit(X_train, y_train)
 
 
