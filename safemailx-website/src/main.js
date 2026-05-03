@@ -148,22 +148,23 @@ app.innerHTML = `
 
       <section class="feature-band">
         <div class="feature-panel feature-panel-large">
-          <p class="eyebrow">Privacy by design</p>
-          <h2>Your emails stay under your control.</h2>
+          <p class="eyebrow">Core Advantage</p>
+          <h2>Why TrustMail AI is Unique</h2>
           <p>
-            TrustMail AI is built around local analysis. The rule engine, local model,
-            AI analyzer, OCR, and report generation run on your own machine.
+            TrustMail AI is built around total sovereignty. All analysis, OCR, 
+            and forensic report generation happens locally. Your private 
+            communications never leave your machine or hit a TrustMail cloud.
           </p>
         </div>
 
         <div class="feature-panel">
-          <h3>No TrustMail AI cloud</h3>
-          <p>There is no separate TrustMail AI server receiving your email content or telemetry.</p>
+          <h3>Triple-Layer Engine</h3>
+          <p>Every email passes through three distinct intelligence layers: Rule-based heuristics, TF-IDF semantic modeling, and deep LLM reasoning.</p>
         </div>
 
         <div class="feature-panel">
-          <h3>Forensic PDF reports</h3>
-          <p>Each analysis can produce a structured report with the verdict, score, and triggered signals.</p>
+          <h3>Attachment Forensics</h3>
+          <p>We don't just scan text. TrustMail AI dissects suspicious PDFs and Office documents, identifying hidden scripts and malicious macros.</p>
         </div>
       </section>
 
