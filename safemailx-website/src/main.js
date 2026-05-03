@@ -107,7 +107,7 @@ app.innerHTML = `
 
       <section class="story-section" id="story">
         <div class="section-heading">
-          <p class="eyebrow">WHY WE ARE UNIQUE</p>
+          <p class="eyebrow"><b>WHAT MAKES US UNIQUE</b></p>
           <h2>Designed to catch what ordinary filters can miss.</h2>
           <p>
             Phishing can look legitimate and pass basic checks. TrustMail AI combines 
@@ -140,6 +140,16 @@ app.innerHTML = `
             <p>
               Built for total sovereignty. All analysis happens locally. 
               Your private communications never leave your machine or hit a TrustMail cloud.
+            </p>
+          </article>
+
+          <article class="story-card story-card--centered">
+            <span class="story-index">04</span>
+            <h3>Evidence-Based Forensic Reports</h3>
+            <p>
+              We don't just give an opinion. TrustMail AI generates a comprehensive 
+              forensic report that breaks down every red flag, so you can see 
+              exactly why an email was flagged.
             </p>
           </article>
         </div>

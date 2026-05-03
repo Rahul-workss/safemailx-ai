@@ -722,6 +722,16 @@ main {
   padding: 1.5rem;
 }
 
+.story-card--centered {
+  grid-column: 2;
+}
+
+@media (max-width: 960px) {
+  .story-card--centered {
+    grid-column: auto;
+  }
+}
+
 .story-index {
   display: inline-block;
   margin-bottom: 1rem;
