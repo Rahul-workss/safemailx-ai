@@ -107,66 +107,45 @@ app.innerHTML = `
 
       <section class="story-section" id="story">
         <div class="section-heading">
-          <p class="eyebrow">What TrustMail AI does</p>
+          <p class="eyebrow">WHY WE ARE UNIQUE</p>
           <h2>Designed to catch what ordinary filters can miss.</h2>
           <p>
-            Phishing can look legitimate, pass basic checks, and still rely on pressure,
-            impersonation, or confusing links. TrustMail AI combines multiple local signals
-            before it makes a call.
+            Phishing can look legitimate and pass basic checks. TrustMail AI combines 
+            three distinct local intelligence layers to find what others overlook.
           </p>
         </div>
 
         <div class="story-grid">
           <article class="story-card">
             <span class="story-index">01</span>
-            <h3>Rule engine</h3>
+            <h3>Triple-Layer Engine</h3>
             <p>
-              A deterministic inspection layer checks sender structure, spoofing clues,
-              suspicious headers, impersonation patterns, and risky URL behavior.
+              Every email passes through three distinct intelligence layers: 
+              Rule-based heuristics, TF-IDF semantic modeling, and deep LLM reasoning.
             </p>
           </article>
 
           <article class="story-card">
             <span class="story-index">02</span>
-            <h3>Local text model</h3>
+            <h3>Attachment Forensics</h3>
             <p>
-              A trained statistical model scores the message language for phishing-style
-              patterns without sending the email body to a remote scoring service.
+              We don't just scan text. TrustMail AI dissects suspicious PDFs 
+              and Office documents, identifying hidden scripts and malicious macros.
             </p>
           </article>
 
           <article class="story-card">
             <span class="story-index">03</span>
-            <h3>AI analyzer</h3>
+            <h3>Zero Data Retention</h3>
             <p>
-              A local analyzer reviews the message like a human reader would, looking for
-              urgency, fear, false authority, and other manipulation tactics.
+              Built for total sovereignty. All analysis happens locally. 
+              Your private communications never leave your machine or hit a TrustMail cloud.
             </p>
           </article>
         </div>
       </section>
 
-      <section class="feature-band">
-        <div class="feature-panel feature-panel-large">
-          <p class="eyebrow">Core Advantage</p>
-          <h2>Why TrustMail AI is Unique</h2>
-          <p>
-            TrustMail AI is built around total sovereignty. All analysis, OCR, 
-            and forensic report generation happens locally. Your private 
-            communications never leave your machine or hit a TrustMail cloud.
-          </p>
-        </div>
 
-        <div class="feature-panel">
-          <h3>Triple-Layer Engine</h3>
-          <p>Every email passes through three distinct intelligence layers: Rule-based heuristics, TF-IDF semantic modeling, and deep LLM reasoning.</p>
-        </div>
-
-        <div class="feature-panel">
-          <h3>Attachment Forensics</h3>
-          <p>We don't just scan text. TrustMail AI dissects suspicious PDFs and Office documents, identifying hidden scripts and malicious macros.</p>
-        </div>
-      </section>
 
       <section class="waitlist-section" id="waitlist">
         <div class="waitlist-card">
