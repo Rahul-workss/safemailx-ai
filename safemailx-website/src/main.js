@@ -404,7 +404,7 @@ form.addEventListener("submit", async (event) => {
 
   // 1. Paste your Google Apps Script Web App URL here!
   // (Follow the setup guide in google_apps_script_waitlist.md)
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWRpfTLeoM49ePAsN7ALjNItCyWmRNIpxEbZ-2Lem2K8GWDzY47Y1KtMinDKX6rub_/exec";
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwo23RPdjHwkOiAqrXsfir4GcKwZ0efPXM5dgp4BwSzwQzIT5ziKW4_4DJWS8SFYJsj/exec";
 
   const data = new FormData(form);
   const name = (data.get("name") || "").trim();
