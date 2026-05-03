@@ -976,6 +976,7 @@ main {
 
   /* ── PIPELINE HUD — compact but clearly visible ── */
   .hero-hud {
+    display: block;
     bottom: 8vh; /* Move up to avoid mobile OS bars */
     padding: 0.8rem 0.6rem;
     border-radius: 12px;
@@ -999,12 +1000,17 @@ main {
 
   .hud-pipeline {
     margin-bottom: 0.8rem;
-    gap: 2px;
+    gap: 0;
+  }
+
+  .hud-step {
+    min-width: 2.55rem;
+    gap: 0.35rem;
   }
 
   .hud-step-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 1.9rem;
+    height: 1.9rem;
     border-width: 1px;
   }
 
@@ -1013,8 +1019,7 @@ main {
   }
 
   .hud-step-label {
-    font-size: 0.52rem;
-    margin-top: 0.4rem;
+    font-size: 0.48rem;
     line-height: 1.1;
     letter-spacing: 0;
   }

@@ -1,5 +1,5 @@
 # ============================================================
-# SafeMail-X — PDF Static Analyzer
+# TrustMail — PDF Static Analyzer
 # ============================================================
 # Uses PyMuPDF (fitz) to inspect PDF bytes WITHOUT executing them.
 # Returns a threat_score (0.0–1.0) and a list of detected indicators.

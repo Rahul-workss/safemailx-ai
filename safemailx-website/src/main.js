@@ -12,9 +12,9 @@ app.innerHTML = `
     <div class="ambient ambient-b"></div>
 
     <header class="topbar">
-      <a class="brand" href="#hero" aria-label="SafeMail-X AI home">
-        <img class="brand-logo-img" src="/logo.png" alt="SafeMail-X AI logo" width="36" height="36" />
-        <span class="brand-text">SafeMail-X AI</span>
+      <a class="brand" href="#hero" aria-label="TrustMail AI home">
+        <img class="brand-logo-img" src="/logo.png" alt="TrustMail AI logo" width="36" height="36" />
+        <span class="brand-text">TrustMail AI</span>
       </a>
 
       <div class="topbar-actions">
@@ -69,7 +69,7 @@ app.innerHTML = `
         <div class="hero-copy">
           <p class="eyebrow">Coming soon</p>
           <h1>
-            SafeMail-X
+            TrustMail
             <span>AI</span>
           </h1>
           <p class="hero-summary">
@@ -107,11 +107,11 @@ app.innerHTML = `
 
       <section class="story-section" id="story">
         <div class="section-heading">
-          <p class="eyebrow">What SafeMail-X AI does</p>
+          <p class="eyebrow">What TrustMail AI does</p>
           <h2>Designed to catch what ordinary filters can miss.</h2>
           <p>
             Phishing can look legitimate, pass basic checks, and still rely on pressure,
-            impersonation, or confusing links. SafeMail-X AI combines multiple local signals
+            impersonation, or confusing links. TrustMail AI combines multiple local signals
             before it makes a call.
           </p>
         </div>
@@ -151,14 +151,14 @@ app.innerHTML = `
           <p class="eyebrow">Privacy by design</p>
           <h2>Your emails stay under your control.</h2>
           <p>
-            SafeMail-X AI is built around local analysis. The rule engine, local model,
+            TrustMail AI is built around local analysis. The rule engine, local model,
             AI analyzer, OCR, and report generation run on your own machine.
           </p>
         </div>
 
         <div class="feature-panel">
-          <h3>No SafeMail-X AI cloud</h3>
-          <p>There is no separate SafeMail-X AI server receiving your email content or telemetry.</p>
+          <h3>No TrustMail AI cloud</h3>
+          <p>There is no separate TrustMail AI server receiving your email content or telemetry.</p>
         </div>
 
         <div class="feature-panel">
@@ -170,9 +170,9 @@ app.innerHTML = `
       <section class="waitlist-section" id="waitlist">
         <div class="waitlist-card">
           <p class="eyebrow">Join the waitlist</p>
-          <h2>Get the launch note when SafeMail-X AI is ready.</h2>
+          <h2>Get the launch note when TrustMail AI is ready.</h2>
           <p class="waitlist-copy">
-            Join early access for SafeMail-X AI launch updates and private testing access.
+            Join early access for TrustMail AI launch updates and private testing access.
           </p>
 
           <form class="waitlist-form" id="waitlist-form" method="POST">

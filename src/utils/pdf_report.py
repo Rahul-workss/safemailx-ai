@@ -1,5 +1,5 @@
 # =============================================
-# SafeMail-X PDF Report Generator
+# TrustMail PDF Report Generator
 # Version 3.0
 # =============================================
 
@@ -158,7 +158,7 @@ def generate_pdf_report(evidence: dict) -> str:
 
     c.setFillColor(COL_BLUE)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(40, height - 20, "SAFEMAIL-X  ·  EMAIL ANALYSIS SYSTEM  ·  CONFIDENTIAL")
+    c.drawString(40, height - 20, "TRUSTMAIL  ·  EMAIL ANALYSIS SYSTEM  ·  CONFIDENTIAL")
 
     c.setFillColor(COL_WHITE)
     c.setFont("Helvetica-Bold", 20)
@@ -167,7 +167,7 @@ def generate_pdf_report(evidence: dict) -> str:
     c.setFillColor(COL_GREY)
     c.setFont("Helvetica", 8)
     c.drawCentredString(width / 2, height - 65,
-                        f"Case ID: {case_id}   |   System: SafeMail-X v3.0   |   UTC: {utc_ts[:19]}")
+                        f"Case ID: {case_id}   |   System: TrustMail v3.0   |   UTC: {utc_ts[:19]}")
 
     y = height - 110
 
@@ -250,7 +250,7 @@ def generate_pdf_report(evidence: dict) -> str:
         ("Analysis Time",    utc_ts[:19] + " UTC"),
         ("Subject Line",     subj[:90]),
         ("Body Size",        f"{evidence['email_metadata'].get('body_length', 0):,} bytes"),
-        ("Analysis Stack",   "SafeMail-X v3.0 - TF-IDF Logistic Regression + Rule Heuristics"),
+        ("Analysis Stack",   "TrustMail v3.0 - TF-IDF Logistic Regression + Rule Heuristics"),
     ]
     for label, val in rows1:
         y = check_space(y, 18)
@@ -915,7 +915,7 @@ def generate_pdf_report(evidence: dict) -> str:
     legal_lines = [
         f"Case Reference:   {case_id}",
         f"Analysis Date:    {utc_ts[:19]} UTC",
-        f"System:           SafeMail-X v3.0",
+        f"System:           TrustMail v3.0",
         f"Method:           TF-IDF Logistic Regression (83,000-sample Kaggle corpus) + Rule-Based Heuristics",
         "",
         "DATA RETENTION:   Report handling follows the project workflow defined in the running bot.",
@@ -946,7 +946,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # Final footer
     c.setFont("Helvetica-Oblique", 7)
     c.setFillColor(COL_GREY)
-    c.drawCentredString(width / 2, 25, f"SafeMail-X  |  Case {case_id}  |  Local Analysis  |  {utc_ts[:10]}")
+    c.drawCentredString(width / 2, 25, f"TrustMail  |  Case {case_id}  |  Local Analysis  |  {utc_ts[:10]}")
 
     c.save()
     return filepath

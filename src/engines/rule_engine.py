@@ -1,5 +1,5 @@
 # ================================
-# SafeMail-X Rule-Based Engine
+# TrustMail Rule-Based Engine
 # Phase 2.5 (Real-world rules)
 # Final Refined Version
 # ================================

@@ -1,5 +1,5 @@
 # =============================================
-# SafeMail-X LLM Analysis Module
+# TrustMail LLM Analysis Module
 # Uses Qwen 2.5 through LM Studio
 # =============================================
 
@@ -20,7 +20,7 @@ from utils.config import (
 )
 
 # -- System prompt -------------------------------------------------------------
-SYSTEM_PROMPT = """You are SafeMail-X Threat Intelligence Engine, a forensic email analyst.
+SYSTEM_PROMPT = """You are TrustMail Threat Intelligence Engine, a forensic email analyst.
 
 Your job is to determine whether an email is PHISHING or LEGITIMATE.
 

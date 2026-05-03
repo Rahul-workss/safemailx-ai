@@ -1,4 +1,4 @@
-# SafeMail-X
+# TrustMail
 
 **Local email phishing analysis for forwarded Gmail messages.**
 
@@ -11,7 +11,7 @@
 
 ## Overview
 
-SafeMail-X monitors a Gmail inbox for forwarded messages, analyzes the forwarded content, and produces a forensic report for the user. The system combines rule-based checks, a local TF-IDF classification model, optional LLM-based analysis through LM Studio, URL inspection, OCR, and attachment analysis.
+TrustMail monitors a Gmail inbox for forwarded messages, analyzes the forwarded content, and produces a forensic report for the user. The system combines rule-based checks, a local TF-IDF classification model, optional LLM-based analysis through LM Studio, URL inspection, OCR, and attachment analysis.
 
 Optional reputation lookups only run when Safe Browsing or VirusTotal API keys are configured.
 
@@ -91,7 +91,7 @@ If `token.pickle` does not exist yet, it will be created after the first Google 
 
 ---
 
-## Running SafeMail-X
+## Running TrustMail
 
 The project uses two running components.
 
@@ -102,7 +102,7 @@ The project uses two running components.
 3. Open the **Local Server** tab
 4. Start the server on port `1234`
 
-SafeMail-X connects to `http://127.0.0.1:1234/v1` and uses model id `qwen2.5-7b-instruct-1m`.
+TrustMail connects to `http://127.0.0.1:1234/v1` and uses model id `qwen2.5-7b-instruct-1m`.
 
 ### Window 2 - Start the bot
 
@@ -172,7 +172,7 @@ This is expected when `token.pickle` is missing or expired.
 - Analysis runs locally except for optional reputation checks.
 - Safe Browsing only receives URLs when `SAFE_BROWSING_API_KEY` is configured.
 - VirusTotal only receives attachment hashes when `VIRUSTOTAL_API_KEY` is configured.
-- There is no separate SafeMail-X cloud service in this repository.
+- There is no separate TrustMail cloud service in this repository.
 
 ---
 
