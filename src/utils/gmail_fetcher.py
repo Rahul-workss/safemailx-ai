@@ -1,12 +1,11 @@
-import os
-import base64
 import pickle
 
+from cryptography.fernet import Fernet, InvalidToken
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from utils.config import GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_PATH
+from utils.config import GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_ENCRYPTION_KEY, GMAIL_TOKEN_PATH
 
 
 SCOPES = [
@@ -15,13 +14,37 @@ SCOPES = [
 ]
 
 
+def _token_cipher() -> Fernet | None:
+    if not GMAIL_TOKEN_ENCRYPTION_KEY:
+        return None
+    return Fernet(GMAIL_TOKEN_ENCRYPTION_KEY.encode("utf-8"))
+
+
+def _load_token():
+    if not GMAIL_TOKEN_PATH.exists():
+        return None
+
+    raw = GMAIL_TOKEN_PATH.read_bytes()
+    cipher = _token_cipher()
+    if cipher:
+        try:
+            raw = cipher.decrypt(raw)
+        except InvalidToken as exc:
+            raise RuntimeError("Gmail token exists but could not be decrypted") from exc
+    return pickle.loads(raw)
+
+
+def _save_token(creds) -> None:
+    raw = pickle.dumps(creds)
+    cipher = _token_cipher()
+    if cipher:
+        raw = cipher.encrypt(raw)
+    GMAIL_TOKEN_PATH.write_bytes(raw)
+
+
 def get_gmail_service():
 
-    creds = None
-
-    if GMAIL_TOKEN_PATH.exists():
-        with open(GMAIL_TOKEN_PATH, "rb") as token:
-            creds = pickle.load(token)
+    creds = _load_token()
 
     if not creds or not creds.valid:
 
@@ -36,8 +59,7 @@ def get_gmail_service():
 
             creds = flow.run_local_server(port=0)
 
-        with open(GMAIL_TOKEN_PATH, "wb") as token:
-            pickle.dump(creds, token)
+        _save_token(creds)
 
     service = build("gmail", "v1", credentials=creds)
 

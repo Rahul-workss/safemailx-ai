@@ -4,7 +4,7 @@
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from utils.config import REPORTS_DIR
 
@@ -13,7 +13,7 @@ def save_json_report(evidence):
 
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     filepath = os.path.join(REPORTS_DIR, f"forensic_report_{timestamp}.json")
 

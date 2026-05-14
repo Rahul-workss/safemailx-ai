@@ -13,13 +13,18 @@ from utils.evidence_builder import build_forensic_evidence
 from utils.json_report import save_json_report
 from utils.pdf_report import generate_pdf_report
 from utils.image_downloader import download_images
-from utils.content_processor import build_full_email_text
+from utils.content_processor import (
+    clean_extracted_text,
+    clean_terminal_evidence_text,
+    collect_ocr_texts,
+)
 from utils.forwarding_parser import (
     extract_forwarded_payload,
     extract_original_headers,
     extract_original_sender,
 )
 from utils.url_extractor import extract_urls
+from utils.config import debug_log
 
 def extract_forwarded_content(text):
     """
@@ -42,6 +47,21 @@ def extract_forwarded_content(text):
     return text
 
 
+def print_evidence_dump(subject, forwarded_text, ocr_texts, final_text):
+    line = "=" * 64
+    display_parts = [clean_terminal_evidence_text(forwarded_text)]
+    display_parts.extend(clean_terminal_evidence_text(text) for text in ocr_texts)
+    display_text = clean_extracted_text("\n\n".join(part for part in display_parts if part))
+
+    print("\n" + line)
+    print("EXTRACTED TEXT")
+    print(line)
+    print(f"Subject: {subject}")
+    print()
+    print(display_text or "<NO TEXT BODY DETECTED>")
+    print(line + "\n")
+
+
 def send_reply_email(service, to_email, original_subject, final_label, final_score, pdf_path, attachment_findings=None):
     """
     Draft and send an HTML email with the scan result and PDF report.
@@ -57,7 +77,7 @@ def send_reply_email(service, to_email, original_subject, final_label, final_sco
         verdict_text  = "CRITICAL THREAT"
         meter_color   = "#FF3B3B"
         badge_label   = "PHISHING"
-    elif final_score > 35:
+    elif final_score > 40:
         verdict_color = "#FF9F0A"
         verdict_bg    = "#2D1A00"
         verdict_text  = "SUSPICIOUS"
@@ -259,6 +279,7 @@ def process_unread_messages():
     messages = results.get('messages', [])
 
     if not messages:
+        print("[BOT] No unread messages found.")
         return
 
     print(f"[BOT] Found {len(messages)} unread messages.")
@@ -280,6 +301,10 @@ def process_unread_messages():
             forwarder_headers = parsed.get("security_headers", {})
             
             print(f"\n[BOT] Processing msg={msg_id} from={user_email} subject='{str(subject)[:80]}'")
+            debug_log(
+                f"[BOT DEBUG] Parsed body chars={len(body_text)}; "
+                f"image refs={len(images)}; attachments={len(parsed.get('attachments', []))}"
+            )
             
             # Only process emails that are explicitly forwarded to the bot
             subject_lower = str(subject).lower()
@@ -292,7 +317,9 @@ def process_unread_messages():
                 continue
             
             # 2. Extract the forwarded payload
-            target_text = extract_forwarded_payload(body_text)
+            forwarded_text = clean_extracted_text(extract_forwarded_payload(body_text))
+            target_text = forwarded_text
+            debug_log(f"[BOT DEBUG] Forwarded payload chars after cleanup={len(forwarded_text)}")
 
             # Extract the original sender from the forwarded header block
             # Supports common forwarding formats across several languages
@@ -301,16 +328,29 @@ def process_unread_messages():
             security_headers = original_headers if auth_context == "original_headers" else {}
             print(f"[BOT] Original sender={original_sender}; auth_context={auth_context}")
 
+            ocr_texts = []
             if images:
-                print(f"[BOT] Processing {len(images)} image(s) with OCR...")
+                debug_log(f"[BOT DEBUG] Processing {len(images)} image(s) with OCR...")
                 try:
                     # Save Base64 image data to local PNG files
                     local_img_paths = download_images(images)
+                    debug_log(f"[BOT DEBUG] Local OCR candidate images={len(local_img_paths)}")
                     
                     # Run OCR on the local image files and append the extracted text
-                    target_text = build_full_email_text(target_text, local_img_paths)
+                    ocr_texts = collect_ocr_texts(local_img_paths)
+                    debug_log(
+                        f"[BOT DEBUG] OCR extracted {len(ocr_texts)} non-empty text block(s); "
+                        f"chars={sum(len(text) for text in ocr_texts)}"
+                    )
                 except Exception as e:
                     print(f"[OCR ERROR] Failed to run image analysis: {e}")
+            else:
+                debug_log("[BOT DEBUG] No image references found for OCR.")
+
+            target_text = clean_extracted_text(
+                "\n\n".join(part for part in [forwarded_text, *ocr_texts] if part)
+            )
+            debug_log(f"[BOT DEBUG] Final LLM text chars={len(target_text)}")
 
             # 3. Use URL Analyzer with sanitized, deduplicated URL records
             url_details = extract_urls(target_text)
@@ -335,6 +375,8 @@ def process_unread_messages():
                 print(f"[BOT] Attachment aggregate threat score: {att_score}")
 
             # 5. Hybrid detection
+            print_evidence_dump(subject, forwarded_text, ocr_texts, target_text)
+
             result = hybrid_detect(
                 subject,
                 target_text,

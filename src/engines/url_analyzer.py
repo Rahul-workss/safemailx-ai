@@ -63,6 +63,15 @@ def analyze_urls(urls):
     # 1. FAST LOCAL HEURISTICS (INSTANT)
     # -----------------------------------
     normalized_urls = []
+    checked_base_domains = {}  # Cache base domains (e.g. google.com)
+    
+    # VIP domains that are mathematically guaranteed to be old/safe
+    VIP_DOMAINS = {"google.com", "microsoft.com", "amazon.com", "apple.com", "github.com", 
+                   "linkedin.com", "facebook.com", "twitter.com", "netflix.com", "gmail.com"}
+
+    if urls:
+        print(f"[URL_ANALYZER] Scanning {len(urls)} unique URLs...")
+
     for item in urls:
         url = item.get("normalized_url") if isinstance(item, dict) else str(item)
         if not url:
@@ -70,12 +79,26 @@ def analyze_urls(urls):
         normalized_urls.append(url)
         try:
             parsed = urlparse(url)
-            domain = (parsed.hostname or parsed.netloc).lower()
+            host = (parsed.hostname or parsed.netloc).lower()
+            
+            # Extract base domain (e.g. sub.example.com -> example.com)
+            parts = host.split(".")
+            base_domain = ".".join(parts[-2:]) if len(parts) >= 2 else host
 
-            if any(short in domain for short in ["bit.ly", "tinyurl", "t.co", "ow.ly", "is.gd", "t.ly"]):
+            if any(short in host for short in ["bit.ly", "tinyurl", "t.co", "ow.ly", "is.gd", "t.ly"]):
                 suspicious.append("shortened_url")
             elif WHOIS_AVAILABLE:
-                w = _whois_with_timeout(domain)
+                # SKIP VIPs (No need to check WHOIS for Google/Microsoft)
+                if base_domain in VIP_DOMAINS:
+                    continue
+
+                # DEDUPLICATION: Only check the base domain once
+                if base_domain not in checked_base_domains:
+                    w = _whois_with_timeout(base_domain)
+                    checked_base_domains[base_domain] = w
+                else:
+                    w = checked_base_domains[base_domain]
+
                 if w is not None:
                     try:
                         creation_date = w.creation_date
@@ -84,16 +107,19 @@ def analyze_urls(urls):
                         if creation_date:
                             age_days = (datetime.now() - creation_date).days
                             if age_days < 14:
-                                suspicious.append(f"domain_age_newly_registered:{domain}")
+                                suspicious.append(f"domain_age_newly_registered:{base_domain}")
                     except Exception:
                         pass
 
-            # Check if domain is just an IP address (no letters)
-            if domain.replace(".", "").isdigit():
+            # Check if domain is just an IP address
+            if host.replace(".", "").isdigit():
                 suspicious.append("ip_based_url")
 
         except Exception:
             pass
+
+    if urls:
+        print(f"[URL_ANALYZER] Completed local heuristics.")
 
     # -----------------------------------
     # 2. LIVE GOOGLE SAFE BROWSING CHECK

@@ -6,7 +6,7 @@
 import os
 import re
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -32,10 +32,96 @@ COL_GREEN = colors.Color(0.19, 0.82, 0.34)
 COL_PALE  = colors.Color(0.75, 0.75, 0.75)
 
 
+def _title_label(value):
+    if value is None or value == "":
+        return "Unknown"
+    return str(value).replace("_", " ").title()
+
+
+def _risk_band_from_score(score):
+    if score >= 0.75:
+        return "High-risk malicious pattern"
+    if score >= 0.45:
+        return "Elevated suspicion"
+    if score >= 0.25:
+        return "Low-to-moderate concern"
+    return "Low-risk contextual pattern"
+
+
+def _dimension_interpretation(name, value):
+    try:
+        score = int(value)
+    except (TypeError, ValueError):
+        score = 0
+
+    if score >= 7:
+        tone = "Concern"
+    elif score <= 3:
+        tone = "Reassuring"
+    else:
+        tone = "Mixed"
+
+    explanations = {
+        "Urgency / Fear": {
+            "Concern": "strong time pressure or emotional compression is present",
+            "Mixed": "some urgency is present, but not at extreme coercive levels",
+            "Reassuring": "no strong fear appeal or deadline pressure dominates the message",
+        },
+        "Sender Legitimacy": {
+            "Concern": "brand or sender context appears inconsistent with the claimed origin",
+            "Mixed": "sender context is not fully conclusive from content alone",
+            "Reassuring": "sender/content relationship appears plausible for the claimed service",
+        },
+        "Grammar Anomalies": {
+            "Concern": "language quality shows suspicious errors or template artifacts",
+            "Mixed": "minor wording artifacts exist but are not decisive",
+            "Reassuring": "language quality is consistent with a normal automated email",
+        },
+        "Contextual Coherence": {
+            "Concern": "message flow or request logic is inconsistent",
+            "Mixed": "message is mostly coherent with a few ambiguous elements",
+            "Reassuring": "message intent and call-to-action are internally consistent",
+        },
+    }
+    return f"{tone}: {explanations.get(name, {}).get(tone, 'dimension reviewed')}."
+
+
+def _build_llm_analyst_notes(llm_data):
+    score = llm_data.get("llm_score", 0.0) or 0.0
+    score_pct = int(score * 100)
+    confidence = llm_data.get("llm_confidence")
+    try:
+        confidence_text = f"{int(float(confidence) * 100)}%" if confidence is not None else "not reported"
+    except (TypeError, ValueError):
+        confidence_text = "not reported"
+    intent = _title_label(llm_data.get("llm_intent"))
+    tactics = [_title_label(t) for t in llm_data.get("llm_tactics", [])]
+
+    headline = (
+        f"{_risk_band_from_score(score)}: the LLM assessed this as {score_pct}% threat "
+        f"with confidence {confidence_text}."
+    )
+
+    observations = [
+        f"Intent classification: {intent}.",
+        "Persuasion cues: " + (", ".join(tactics) if tactics else "none strongly detected") + ".",
+    ]
+
+    dims = [
+        ("Urgency / Fear", llm_data.get("urgency_score")),
+        ("Sender Legitimacy", llm_data.get("legitimacy_score")),
+        ("Grammar Anomalies", llm_data.get("grammar_score")),
+        ("Contextual Coherence", llm_data.get("coherence_score")),
+    ]
+    observations.extend(_dimension_interpretation(name, value) for name, value in dims)
+
+    return headline, observations
+
+
 def _score_color(score_fraction):
-    if score_fraction >= 0.75:
+    if score_fraction >= 0.80:
         return COL_RED
-    elif score_fraction >= 0.45:
+    elif score_fraction > 0.40:
         return COL_AMBER
     return COL_GREEN
 
@@ -80,14 +166,14 @@ def generate_pdf_report(evidence: dict) -> str:
     # ── Setup ─────────────────────────────────────────────────────────────────
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    timestamp_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filepath      = os.path.join(REPORTS_DIR, f"forensic_report_{timestamp_str}.pdf")
 
     c     = canvas.Canvas(filepath, pagesize=letter)
     width, height = letter
 
     case_id    = evidence.get("case_id", "SMX-UNKNOWN")
-    utc_ts     = evidence.get("timestamp", datetime.utcnow().isoformat())
+    utc_ts     = evidence.get("timestamp", datetime.now(timezone.utc).isoformat())
     final_score_frac  = evidence["hybrid_decision"]["final_score"]
     final_score_pct   = int(final_score_frac * 100)
     final_label       = evidence["hybrid_decision"]["final_label"]
@@ -502,27 +588,48 @@ def generate_pdf_report(evidence: dict) -> str:
         y -= 6
 
         # ── Analyst reasoning narrative ──────────────────────────────────
+        headline, observations = _build_llm_analyst_notes(llm_data)
         llm_reasoning = llm_data.get("llm_reasoning", "")
+
+        y = check_space(y, 108)
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(COL_GREY)
+        c.drawString(50, y, "Analyst Interpretation:")
+        y -= 12
+
+        card_top = y + 5
+        card_h = 88
+        c.setFillColorRGB(0.12, 0.12, 0.14)
+        c.roundRect(48, card_top - card_h, width - 96, card_h, 4, fill=1, stroke=0)
+
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(COL_WHITE)
+        for line in textwrap.wrap(headline, width=88)[:2]:
+            c.drawString(58, y, line)
+            y -= 11
+
+        c.setFont("Helvetica", 7.6)
+        c.setFillColor(COL_PALE)
+        for note in observations[:5]:
+            for line in textwrap.wrap("- " + note, width=92)[:2]:
+                c.drawString(60, y, line)
+                y -= 10
+
+        y = card_top - card_h - 10
+
         if llm_reasoning:
-            y = check_space(y, 30)
+            y = check_space(y, 42)
             c.setFont("Helvetica-Bold", 8)
             c.setFillColor(COL_GREY)
-            c.drawString(50, y, "Analyst Reasoning:")
+            c.drawString(50, y, "Model Narrative:")
             y -= 12
-
-            wrapped = textwrap.wrap(str(llm_reasoning), width=90)
-            box_h   = len(wrapped) * 12 + 12
-            y = check_space(y, box_h + 10)
-
-            c.setFillColorRGB(0.12, 0.12, 0.14)
-            c.roundRect(48, y - box_h + 8, width - 96, box_h,
-                        4, fill=1, stroke=0)
             c.setFont("Helvetica", 8)
             c.setFillColor(COL_WHITE)
-            for line in wrapped:
+            for line in textwrap.wrap(str(llm_reasoning), width=92)[:5]:
+                y = check_space(y, 14)
                 c.drawString(56, y, line)
-                y -= 12
-            y -= 8
+                y -= 11
+            y -= 6
 
         # ── Social engineering tactic badges ─────────────────────────────
         tactics = llm_data.get("llm_tactics", [])
@@ -530,7 +637,7 @@ def generate_pdf_report(evidence: dict) -> str:
             y = check_space(y, 28)
             c.setFont("Helvetica-Bold", 8)
             c.setFillColor(COL_GREY)
-            c.drawString(50, y, "Social Engineering Tactics Detected:")
+            c.drawString(50, y, "Persuasion Cues Detected:")
             y -= 14
             px = 50
             for tactic in tactics:
@@ -647,12 +754,14 @@ def generate_pdf_report(evidence: dict) -> str:
     
     c.setFont("Courier", 8)
     if llm_avail:
+        base_total = (r_score * 0.25) + (a_score * 0.25) + (l_score * 0.50)
         c.drawString(60, y, f"Rule:    {r_score:.3f} × 0.25 = {r_score*0.25:.3f}")
         y -= 12
         c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × 0.25 = {a_score*0.25:.3f}")
         y -= 12
         c.drawString(60, y, f"LLM:     {l_score:.3f} × 0.50 = {l_score*0.50:.3f}")
     else:
+        base_total = (r_score * 0.40) + (a_score * 0.60)
         c.drawString(60, y, f"Rule:    {r_score:.3f} × 0.40 = {r_score*0.40:.3f}")
         y -= 12
         c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × 0.60 = {a_score*0.60:.3f}")
@@ -661,7 +770,13 @@ def generate_pdf_report(evidence: dict) -> str:
     c.drawString(60, y, "-" * 32)
     y -= 12
     c.setFillColor(COL_WHITE)
-    c.drawString(60, y, f"Total:                = {final_s:.3f}")
+    c.drawString(60, y, f"Base Sum:             = {base_total:.3f}")
+    
+    if abs(final_s - base_total) > 0.001:
+        y -= 12
+        c.setFillColor(COL_AMBER)
+        c.drawString(60, y, f"SMART VETO APPLIED:   → {final_s:.3f}")
+        
     y -= 20
     
     # --- Consensus / Conflict Badge ---

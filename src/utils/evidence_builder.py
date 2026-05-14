@@ -5,7 +5,7 @@
 
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def _extract_sender_forensics(sender_raw: str, security_headers: dict) -> dict:
@@ -66,7 +66,7 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
     evidence = {
 
         "case_id":   case_id,
-        "timestamp": str(datetime.utcnow()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
 
         "email_metadata": {
             "subject":     email_subject,
@@ -91,6 +91,10 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
                                  if hybrid_result.get("llm_reasons")
                                  else ""),
             "llm_tactics":      hybrid_result.get("llm_tactics", []),
+            "llm_intent":       (hybrid_result.get("llm_analysis") or {})
+                                .get("intent"),
+            "llm_confidence":   (hybrid_result.get("llm_analysis") or {})
+                                .get("confidence"),
             "urgency_score":    (hybrid_result.get("llm_analysis") or {})
                                 .get("urgency_score"),
             "legitimacy_score": (hybrid_result.get("llm_analysis") or {})

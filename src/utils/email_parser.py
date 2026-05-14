@@ -2,6 +2,62 @@ import re
 import base64
 from bs4 import BeautifulSoup
 
+
+def _decode_gmail_body(data):
+    if not data:
+        return ""
+    return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+
+
+def _append_unique(items, value):
+    if value and value not in items:
+        items.append(value)
+
+
+def _looks_hidden(tag):
+    if tag.name in {"script", "style", "head", "title", "meta", "link", "noscript"}:
+        return True
+
+    if tag.has_attr("hidden") or tag.get("aria-hidden") == "true":
+        return True
+
+    classes = " ".join(tag.get("class", [])).lower()
+    if any(token in classes for token in ("preheader", "preview", "hidden")):
+        return True
+
+    style = re.sub(r"\s+", "", tag.get("style", "").lower())
+    hidden_markers = (
+        "display:none",
+        "visibility:hidden",
+        "opacity:0",
+        "font-size:0",
+        "font-size:0px",
+        "max-height:0",
+        "max-height:0px",
+        "width:0",
+        "width:0px",
+        "height:0",
+        "height:0px",
+        "mso-hide:all",
+    )
+    return any(marker in style for marker in hidden_markers)
+
+
+def _html_text_and_images(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in list(soup.find_all(_looks_hidden)):
+        tag.decompose()
+
+    image_sources = []
+    for img in soup.find_all("img"):
+        src = (img.get("src") or "").strip()
+        if src.startswith(("http://", "https://", "data:image/")):
+            _append_unique(image_sources, src)
+
+    return soup.get_text(separator="\n", strip=True), image_sources
+
+
 # MIME types treated as scannable file attachments
 def parse_security_headers(headers: list) -> dict:
     """
@@ -129,15 +185,17 @@ def _extract_parts(service, message_id, parts, body_list, images_list, attachmen
         if mime_type == "text/plain":
             data = part.get("body", {}).get("data")
             if data:
-                decoded = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                decoded = _decode_gmail_body(data)
                 body_list.append(decoded)
                 
         elif mime_type == "text/html":
             data = part.get("body", {}).get("data")
             if data:
-                decoded = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
-                soup = BeautifulSoup(decoded, "html.parser")
-                body_list.append(soup.get_text(separator=' ', strip=True))
+                decoded = _decode_gmail_body(data)
+                html_text, html_images = _html_text_and_images(decoded)
+                body_list.append(html_text)
+                for src in html_images:
+                    _append_unique(images_list, src)
                 
         elif mime_type.startswith("multipart/"):
             nested_parts = part.get("parts", [])
@@ -227,10 +285,12 @@ def parse_email(service, message_id, message):
         if mime_type == "text/plain" or mime_type == "text/html":
             data = message["payload"].get("body", {}).get("data")
             if data:
-                decoded = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                decoded = _decode_gmail_body(data)
                 if mime_type == "text/html":
-                    soup = BeautifulSoup(decoded, "html.parser")
-                    body_list.append(soup.get_text(separator=' ', strip=True))
+                    html_text, html_images = _html_text_and_images(decoded)
+                    body_list.append(html_text)
+                    for src in html_images:
+                        _append_unique(images_list, src)
                 else:
                     body_list.append(decoded)
                 

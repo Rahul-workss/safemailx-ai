@@ -22,7 +22,7 @@ VIP_DOMAINS = {
 
 
 def classify_risk_band(score):
-    if score <= 35:
+    if score <= 40:
         return "SAFE"
     elif score <= 80:
         return "SUSPICIOUS"
@@ -167,9 +167,14 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
 
     # -- Confidence override for extreme rule/model scores ----------------------
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]
-    if any(s > 0.95 for s in active_scores) or rule_score > 0.9:
-        final_score = max(final_score, 0.9)
-        analysis_steps.append("Safety Limit: Confidence override triggered")
+    
+    # Do NOT apply the extreme safety override if the LLM explicitly vetoed as SAFE
+    is_safe_veto = llm_available and (llm_score is not None) and (llm_score < 0.25) and (llm_confidence > 0.8)
+    
+    if not is_safe_veto:
+        if any(s > 0.95 for s in active_scores) or rule_score > 0.9:
+            final_score = max(final_score, 0.9)
+            analysis_steps.append("Safety Limit: Confidence override triggered")
 
     # -- Conditional trust based on authentication signals ----------------------
     sender_domain = sender.split("@")[-1].lower() if "@" in sender else ""
@@ -213,7 +218,7 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     risk_band = classify_risk_band(int(final_score * 100))
     if final_score >= 0.80:
         final_label = "phishing"
-    elif final_score > 0.35:
+    elif final_score > 0.40:
         final_label = "suspicious"
     else:
         final_label = "legitimate"

@@ -200,11 +200,18 @@ app.innerHTML = `
           <div class="form-message hidden" id="form-message" aria-live="polite"></div>
         </div>
       </section>
+      <footer class="site-footer" style="padding: 2rem; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.9rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4rem;">
+        <p>&copy; 2026 TrustMail AI. All rights reserved.</p>
+        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1.5rem;">
+          <a href="/privacy.html" style="color: rgba(255,255,255,0.6); text-decoration: none;">Privacy Policy</a>
+          <a href="/terms.html" style="color: rgba(255,255,255,0.6); text-decoration: none;">Terms of Service</a>
+        </div>
+      </footer>
     </main>
   </div>
 `;
 
-const TOTAL_FRAMES = 240;
+const TOTAL_FRAMES = 192;
 // On mobile: load every 4th frame (60 frames) for 75% less memory usage
 const isMobile = window.innerWidth <= 720;
 const frameStep = isMobile ? 4 : 1;
@@ -227,7 +234,7 @@ const submitButton = document.querySelector("#submit-button");
 // framePath maps our reduced index back to the actual original filename
 const framePath = (reducedIndex) => {
   const actualIndex = frameIndices[reducedIndex];
-  return `/images/ezgif-frame-${String(actualIndex + 1).padStart(3, "0")}.jpg`;
+  return `/images/frame-${String(actualIndex + 1).padStart(3, "0")}.webp`;
 };
 
 const imageSequence = Array.from({ length: frameCount }, (_, index) => {

@@ -10,13 +10,15 @@ from urllib.parse import urlparse
 import requests
 
 from utils.config import (
+    LLM_BASE_URL,
+    LLM_EMAIL_CHAR_LIMIT,
+    LLM_HEALTH_URL,
+    LLM_MAX_CONTEXT_TOKENS,
+    LLM_MAX_OUTPUT_TOKENS,
+    LLM_MODEL,
+    LLM_PROVIDER,
+    LLM_TIMEOUT,
     LM_STUDIO_AUTO_CONTEXT,
-    LM_STUDIO_EMAIL_CHAR_LIMIT,
-    LM_STUDIO_MAX_CONTEXT_TOKENS,
-    LM_STUDIO_MAX_OUTPUT_TOKENS,
-    LM_STUDIO_MODEL,
-    LM_STUDIO_TIMEOUT,
-    LM_STUDIO_URL,
 )
 
 # -- System prompt -------------------------------------------------------------
@@ -73,7 +75,7 @@ Return a JSON object with EXACTLY these keys:
   "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
   "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "unknown"]>,
   "threat_probability": <float 0.0-1.0>,
-  "reasoning": <string: 2-3 sentence professional assessment explaining your verdict>
+  "reasoning": <string: 2-3 sentence professional assessment. Include the apparent intent, the strongest benign or suspicious evidence, and what factor most influenced the score. Do not expose hidden chain-of-thought.>
 }
 
 EXAMPLE OUTPUT:
@@ -103,15 +105,18 @@ def _estimate_tokens(text: str) -> int:
 def _detect_loaded_context_tokens() -> int:
     """Read the active LM Studio context length when the local API exposes it."""
     if not LM_STUDIO_AUTO_CONTEXT:
-        return LM_STUDIO_MAX_CONTEXT_TOKENS
+        return LLM_MAX_CONTEXT_TOKENS
+
+    if LLM_PROVIDER != "lmstudio":
+        return LLM_MAX_CONTEXT_TOKENS
 
     try:
-        parsed = urlparse(LM_STUDIO_URL)
+        parsed = urlparse(LLM_BASE_URL)
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         resp = requests.get(f"{base_url}/api/v1/models", timeout=3)
         resp.raise_for_status()
         for model in resp.json().get("models", []):
-            if model.get("key") != LM_STUDIO_MODEL:
+            if model.get("key") != LLM_MODEL:
                 continue
             for instance in model.get("loaded_instances", []):
                 context_length = instance.get("config", {}).get("context_length")
@@ -122,7 +127,7 @@ def _detect_loaded_context_tokens() -> int:
     except Exception as e:
         print(f"[LLM] Context auto-detect unavailable: {e}")
 
-    return LM_STUDIO_MAX_CONTEXT_TOKENS
+    return LLM_MAX_CONTEXT_TOKENS
 
 
 def _fit_email_to_context(prefix: str, suffix: str, email_text: str,
@@ -139,12 +144,12 @@ def _fit_email_to_context(prefix: str, suffix: str, email_text: str,
         context_tokens = _detect_loaded_context_tokens()
         available_tokens = (
             context_tokens
-            - LM_STUDIO_MAX_OUTPUT_TOKENS
+            - LLM_MAX_OUTPUT_TOKENS
             - reserved_prompt_tokens
             - 256
         )
         available_chars = max(1200, available_tokens * 4)
-        char_limit = min(LM_STUDIO_EMAIL_CHAR_LIMIT, available_chars)
+        char_limit = min(LLM_EMAIL_CHAR_LIMIT, available_chars)
 
     if len(email_text) <= char_limit:
         return email_text
@@ -216,14 +221,14 @@ def run_llm_analysis(email_text: str, subject: str = "",
     user_msg = _build_user_message(user_prefix, user_suffix, email_text)
 
     payload = {
-        "model": LM_STUDIO_MODEL,
+        "model": LLM_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": user_msg},
         ],
         "temperature": 0.1,
         "top_p": 0.8,
-        "max_tokens": LM_STUDIO_MAX_OUTPUT_TOKENS,
+        "max_tokens": LLM_MAX_OUTPUT_TOKENS,
         "stream": False,
     }
 
@@ -267,8 +272,8 @@ def run_llm_analysis(email_text: str, subject: str = "",
         t.start()
 
         try:
-            resp = requests.post(LM_STUDIO_URL, json=payload,
-                                 timeout=LM_STUDIO_TIMEOUT)
+            resp = requests.post(LLM_BASE_URL, json=payload,
+                                 timeout=LLM_TIMEOUT)
             if _is_context_error(resp):
                 print("[LLM] Context limit hit; retrying with shorter excerpts.")
                 last_context_error = resp.text[:240].replace("\n", " ")
@@ -282,11 +287,11 @@ def run_llm_analysis(email_text: str, subject: str = "",
                         force_char_limit=forced_limit,
                     )
                     shorter_payload["messages"] = shorter_messages
-                    shorter_payload["max_tokens"] = min(400, LM_STUDIO_MAX_OUTPUT_TOKENS)
+                    shorter_payload["max_tokens"] = min(400, LLM_MAX_OUTPUT_TOKENS)
                     resp = requests.post(
-                        LM_STUDIO_URL,
+                        LLM_BASE_URL,
                         json=shorter_payload,
-                        timeout=LM_STUDIO_TIMEOUT,
+                        timeout=LLM_TIMEOUT,
                     )
                     if not _is_context_error(resp):
                         print(f"[LLM] Retry succeeded with {forced_limit} chars.")

@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "TrustMail AI",
+    "slug": "trustmail-ai",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#080B12"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#080B12"
+      }
+    }
+  }
+}

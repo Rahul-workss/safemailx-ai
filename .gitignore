@@ -2,6 +2,14 @@
 venv/
 env/
 .env
+trustmail_app.db
+trustmail-api.log
+trustmail-api.err.log
+trustmail-mobile/node_modules/
+trustmail-mobile/.expo/
+trustmail-mobile/dist/
+trustmail-mobile/expo.log
+trustmail-mobile/expo.err.log
 
 # Google API Credentials (CRITICAL - DO NOT UPLOAD)
 src/credentials.json
@@ -24,6 +32,8 @@ src/temp_images/*
 
 # Machine Learning Models and Datasets (Too large for GitHub)
 models/*.joblib
+data/*.db
+data/*.sqlite
 data/*.csv
 data/splits/*
 !models/.gitkeep
