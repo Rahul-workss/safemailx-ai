@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as Notifications from "expo-notifications";
 
-import { confirmPasswordReset, createManualScan, fetchGmailOAuthStatus, fetchHealth, fetchScans, Health, login, registerPushToken, requestPasswordReset, ScanSummary, startGmailOAuth, uploadScanFile } from "./src/api";
+import { confirmPasswordReset, createManualScan, fetchGmailOAuthStatus, fetchHealth, fetchScans, getApiBaseUrl, getReportDownloadUrl, Health, login, registerPushToken, requestPasswordReset, ScanSummary, setApiBaseUrl, startGmailOAuth, uploadScanFile } from "./src/api";
 import { colors, verdictColor } from "./src/theme";
 
 type Tab = "dashboard" | "scans" | "new" | "reports" | "settings";
@@ -72,6 +72,7 @@ function App() {
   const [manualText, setManualText] = useState("");
   const [email, setEmail] = useState("admin@trustmail.local");
   const [password, setPassword] = useState("");
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const [authState, setAuthState] = useState("local mode");
   const [gmailState, setGmailState] = useState("not checked");
   const [busy, setBusy] = useState(false);
@@ -200,6 +201,23 @@ function App() {
     }
   }
 
+  async function saveApiUrl(value: string) {
+    if (!value.trim()) return;
+    setApiBaseUrl(value.trim());
+    setApiUrl(getApiBaseUrl());
+    await refresh();
+    showToast("API server updated", "success");
+  }
+
+  async function openReport(scanId: string, kind: "pdf" | "json") {
+    try {
+      const url = await getReportDownloadUrl(scanId, kind);
+      await Linking.openURL(url);
+    } catch (err: any) {
+      showToast(err.message || "Report is not available yet");
+    }
+  }
+
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar style="light" />
@@ -226,16 +244,19 @@ function App() {
             onUpload={submitUploadScan}
           />
         )}
-        {activeTab === "reports" && <Reports scans={scans} />}
+        {activeTab === "reports" && <Reports scans={scans} onOpenReport={openReport} />}
         {activeTab === "settings" && (
           <Settings
             health={health}
             email={email}
             password={password}
+            apiUrl={apiUrl}
             authState={authState}
             gmailState={gmailState}
             onEmail={setEmail}
             onPassword={setPassword}
+            onApiUrl={setApiUrl}
+            onSaveApiUrl={saveApiUrl}
             onLogin={submitLogin}
             onConnectGmail={connectGmail}
             onRefreshGmail={refreshGmailStatus}
@@ -362,28 +383,46 @@ function NewScan({ value, busy, uploadBusy, onChange, onSubmit, onUpload }: {
   );
 }
 
-function Reports({ scans }: { scans: ScanSummary[] }) {
+function Reports({ scans, onOpenReport }: { scans: ScanSummary[]; onOpenReport: (scanId: string, kind: "pdf" | "json") => void }) {
+  const reportableScans = scans.filter((scan) => scan.final_label !== "queued" && scan.final_label !== "failed");
   return (
     <View style={styles.stack}>
       <Text style={styles.sectionTitle}>Recent Reports</Text>
-      {scans.slice(0, 5).map((scan) => (
+      {reportableScans.length === 0 ? <Empty text="Completed reports will appear here after a scan finishes." /> : null}
+      {reportableScans.slice(0, 8).map((scan) => (
         <View key={scan.id} style={styles.card}>
-          <Text style={styles.cardTitle}>{scan.subject}</Text>
-          <Text style={styles.muted}>PDF and JSON export are available from the API endpoints.</Text>
+          <View style={styles.row}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{scan.subject}</Text>
+            <Text style={[styles.verdict, { color: verdictColor(scan.final_label) }]}>{scan.final_label.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.muted}>{new Date(scan.created_at).toLocaleString()}</Text>
+          <View style={styles.reportActions}>
+            <Pressable style={styles.reportButton} onPress={() => onOpenReport(scan.id, "pdf")}>
+              <Ionicons name="document-text" size={17} color={colors.blue} />
+              <Text style={styles.reportButtonText}>PDF</Text>
+            </Pressable>
+            <Pressable style={styles.reportButton} onPress={() => onOpenReport(scan.id, "json")}>
+              <Ionicons name="code-slash" size={17} color={colors.blue} />
+              <Text style={styles.reportButtonText}>JSON</Text>
+            </Pressable>
+          </View>
         </View>
       ))}
     </View>
   );
 }
 
-function Settings({ health, email, password, authState, gmailState, onEmail, onPassword, onLogin, onConnectGmail, onRefreshGmail, onShowToast }: {
+function Settings({ health, email, password, apiUrl, authState, gmailState, onEmail, onPassword, onApiUrl, onSaveApiUrl, onLogin, onConnectGmail, onRefreshGmail, onShowToast }: {
   health: Health | null;
   email: string;
   password: string;
+  apiUrl: string;
   authState: string;
   gmailState: string;
   onEmail: (value: string) => void;
   onPassword: (value: string) => void;
+  onApiUrl: (value: string) => void;
+  onSaveApiUrl: (value: string) => void;
   onLogin: () => void;
   onConnectGmail: () => void;
   onRefreshGmail: () => void;
@@ -426,6 +465,23 @@ function Settings({ health, email, password, authState, gmailState, onEmail, onP
   return (
     <View style={styles.stack}>
       <HealthGrid health={health} />
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>API Server</Text>
+        <Text style={styles.muted}>Use your computer LAN IP for Android APK testing, for example http://192.168.1.25:8080.</Text>
+        <TextInput
+          value={apiUrl}
+          onChangeText={onApiUrl}
+          placeholder="http://192.168.1.25:8080"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="none"
+          keyboardType="url"
+          style={styles.compactInput}
+        />
+        <Pressable style={styles.secondaryButton} onPress={() => onSaveApiUrl(apiUrl)}>
+          <Ionicons name="server" size={18} color={colors.blue} />
+          <Text style={styles.secondaryButtonText}>Use This Server</Text>
+        </Pressable>
+      </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Account</Text>
         <Text style={styles.muted}>
@@ -627,6 +683,9 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: "#06111A", fontWeight: "900" },
   secondaryButton: { borderColor: colors.blue, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center", paddingVertical: 13, marginTop: 10, flexDirection: "row", gap: 8 },
   secondaryButtonText: { color: colors.blue, fontWeight: "900" },
+  reportActions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  reportButton: { flex: 1, minHeight: 42, borderColor: colors.blue, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  reportButtonText: { color: colors.blue, fontWeight: "900", fontSize: 13 },
   demoRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9 },
   demoText: { color: colors.text, fontSize: 14 },
   segmented: { flexDirection: "row", gap: 8, marginTop: 14 },

@@ -45,22 +45,25 @@ def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
     return base64.urlsafe_b64encode(digest).decode("ascii"), salt
 
 
-def create_access_token(email: str, user_id: str = "local") -> str:
+def create_signed_token(payload: dict[str, Any], expires_minutes: int = JWT_EXPIRES_MINUTES) -> str:
     now = datetime.now(timezone.utc)
-    payload = {
-        "sub": email,
-        "uid": user_id,
+    signed_payload = {
+        **payload,
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=JWT_EXPIRES_MINUTES)).timestamp()),
+        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
     }
     header = {"alg": "HS256", "typ": "JWT"}
-    signing_input = f"{_json_b64(header)}.{_json_b64(payload)}"
+    signing_input = f"{_json_b64(header)}.{_json_b64(signed_payload)}"
     signature = hmac.new(
         JWT_SECRET.encode("utf-8"),
         signing_input.encode("ascii"),
         hashlib.sha256,
     ).digest()
     return f"{signing_input}.{_b64url_encode(signature)}"
+
+
+def create_access_token(email: str, user_id: str = "local") -> str:
+    return create_signed_token({"sub": email, "uid": user_id})
 
 
 def verify_access_token(token: str) -> dict[str, Any]:

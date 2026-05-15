@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, WebSocket
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse
 
-from server.auth import create_access_token, require_auth, validate_login, verify_access_token
+from server.auth import create_access_token, create_signed_token, require_auth, validate_login, verify_access_token
 from server.gmail_watcher import enqueue_unread_forwarded_messages
 from server.gmail_oauth import build_authorization_url, encode_credentials, exchange_code_for_token
 from server.health import build_health, check_llm_health
@@ -23,6 +23,7 @@ from server.schemas import (
     PushTokenRequest,
     PushTokenResponse,
     ReadinessResponse,
+    ReportDownloadLinkResponse,
     ResetPasswordRequest,
     ScanDetail,
     ScanSummary,
@@ -281,6 +282,58 @@ def report_json(scan_id: str, _auth=Depends(require_auth)):
     if not path.exists():
         raise HTTPException(status_code=404, detail="Evidence file missing")
     return FileResponse(path, media_type="application/json", filename=path.name)
+
+
+@app.post("/api/scans/{scan_id}/report-link", response_model=ReportDownloadLinkResponse)
+def report_download_link(
+    scan_id: str,
+    request: Request,
+    kind: str = Query("pdf", pattern="^(pdf|json)$"),
+    _auth=Depends(require_auth),
+):
+    user_id = _user_id(_auth)
+    scan = repository.get_scan(scan_id, user_id=user_id)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    report_key = "report_pdf" if kind == "pdf" else "report_json"
+    if not scan.get(report_key):
+        raise HTTPException(status_code=404, detail=f"{kind.upper()} report not found")
+
+    expires_minutes = 10
+    token = create_signed_token(
+        {"sub": _auth.get("sub", "local"), "uid": user_id, "sid": scan_id, "kind": kind, "purpose": "report_download"},
+        expires_minutes=expires_minutes,
+    )
+    absolute_url = f"{request.url_for('download_report_with_token')}?token={token}"
+    return ReportDownloadLinkResponse(url=absolute_url, expires_in_seconds=expires_minutes * 60)
+
+
+@app.get("/api/reports/download", name="download_report_with_token")
+def download_report_with_token(token: str = Query(...)):
+    payload = verify_access_token(token)
+    if payload.get("purpose") != "report_download":
+        raise HTTPException(status_code=401, detail="Invalid report download token")
+    scan_id = payload.get("sid")
+    user_id = payload.get("uid")
+    kind = payload.get("kind")
+    if kind not in {"pdf", "json"} or not scan_id or not user_id:
+        raise HTTPException(status_code=401, detail="Invalid report download token")
+
+    scan = repository.get_scan(scan_id, user_id=user_id)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    report_key = "report_pdf" if kind == "pdf" else "report_json"
+    path_value = scan.get(report_key)
+    if not path_value:
+        raise HTTPException(status_code=404, detail=f"{kind.upper()} report not found")
+    path = Path(path_value)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report file missing")
+
+    media_type = "application/pdf" if kind == "pdf" else "application/json"
+    return FileResponse(path, media_type=media_type, filename=path.name)
 
 
 @app.post("/api/gmail/connect")

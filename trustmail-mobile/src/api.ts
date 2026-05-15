@@ -1,6 +1,14 @@
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8080";
+let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
 let accessToken = "";
+
+export function getApiBaseUrl() {
+  return apiBaseUrl;
+}
+
+export function setApiBaseUrl(url: string) {
+  apiBaseUrl = url.replace(/\/+$/, "");
+}
 
 export function setAccessToken(token: string) {
   accessToken = token;
@@ -31,13 +39,13 @@ export type ScanSummary = {
 };
 
 export async function fetchHealth(): Promise<Health> {
-  const response = await fetch(`${API_BASE_URL}/api/health`);
+  const response = await fetch(`${apiBaseUrl}/api/health`);
   if (!response.ok) throw new Error("Health check failed");
   return response.json();
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+  const response = await fetch(`${apiBaseUrl}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
@@ -49,7 +57,7 @@ export async function login(email: string, password: string): Promise<string> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+  const response = await fetch(`${apiBaseUrl}/auth/forgot-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email })
@@ -58,7 +66,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 }
 
 export async function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+  const response = await fetch(`${apiBaseUrl}/auth/reset-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, new_password: newPassword })
@@ -67,7 +75,7 @@ export async function confirmPasswordReset(token: string, newPassword: string): 
 }
 
 export async function fetchScans(): Promise<ScanSummary[]> {
-  const response = await fetch(`${API_BASE_URL}/api/scans`, {
+  const response = await fetch(`${apiBaseUrl}/api/scans`, {
     headers: authHeaders()
   });
   if (!response.ok) throw new Error("Scan list failed");
@@ -82,14 +90,14 @@ export async function createManualScan(body: string): Promise<ScanSummary> {
     scan_mode: "balanced"
   };
 
-  let response = await fetch(`${API_BASE_URL}/api/scans/manual/queue`, {
+  let response = await fetch(`${apiBaseUrl}/api/scans/manual/queue`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(payload)
   });
 
   if (response.status === 503) {
-    response = await fetch(`${API_BASE_URL}/api/scans/manual`, {
+    response = await fetch(`${apiBaseUrl}/api/scans/manual`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload)
@@ -114,7 +122,7 @@ export async function uploadScanFile(file: {
     type: file.mimeType || "application/octet-stream"
   } as unknown as Blob);
 
-  const response = await fetch(`${API_BASE_URL}/api/scans/upload`, {
+  const response = await fetch(`${apiBaseUrl}/api/scans/upload`, {
     method: "POST",
     headers: authHeaders(),
     body: form
@@ -124,7 +132,7 @@ export async function uploadScanFile(file: {
 }
 
 export async function registerPushToken(token: string, platform: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/notifications/register`, {
+  const response = await fetch(`${apiBaseUrl}/api/notifications/register`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ token, platform })
@@ -133,7 +141,7 @@ export async function registerPushToken(token: string, platform: string): Promis
 }
 
 export async function fetchGmailOAuthStatus(): Promise<boolean> {
-  const response = await fetch(`${API_BASE_URL}/api/gmail/oauth/status`, {
+  const response = await fetch(`${apiBaseUrl}/api/gmail/oauth/status`, {
     headers: authHeaders()
   });
   if (!response.ok) throw new Error("Gmail status failed");
@@ -142,10 +150,20 @@ export async function fetchGmailOAuthStatus(): Promise<boolean> {
 }
 
 export async function startGmailOAuth(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/api/gmail/oauth/start`, {
+  const response = await fetch(`${apiBaseUrl}/api/gmail/oauth/start`, {
     headers: authHeaders()
   });
   if (!response.ok) throw new Error("Gmail OAuth start failed");
   const payload = await response.json();
   return payload.authorization_url;
+}
+
+export async function getReportDownloadUrl(scanId: string, kind: "pdf" | "json"): Promise<string> {
+  const response = await fetch(`${apiBaseUrl}/api/scans/${scanId}/report-link?kind=${kind}`, {
+    method: "POST",
+    headers: authHeaders()
+  });
+  if (!response.ok) throw new Error(`${kind.toUpperCase()} report is not available yet`);
+  const payload = await response.json();
+  return payload.url;
 }

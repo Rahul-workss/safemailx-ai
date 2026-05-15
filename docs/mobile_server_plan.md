@@ -85,6 +85,26 @@ For phone testing against your computer, set:
 EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8080
 ```
 
+For an installable Android testing APK, log in to Expo and run the preview
+build profile:
+
+```powershell
+cd trustmail-mobile
+npm run eas:login
+npm run build:android:apk
+```
+
+The `preview` EAS profile in `trustmail-mobile/eas.json` produces an APK. The
+Android app also includes a Settings field for the API server URL; for a phone
+on the same Wi-Fi as your computer, set it to:
+
+```text
+http://YOUR_LAN_IP:8080
+```
+
+Do not use `127.0.0.1` on a physical Android phone, because that points to the
+phone itself rather than your computer.
+
 ## Quick Local End-to-End Test
 
 From the repo root, start Redis, the API, and the worker:
@@ -169,6 +189,8 @@ Implemented now:
 - worker Gmail reply flow after queued scan completion
 - Expo mobile dashboard/scans/new scan/reports/settings UI
 - mobile file picker for upload scans
+- mobile Settings API server override for Android APK/LAN testing
+- mobile report actions backed by short-lived signed PDF/JSON download links
 - JWT login with optional production auth enforcement
 - local user table with hashed passwords and per-user scan history
 - password reset request/confirm endpoints

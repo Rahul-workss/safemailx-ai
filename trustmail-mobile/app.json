@@ -5,6 +5,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "scheme": "trustmailai",
     "splash": {
       "backgroundColor": "#080B12"
     },
@@ -13,6 +14,8 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "tech.safemailx.trustmailai",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#080B12"
       }

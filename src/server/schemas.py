@@ -97,6 +97,11 @@ class PushTokenResponse(BaseModel):
     token_count: int
 
 
+class ReportDownloadLinkResponse(BaseModel):
+    url: str
+    expires_in_seconds: int
+
+
 class GmailOAuthStartResponse(BaseModel):
     authorization_url: str
 

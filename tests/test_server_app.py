@@ -131,6 +131,42 @@ class ServerAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 415)
 
+    def test_report_link_downloads_with_signed_token(self):
+        client = TestClient(app)
+        headers = self.auth_headers(client)
+
+        with TemporaryDirectory() as temp_dir:
+            report_path = Path(temp_dir) / "report.json"
+            report_path.write_text('{"status":"ok"}', encoding="utf-8")
+            user_id = server_app.repository.get_user_by_email("admin@trustmail.local")["id"]
+            scan_id = server_app.repository.create_scan(
+                user_id=user_id,
+                subject="Downloadable report",
+                sender="report@example.com",
+                final_label="legitimate",
+                final_score=0.05,
+                llm_used=False,
+                degraded=False,
+                evidence={"status": "ok"},
+                report_pdf=None,
+                report_json=str(report_path),
+            )
+
+            link_response = client.post(
+                f"/api/scans/{scan_id}/report-link?kind=json",
+                headers=headers,
+            )
+            self.assertEqual(link_response.status_code, 200)
+            url = link_response.json()["url"]
+            token = url.split("token=", 1)[1]
+
+            download_response = client.get(f"/api/reports/download?token={token}")
+            self.assertEqual(download_response.status_code, 200)
+            self.assertEqual(download_response.json(), {"status": "ok"})
+
+        bad_response = client.get("/api/reports/download?token=not-a-token")
+        self.assertEqual(bad_response.status_code, 401)
+
     def test_register_push_token(self):
         client = TestClient(app)
         headers = self.auth_headers(client)
