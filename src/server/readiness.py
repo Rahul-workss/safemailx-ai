@@ -63,7 +63,7 @@ def _redirect_status(redirect_uri: str, production: bool) -> dict[str, str]:
 
 
 def build_readiness() -> dict:
-    production = _is_truthy("TRUSTMAIL_PRODUCTION") or _is_truthy("TRUSTMAIL_REQUIRE_AUTH")
+    production = _is_truthy("TRUSTMAIL_PRODUCTION")
     items: list[dict[str, str]] = []
 
     jwt_secret = _env("JWT_SECRET", "change-me-before-production")
