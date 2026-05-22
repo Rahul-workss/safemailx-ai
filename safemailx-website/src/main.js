@@ -211,7 +211,7 @@ app.innerHTML = `
   </div>
 `;
 
-const TOTAL_FRAMES = 192;
+const TOTAL_FRAMES = 240;
 // On mobile: load every 4th frame (60 frames) for 75% less memory usage
 const isMobile = window.innerWidth <= 720;
 const frameStep = isMobile ? 4 : 1;
@@ -240,6 +240,12 @@ const framePath = (reducedIndex) => {
 const imageSequence = Array.from({ length: frameCount }, (_, index) => {
   const image = new Image();
   image.src = framePath(index);
+  image.addEventListener("load", () => {
+    // If this image is the active one, render it immediately when loaded
+    if (Math.round(playhead.frame) === index) {
+      renderFrame();
+    }
+  });
   return image;
 });
 
@@ -292,7 +298,11 @@ function renderFrame() {
   drawCoverImage(image);
 }
 
-imageSequence[0].addEventListener("load", sizeCanvas);
+if (imageSequence[0] && imageSequence[0].complete) {
+  sizeCanvas();
+} else if (imageSequence[0]) {
+  imageSequence[0].addEventListener("load", sizeCanvas);
+}
 window.addEventListener("resize", sizeCanvas);
 
 gsap.to(playhead, {
