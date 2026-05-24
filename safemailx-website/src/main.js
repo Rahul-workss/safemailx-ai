@@ -26,40 +26,93 @@ app.innerHTML = `
     <main>
       <section class="hero-sequence" id="hero">
         <div class="hero-stage">
-          <canvas id="sequence-canvas" aria-hidden="true"></canvas>
+          <video id="sequence-video" aria-hidden="true" src="/animation.mp4" muted playsinline></video>
           <div class="hero-scrim"></div>
           <div class="hero-grid"></div>
 
+          <!-- NEW REDESIGNED HUD — vertical right-side panel -->
           <div class="hero-hud">
-            <div class="hud-header">SYSTEM PIPELINE STATUS</div>
-            <div class="hud-pipeline">
+            <!-- Top progress bar -->
+            <div class="hud-progress-bar">
+              <div class="hud-progress-fill" id="hud-progress-fill"></div>
+            </div>
+            <!-- Chrome window header -->
+            <div class="hud-chrome">
+              <div class="hud-chrome-dots">
+                <div class="hud-chrome-dot"></div>
+                <div class="hud-chrome-dot"></div>
+                <div class="hud-chrome-dot"></div>
+              </div>
+              <div class="hud-chrome-title">ANALYSIS PIPELINE</div>
+              <div class="hud-chrome-signal"></div>
+            </div>
+            <!-- Step cards -->
+            <div class="hud-steps">
               <div class="hud-step" data-hud-step="0">
-                <div class="hud-step-icon"><span>01</span></div>
-                <div class="hud-step-label">INTAKE &amp;<br>ISOLATION</div>
+                <div class="hud-badge">
+                  <span class="hud-badge-num">01</span>
+                  <span class="hud-badge-check">✓</span>
+                </div>
+                <div class="hud-step-content">
+                  <div class="hud-step-title">Intake &amp; Isolation</div>
+                  <div class="hud-step-desc">Strip noise, extract raw signal</div>
+                </div>
+                <div class="hud-step-status">IDLE</div>
               </div>
-              <div class="hud-connector"><div class="hud-connector-fill"></div></div>
               <div class="hud-step" data-hud-step="1">
-                <div class="hud-step-icon"><span>02</span></div>
-                <div class="hud-step-label">RULE<br>ENGINE</div>
+                <div class="hud-badge">
+                  <span class="hud-badge-num">02</span>
+                  <span class="hud-badge-check">✓</span>
+                </div>
+                <div class="hud-step-content">
+                  <div class="hud-step-title">Rule Engine</div>
+                  <div class="hud-step-desc">Headers, URLs, spoofing patterns</div>
+                </div>
+                <div class="hud-step-status">IDLE</div>
               </div>
-              <div class="hud-connector"><div class="hud-connector-fill"></div></div>
               <div class="hud-step" data-hud-step="2">
-                <div class="hud-step-icon"><span>03</span></div>
-                <div class="hud-step-label">TF-IDF<br>ML MODEL</div>
+                <div class="hud-badge">
+                  <span class="hud-badge-num">03</span>
+                  <span class="hud-badge-check">✓</span>
+                </div>
+                <div class="hud-step-content">
+                  <div class="hud-step-title">TF-IDF ML Model</div>
+                  <div class="hud-step-desc">Semantic vocabulary scoring</div>
+                </div>
+                <div class="hud-step-status">IDLE</div>
               </div>
-              <div class="hud-connector"><div class="hud-connector-fill"></div></div>
               <div class="hud-step" data-hud-step="3">
-                <div class="hud-step-icon"><span>04</span></div>
-                <div class="hud-step-label">LLM<br>REASONING</div>
+                <div class="hud-badge">
+                  <span class="hud-badge-num">04</span>
+                  <span class="hud-badge-check">✓</span>
+                </div>
+                <div class="hud-step-content">
+                  <div class="hud-step-title">LLM Reasoning</div>
+                  <div class="hud-step-desc">Behavioural intent analysis</div>
+                </div>
+                <div class="hud-step-status">IDLE</div>
               </div>
-              <div class="hud-connector"><div class="hud-connector-fill"></div></div>
               <div class="hud-step" data-hud-step="4">
-                <div class="hud-step-icon"><span>05</span></div>
-                <div class="hud-step-label">FORENSIC<br>VERDICT</div>
+                <div class="hud-badge">
+                  <span class="hud-badge-num">05</span>
+                  <span class="hud-badge-check">✓</span>
+                </div>
+                <div class="hud-step-content">
+                  <div class="hud-step-title">Forensic Verdict</div>
+                  <div class="hud-step-desc">PDF report generation</div>
+                </div>
+                <div class="hud-step-status">IDLE</div>
               </div>
             </div>
-            <div class="hud-logs">
-              <div class="log-line">[SYS] Pipeline ready. Waiting for input...</div>
+            <!-- Terminal log strip -->
+            <div class="hud-terminal">
+              <div class="hud-terminal-header">
+                <span class="hud-terminal-label">Live Log</span>
+                <div class="hud-terminal-line"></div>
+              </div>
+              <div class="hud-logs">
+                <div class="log-line"><span class="log-time">[SYS]</span><span class="log-msg"> Pipeline ready. Awaiting input...<span class="log-cursor"></span></span></div>
+              </div>
             </div>
           </div>
 
@@ -67,11 +120,11 @@ app.innerHTML = `
         </div>
 
         <div class="hero-copy">
-          <p class="eyebrow">Coming soon</p>
           <h1>
             TrustMail
             <span>AI</span>
           </h1>
+          <p class="eyebrow">Coming soon</p>
           <p class="hero-summary">
             Next-gen email security that actually respects your privacy. Our on-device AI rips through sophisticated phishing attempts to give you the exact "who, what, and how" before you ever click a link.
           </p>
@@ -211,19 +264,9 @@ app.innerHTML = `
   </div>
 `;
 
-const TOTAL_FRAMES = 240;
-// On mobile: load every 4th frame (60 frames) for 75% less memory usage
 const isMobile = window.innerWidth <= 720;
-const frameStep = isMobile ? 4 : 1;
-// Build the list of actual frame indices we will load (0, 4, 8, ... or 0, 1, 2, ...)
-const frameIndices = [];
-for (let i = 0; i < TOTAL_FRAMES; i += frameStep) {
-  frameIndices.push(i);
-}
-const frameCount = frameIndices.length;
 
-const canvas = document.querySelector("#sequence-canvas");
-const context = canvas.getContext("2d");
+const video = document.querySelector("#sequence-video");
 const heroSection = document.querySelector(".hero-sequence");
 const topbar = document.querySelector(".topbar");
 const form = document.querySelector("#waitlist-form");
@@ -231,93 +274,21 @@ const formMessage = document.querySelector("#form-message");
 const formNote = document.querySelector("#form-note");
 const submitButton = document.querySelector("#submit-button");
 
-// framePath maps our reduced index back to the actual original filename
-const framePath = (reducedIndex) => {
-  const actualIndex = frameIndices[reducedIndex];
-  return `/images/frame-${String(actualIndex + 1).padStart(3, "0")}.webp`;
-};
-
-const imageSequence = Array.from({ length: frameCount }, (_, index) => {
-  const image = new Image();
-  image.src = framePath(index);
-  image.addEventListener("load", () => {
-    // If this image is the active one, render it immediately when loaded
-    if (Math.round(playhead.frame) === index) {
-      renderFrame();
-    }
+video.addEventListener("loadedmetadata", () => {
+  gsap.to(video, {
+    currentTime: video.duration || 10,
+    ease: "none",
+    scrollTrigger: {
+      trigger: heroSection,
+      start: "top top",
+      end: "bottom bottom",
+      scrub: isMobile ? 1.2 : 0.35,
+    },
   });
-  return image;
 });
 
-const playhead = { frame: 0 };
-
-function sizeCanvas() {
-  const ratio = window.devicePixelRatio || 1;
-  // On mobile, cap ratio at 1 to reduce canvas resolution and save GPU memory
-  const cappedRatio = isMobile ? Math.min(ratio, 1) : ratio;
-  const width = Math.floor(window.innerWidth * cappedRatio);
-  const height = Math.floor(window.innerHeight * cappedRatio);
-
-  canvas.width = width;
-  canvas.height = height;
-  canvas.style.width = `${window.innerWidth}px`;
-  canvas.style.height = `${window.innerHeight}px`;
-
-  renderFrame();
-}
-
-function drawCoverImage(image) {
-  const canvasWidth = canvas.width;
-  const canvasHeight = canvas.height;
-  const imageRatio = image.naturalWidth / image.naturalHeight;
-  const canvasRatio = canvasWidth / canvasHeight;
-
-  let drawWidth = canvasWidth;
-  let drawHeight = canvasHeight;
-
-  if (imageRatio > canvasRatio) {
-    drawHeight = canvasHeight;
-    drawWidth = drawHeight * imageRatio;
-  } else {
-    drawWidth = canvasWidth;
-    drawHeight = drawWidth / imageRatio;
-  }
-
-  const offsetX = (canvasWidth - drawWidth) / 2;
-  const offsetY = (canvasHeight - drawHeight) / 2;
-
-  context.clearRect(0, 0, canvasWidth, canvasHeight);
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = isMobile ? "medium" : "high";
-  context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
-}
-
-function renderFrame() {
-  const image = imageSequence[Math.round(playhead.frame)];
-  if (!image || !image.complete) return;
-  drawCoverImage(image);
-}
-
-if (imageSequence[0] && imageSequence[0].complete) {
-  sizeCanvas();
-} else if (imageSequence[0]) {
-  imageSequence[0].addEventListener("load", sizeCanvas);
-}
-window.addEventListener("resize", sizeCanvas);
-
-gsap.to(playhead, {
-  frame: frameCount - 1,
-  ease: "none",
-  snap: "frame",
-  onUpdate: renderFrame,
-  scrollTrigger: {
-    trigger: heroSection,
-    start: "top top",
-    end: "bottom bottom",
-    // Higher scrub value on mobile = smoother, less janky
-    scrub: isMobile ? 1.2 : 0.35,
-  },
-});
+// Force load for Safari/iOS
+video.load();
 
 gsap.from(".hero-copy > *", {
   opacity: 0,
@@ -328,9 +299,12 @@ gsap.from(".hero-copy > *", {
   delay: 0.15,
 });
 
+// Inform GSAP of the percentage-based transform so it doesn't overwrite it
+gsap.set(".hero-copy", { xPercent: -50, yPercent: -50 });
+
 gsap.to(".hero-copy", {
-  opacity: 0.32,
-  y: -50,
+  opacity: 0,
+  yPercent: -65,
   scrollTrigger: {
     trigger: heroSection,
     start: "top top",
@@ -461,19 +435,18 @@ form.addEventListener("submit", async (event) => {
   }, 3000);
 });
 
-// HUD Overlay Logic
+// ── NEW HUD Logic ──────────────────────────────────────────────
 const hudStepEls = document.querySelectorAll('.hud-step');
-const hudConnectors = document.querySelectorAll('.hud-connector-fill');
 const hudLogs = document.querySelector('.hud-logs');
+const hudProgressFill = document.querySelector('#hud-progress-fill');
 window.lastActiveStep = -2;
 
-// Slide HUD in on scroll start
-// On mobile, show it almost immediately
+// Slide HUD in from right
 const hudStart = isMobile ? "top+=1% top" : "top+=5% top";
 const hudEnd = isMobile ? "top+=10% top" : "top+=22% top";
-const hudY = isMobile ? 30 : 80;
 
-gsap.set(".hero-hud", { autoAlpha: 0, y: hudY, scale: 0.96 });
+gsap.set(".hero-hud", { autoAlpha: 0, x: 60, scale: 0.95 });
+gsap.set(".hud-step", { autoAlpha: 0, x: 16 });
 
 gsap.timeline({
   scrollTrigger: {
@@ -483,8 +456,8 @@ gsap.timeline({
     scrub: true,
   }
 })
-  .to(".hero-hud", { autoAlpha: 1, y: 0, scale: 1, ease: "power2.out" })
-  .to(".hud-step", { autoAlpha: 1, y: 0, stagger: 0.08, ease: "power2.out" }, "<0.1");
+  .to(".hero-hud", { autoAlpha: 1, x: 0, scale: 1, ease: "power2.out" })
+  .to(".hud-step", { autoAlpha: 1, x: 0, stagger: 0.1, ease: "power2.out" }, "<0.1");
 
 // Slide HUD out at end
 gsap.timeline({
@@ -494,33 +467,40 @@ gsap.timeline({
     end: "top+=360% top",
     scrub: true,
   }
-}).to(".hero-hud", { autoAlpha: 0, y: -50, scale: 0.94, ease: "power2.in" });
+}).to(".hero-hud", { autoAlpha: 0, x: 50, scale: 0.94, ease: "power2.in" });
 
 function updateHud(index, activeLog) {
   hudStepEls.forEach((step, i) => {
+    const statusEl = step.querySelector('.hud-step-status');
     step.classList.remove('active', 'completed');
-    if (i < index) step.classList.add('completed');
-    else if (i === index) step.classList.add('active');
-  });
 
-  // Animate connector lines filling in up to (index) position
-  hudConnectors.forEach((conn, i) => {
     if (i < index) {
-      gsap.to(conn, { scaleX: 1, duration: 0.5, ease: "power2.out" });
+      step.classList.add('completed');
+      if (statusEl) statusEl.textContent = 'DONE';
+    } else if (i === index) {
+      step.classList.add('active');
+      if (statusEl) statusEl.textContent = 'RUNNING';
     } else {
-      gsap.to(conn, { scaleX: 0, duration: 0.3, ease: "power2.in" });
+      if (statusEl) statusEl.textContent = 'IDLE';
     }
   });
 
+  // Update progress bar (step 0→4 fills 20%→100%)
+  if (hudProgressFill) {
+    const progress = index < 0 ? 0 : ((index + 1) / 5) * 100;
+    hudProgressFill.style.width = progress + '%';
+  }
+
+  // Append new log line
   if (activeLog && index !== window.lastActiveStep) {
+    const existing = hudLogs.querySelector('.log-line');
+    if (existing) existing.remove();
+
     const div = document.createElement('div');
     div.className = 'log-line';
     const timestamp = new Date().toISOString().split('T')[1].substring(0, 8);
-    div.textContent = `[${timestamp}] ${activeLog}`;
+    div.innerHTML = `<span class="log-time">[${timestamp}]</span><span class="log-msg"> ${activeLog}<span class="log-cursor"></span></span>`;
     hudLogs.appendChild(div);
-    while (hudLogs.children.length > 1) {
-      hudLogs.removeChild(hudLogs.firstChild);
-    }
   }
   window.lastActiveStep = index;
 }

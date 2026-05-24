@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HUD Redesign Preview — TrustMail AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg-deep: #030915;
+      --accent: #8ef0ff;
+      --accent-2: #5ca7ff;
+      --accent-3: #ffd089;
+      --success: #8df0bd;
+      --danger: #ff9b9b;
+      --text: #f2f5fb;
+      --muted: #9caec8;
+      --sans: "Space Grotesk", sans-serif;
+      --serif: "Instrument Serif", Georgia, serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg-deep);
+      color: var(--text);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Scroll spacer to enable scrolling for GSAP ──────── */
+    .hero-sequence {
+      position: relative;
+      height: 420vh;
+    }
+
+    .hero-stage {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 50%, rgba(92, 167, 255, 0.08) 0%, transparent 70%),
+        radial-gradient(circle at 80% 20%, rgba(142, 240, 255, 0.07), transparent 40%),
+        linear-gradient(180deg, #07111f 0%, #050b16 50%, #030915 100%);
+    }
+
+    /* Simulated grid overlay */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 5rem 5rem;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.8));
+      z-index: 0;
+    }
+
+    /* Simulated canvas / gradient stand-in for background animation */
+    .hero-bg-orb {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 0;
+    }
+    .hero-bg-orb::after {
+      content: '';
+      width: 60vmin;
+      height: 60vmin;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(92, 167, 255, 0.14) 0%, rgba(142, 240, 255, 0.06) 40%, transparent 70%);
+      animation: orbPulse 4s ease-in-out infinite;
+    }
+
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+
+    /* ── NEW REDESIGNED HUD ─────────────────────────────────── */
+
+    /*
+     * DESIGN RATIONALE:
+     * Instead of a wide horizontal pill bar at the bottom (hard to read, low contrast),
+     * we use a compact VERTICAL SIDE PANEL anchored to the right edge.
+     * Each AI stage gets its own card row with:
+     *  - A step number badge
+     *  - Title + short description
+     *  - A status chip (idle / processing / done)
+     * A live terminal log strip sits at the bottom of the panel.
+     * Colors: cyan (#8ef0ff) active, green (#8df0bd) completed, muted for idle.
+     * Glassmorphism panel with stronger contrast than the old design.
+     */
+
+    .hero-hud {
+      position: absolute;
+      right: max(1.5rem, calc((100vw - 1180px) / 2));
+      top: 50%;
+      transform: translateY(-50%);
+      width: min(22rem, calc(100vw - 2rem));
+      z-index: 3;
+      pointer-events: none;
+      /* Strong glass panel */
+      background: rgba(3, 9, 21, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(142, 240, 255, 0.14);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(142, 240, 255, 0.04) inset,
+        0 0 60px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(142, 240, 255, 0.04);
+    }
+
+    /* Top chrome strip */
+    .hud-chrome {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.9rem 1.2rem 0.8rem;
+      border-bottom: 1px solid rgba(142, 240, 255, 0.07);
+      background: rgba(142, 240, 255, 0.03);
+    }
+
+    .hud-chrome-dots {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .hud-chrome-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .hud-chrome-title {
+      flex: 1;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: rgba(142, 240, 255, 0.6);
+      text-align: center;
+    }
+
+    .hud-chrome-signal {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+      animation: signalBlink 2s ease-in-out infinite;
+    }
+
+    @keyframes signalBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Steps list */
+    .hud-steps {
+      padding: 0.6rem 0;
+    }
+
+    .hud-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      padding: 0.7rem 1.2rem;
+      position: relative;
+      transition: background 0.4s ease;
+    }
+
+    /* Vertical connector line between steps */
+    .hud-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: calc(1.2rem + 0.85rem / 2);
+      top: calc(0.7rem + 1.5rem);
+      width: 1px;
+      height: calc(100% - 0.7rem - 1.5rem);
+      background: rgba(142, 240, 255, 0.07);
+      transition: background 0.5s ease;
+    }
+
+    .hud-step.active {
+      background: rgba(142, 240, 255, 0.04);
+    }
+
+    .hud-step.completed:not(:last-child)::after {
+      background: rgba(141, 240, 189, 0.25);
+    }
+
+    /* Step badge */
+    .hud-badge {
+      flex-shrink: 0;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      border: 1px solid rgba(156, 174, 200, 0.2);
+      background: rgba(5, 14, 28, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition:
+        border-color 0.4s ease,
+        background 0.4s ease,
+        box-shadow 0.4s ease;
+    }
+
+    /* Outer ping ring on active step */
+    .hud-badge::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+
+    .hud-badge-num {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: rgba(156, 174, 200, 0.4);
+      letter-spacing: 0.03em;
+      transition: color 0.4s ease;
+    }
+
+    /* Check mark icon for completed */
+    .hud-badge-check {
+      display: none;
+      font-size: 0.7rem;
+      color: var(--success);
+    }
+
+    /* Step content */
+    .hud-step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .hud-step-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: rgba(156, 174, 200, 0.4);
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+      transition: color 0.4s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hud-step-desc {
+      font-size: 0.65rem;
+      color: rgba(156, 174, 200, 0.22);
+      line-height: 1.5;
+      margin-top: 0.15rem;
+      transition: color 0.4s ease;
+    }
+
+    /* Status chip on the right */
+    .hud-step-status {
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      font-size: 0.5rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(156, 174, 200, 0.12);
+      color: rgba(156, 174, 200, 0.3);
+      background: rgba(5, 14, 28, 0.3);
+      transition: all 0.4s ease;
+      white-space: nowrap;
+    }
+
+    /* ── ACTIVE state ──────────────────── */
+    .hud-step.active .hud-badge {
+      border-color: var(--accent);
+      background: rgba(142, 240, 255, 0.1);
+      box-shadow:
+        0 0 14px rgba(142, 240, 255, 0.3),
+        0 0 5px rgba(142, 240, 255, 0.15) inset;
+    }
+
+    .hud-step.active .hud-badge::before {
+      border-color: rgba(142, 240, 255, 0.22);
+      box-shadow: 0 0 18px rgba(142, 240, 255, 0.15);
+      animation: pingRing 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pingRing {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.18); opacity: 0.25; }
+    }
+
+    .hud-step.active .hud-badge-num { color: var(--accent); }
+
+    .hud-step.active .hud-step-title {
+      color: var(--text);
+    }
+
+    .hud-step.active .hud-step-desc {
+      color: var(--muted);
+    }
+
+    .hud-step.active .hud-step-status {
+      color: var(--accent);
+      border-color: rgba(142, 240, 255, 0.3);
+      background: rgba(142, 240, 255, 0.07);
+    }
+
+    /* ── COMPLETED state ───────────────── */
+    .hud-step.completed .hud-badge {
+      border-color: rgba(141, 240, 189, 0.5);
+      background: rgba(141, 240, 189, 0.07);
+      box-shadow: 0 0 10px rgba(141, 240, 189, 0.18);
+    }
+
+    .hud-step.completed .hud-badge-num { display: none; }
+    .hud-step.completed .hud-badge-check { display: block; }
+
+    .hud-step.completed .hud-step-title {
+      color: rgba(141, 240, 189, 0.75);
+    }
+
+    .hud-step.completed .hud-step-desc {
+      color: rgba(141, 240, 189, 0.38);
+    }
+
+    .hud-step.completed .hud-step-status {
+      color: var(--success);
+      border-color: rgba(141, 240, 189, 0.3);
+      background: rgba(141, 240, 189, 0.06);
+    }
+
+    /* ── BOTTOM LOG TERMINAL ──────────── */
+    .hud-terminal {
+      border-top: 1px solid rgba(142, 240, 255, 0.07);
+      padding: 0.75rem 1.2rem;
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .hud-terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .hud-terminal-label {
+      font-size: 0.5rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: rgba(142, 240, 255, 0.4);
+      text-transform: uppercase;
+    }
+
+    .hud-terminal-line {
+      flex: 1;
+      height: 1px;
+      background: rgba(142, 240, 255, 0.07);
+    }
+
+    .hud-logs {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.65rem;
+      line-height: 1.5;
+      height: 1.6rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    .log-line {
+      opacity: 0;
+      animation: fadeSlideIn 0.35s ease forwards;
+      display: flex;
+      gap: 0.5rem;
+      align-items: baseline;
+    }
+
+    .log-time {
+      color: rgba(142, 240, 255, 0.35);
+      flex-shrink: 0;
+    }
+
+    .log-msg {
+      color: var(--accent-3);
+      font-weight: 600;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Blinking cursor at end of log line */
+    .log-cursor {
+      display: inline-block;
+      width: 5px;
+      height: 0.7em;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: baseline;
+      animation: cursorBlink 1.1s step-end infinite;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* ── PROGRESS MICRO BAR at top of panel ──── */
+    .hud-progress-bar {
+      height: 2px;
+      background: rgba(142, 240, 255, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hud-progress-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--success), var(--accent));
+      box-shadow: 0 0 8px rgba(142, 240, 255, 0.6);
+      transition: width 0.5s ease;
+    }
+
+    /* ── DEMO SCROLL HINT ──────────────── */
+    .scroll-hint {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(242, 245, 251, 0.5);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      z-index: 10;
+      animation: fadeHint 2s 1s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeHint {
+      to { opacity: 1; }
+    }
+
+    .scroll-hint-line {
+      width: 1px;
+      height: 3rem;
+      background: rgba(255,255,255,0.15);
+      overflow: hidden;
+    }
+
+    .scroll-hint-line span {
+      display: block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: -1.5px;
+      animation: scrollDot 1.6s infinite;
+    }
+
+    @keyframes scrollDot {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(3rem); opacity: 0; }
+    }
+
+    /* ── HERO COPY (minimal placeholder) ─────────── */
+    .hero-copy {
+      position: absolute;
+      left: max(1.5rem, calc((100vw - 1180px) / 2));
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+    }
+
+    .hero-eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-title {
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      background: linear-gradient(110deg, #fff, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1.2rem;
+    }
+
+    .hero-title em {
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .hero-sub {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 28rem;
+      line-height: 1.7;
+    }
+
+    /* ── COMPARISON NOTE ─────────── */
+    .compare-note {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(3, 9, 21, 0.9);
+      border: 1px solid rgba(142, 240, 255, 0.2);
+      border-radius: 999px;
+      padding: 0.45rem 1.1rem;
+      font-size: 0.7rem;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="compare-note">🎨 HUD REDESIGN PREVIEW — Scroll to see the animation</div>
+
+  <section class="hero-sequence" id="hero">
+    <div class="hero-stage">
+      <div class="hero-grid"></div>
+      <div class="hero-bg-orb"></div>
+
+      <!-- Left: hero text placeholder -->
+      <div class="hero-copy">
+        <p class="hero-eyebrow">Coming soon</p>
+        <h1 class="hero-title">TrustMail<br><em>AI</em></h1>
+        <p class="hero-sub">Next-gen email security that actually respects your privacy.</p>
+      </div>
+
+      <!-- RIGHT SIDE HUD — NEW DESIGN -->
+      <div class="hero-hud" id="hero-hud">
+        <!-- 2px progress bar at very top -->
+        <div class="hud-progress-bar">
+          <div class="hud-progress-fill" id="hud-progress-fill"></div>
+        </div>
+
+        <!-- Window chrome header -->
+        <div class="hud-chrome">
+          <div class="hud-chrome-dots">
+            <div class="hud-chrome-dot"></div>
+            <div class="hud-chrome-dot"></div>
+            <div class="hud-chrome-dot"></div>
+          </div>
+          <div class="hud-chrome-title">ANALYSIS PIPELINE</div>
+          <div class="hud-chrome-signal"></div>
+        </div>
+
+        <!-- Steps -->
+        <div class="hud-steps">
+          <div class="hud-step" data-hud-step="0">
+            <div class="hud-badge">
+              <span class="hud-badge-num">01</span>
+              <span class="hud-badge-check">✓</span>
+            </div>
+            <div class="hud-step-content">
+              <div class="hud-step-title">Intake & Isolation</div>
+              <div class="hud-step-desc">Strip noise, extract raw signal</div>
+            </div>
+            <div class="hud-step-status">IDLE</div>
+          </div>
+
+          <div class="hud-step" data-hud-step="1">
+            <div class="hud-badge">
+              <span class="hud-badge-num">02</span>
+              <span class="hud-badge-check">✓</span>
+            </div>
+            <div class="hud-step-content">
+              <div class="hud-step-title">Rule Engine</div>
+              <div class="hud-step-desc">Headers, URLs, spoofing patterns</div>
+            </div>
+            <div class="hud-step-status">IDLE</div>
+          </div>
+
+          <div class="hud-step" data-hud-step="2">
+            <div class="hud-badge">
+              <span class="hud-badge-num">03</span>
+              <span class="hud-badge-check">✓</span>
+            </div>
+            <div class="hud-step-content">
+              <div class="hud-step-title">TF-IDF ML Model</div>
+              <div class="hud-step-desc">Semantic vocabulary scoring</div>
+            </div>
+            <div class="hud-step-status">IDLE</div>
+          </div>
+
+          <div class="hud-step" data-hud-step="3">
+            <div class="hud-badge">
+              <span class="hud-badge-num">04</span>
+              <span class="hud-badge-check">✓</span>
+            </div>
+            <div class="hud-step-content">
+              <div class="hud-step-title">LLM Reasoning</div>
+              <div class="hud-step-desc">Behavioural intent analysis</div>
+            </div>
+            <div class="hud-step-status">IDLE</div>
+          </div>
+
+          <div class="hud-step" data-hud-step="4">
+            <div class="hud-badge">
+              <span class="hud-badge-num">05</span>
+              <span class="hud-badge-check">✓</span>
+            </div>
+            <div class="hud-step-content">
+              <div class="hud-step-title">Forensic Verdict</div>
+              <div class="hud-step-desc">PDF report generation</div>
+            </div>
+            <div class="hud-step-status">IDLE</div>
+          </div>
+        </div>
+
+        <!-- Terminal log strip -->
+        <div class="hud-terminal">
+          <div class="hud-terminal-header">
+            <span class="hud-terminal-label">Live Log</span>
+            <div class="hud-terminal-line"></div>
+          </div>
+          <div class="hud-logs" id="hud-logs">
+            <div class="log-line">
+              <span class="log-time">[SYS]</span>
+              <span class="log-msg">Pipeline ready. Awaiting input...<span class="log-cursor"></span></span>
+            </div>
+          </div>
+        </div>
+      </div><!-- /.hero-hud -->
+    </div>
+  </section>
+
+  <!-- Scroll hint -->
+  <div class="scroll-hint">
+    Scroll
+    <div class="scroll-hint-line"><span></span></div>
+  </div>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    const heroSection = document.querySelector('#hero');
+    const hudEl = document.querySelector('#hero-hud');
+    const hudStepEls = document.querySelectorAll('.hud-step');
+    const hudLogs = document.querySelector('#hud-logs');
+    const progressFill = document.querySelector('#hud-progress-fill');
+    let lastActiveStep = -2;
+
+    // ── Initial hidden state ──────────────────────────────────
+    gsap.set(hudEl, { autoAlpha: 0, x: 60, scale: 0.95 });
+    gsap.set('.hud-step', { autoAlpha: 0, x: 20 });
+
+    // ── Slide in from right ───────────────────────────────────
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: heroSection,
+        start: 'top+=5% top',
+        end: 'top+=22% top',
+        scrub: true,
+      }
+    })
+      .to(hudEl, { autoAlpha: 1, x: 0, scale: 1, ease: 'power2.out' })
+      .to('.hud-step', { autoAlpha: 1, x: 0, stagger: 0.1, ease: 'power2.out' }, '<0.1');
+
+    // ── Slide out at end ──────────────────────────────────────
+    gsap.timeline({
+      scrollTrigger: {
+        trigger: heroSection,
+        start: 'top+=340% top',
+        end: 'top+=360% top',
+        scrub: true,
+      }
+    }).to(hudEl, { autoAlpha: 0, x: 50, scale: 0.94, ease: 'power2.in' });
+
+    // ── Update step states ────────────────────────────────────
+    function updateHud(index, log) {
+      // Update each step class
+      hudStepEls.forEach((step, i) => {
+        const statusEl = step.querySelector('.hud-step-status');
+        step.classList.remove('active', 'completed');
+
+        if (i < index) {
+          step.classList.add('completed');
+          if (statusEl) statusEl.textContent = 'DONE';
+        } else if (i === index) {
+          step.classList.add('active');
+          if (statusEl) statusEl.textContent = 'RUNNING';
+        } else {
+          if (statusEl) statusEl.textContent = 'IDLE';
+        }
+      });
+
+      // Update progress bar (0-4 steps → 0-100%)
+      const progress = index < 0 ? 0 : ((index + 1) / 5) * 100;
+      progressFill.style.width = progress + '%';
+
+      // Append log line
+      if (log && index !== lastActiveStep) {
+        const existing = hudLogs.querySelector('.log-line');
+        if (existing) existing.remove();
+
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        const ts = new Date().toISOString().split('T')[1].substring(0, 8);
+        div.innerHTML = `<span class="log-time">[${ts}]</span><span class="log-msg">${log}<span class="log-cursor"></span></span>`;
+        hudLogs.appendChild(div);
+      }
+
+      lastActiveStep = index;
+    }
+
+    // ── Drive HUD with scroll progress ───────────────────────
+    ScrollTrigger.create({
+      trigger: heroSection,
+      start: 'top top',
+      end: 'bottom bottom',
+      onUpdate: (self) => {
+        const p = self.progress;
+        let step = -1, log = '';
+
+        if      (p < 0.05)               { step = -1; log = ''; }
+        else if (p >= 0.05 && p < 0.23)  { step = 0;  log = 'Intake initiated: stripping noise...'; }
+        else if (p >= 0.23 && p < 0.41)  { step = 1;  log = 'Rule engine: checking headers & URLs...'; }
+        else if (p >= 0.41 && p < 0.58)  { step = 2;  log = 'TF-IDF model: scoring vocabulary...'; }
+        else if (p >= 0.58 && p < 0.75)  { step = 3;  log = 'LLM reasoning: analyzing intent...'; }
+        else if (p >= 0.75 && p <= 1.0)  { step = 4;  log = 'Compiling forensic PDF report...'; }
+
+        if (step !== lastActiveStep) updateHud(step, log);
+      }
+    });
+  </script>
+</body>
+</html>
