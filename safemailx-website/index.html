@@ -1078,10 +1078,13 @@
     // ─── 8. WAITLIST FORM ─────────────────────────────────
     document.getElementById('wl-form').addEventListener('submit',async function(e){
       e.preventDefault();const btn=this.querySelector('.btn-submit');btn.textContent='Submitting...';btn.disabled=true;
-      try{const r=await fetch('https://formspree.io/f/xkgjpova',{method:'POST',body:new FormData(this),headers:{'Accept':'application/json'}});
-        if(r.ok){this.style.display='none';document.getElementById('wl-success').style.display='block';}
-        else{btn.textContent='Try again →';btn.disabled=false;}}
-      catch{btn.textContent='Join the waitlist →';btn.disabled=false;}
+      try{
+        const params = new URLSearchParams();
+        params.append("Name", (this.first_name.value + " " + this.last_name.value).trim());
+        params.append("Email", this.email.value);
+        await fetch('https://script.google.com/macros/s/AKfycbwo23RPdjHwkOiAqrXsfir4GcKwZ0efPXM5dgp4BwSzwQzIT5ziKW4_4DJWS8SFYJsj/exec',{method:'POST',body:params,mode:'no-cors'});
+        this.style.display='none';document.getElementById('wl-success').style.display='block';
+      } catch{btn.textContent='Join the waitlist →';btn.disabled=false;}
     });
   </script>
 </body>
