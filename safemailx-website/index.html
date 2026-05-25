@@ -1082,7 +1082,7 @@
         const params = new URLSearchParams();
         params.append("Name", this.name.value.trim());
         params.append("Email", this.email.value);
-        await fetch('https://script.google.com/macros/s/AKfycbw352kEYICH-1EYIKesrIVdBrC_Orm0z3eTzXW7BoVFr1osOnykzXvgAN4_Cp0wyW8l/exec',{method:'POST',body:params,mode:'no-cors'});
+        await fetch('https://script.google.com/macros/s/AKfycbyFKo8c2Ze6yo2uyr_TraAm67HpywbHyq3dGaIOeMeGVN9N1PkczLBT_Cf2bY-Zw_-6/exec',{method:'POST',body:params,mode:'no-cors'});
         this.style.display='none';document.getElementById('wl-success').style.display='block';
       } catch{btn.textContent='Join the waitlist →';btn.disabled=false;}
     });
