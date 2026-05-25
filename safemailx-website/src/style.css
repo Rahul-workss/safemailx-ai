@@ -208,17 +208,16 @@ main {
   overflow: hidden;
 }
 
-#sequence-video,
+#sequence-canvas,
 .hero-scrim,
 .hero-grid {
   position: absolute;
   inset: 0;
 }
 
-#sequence-video {
+#sequence-canvas {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .hero-scrim {
@@ -237,7 +236,20 @@ main {
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.9));
 }
 
-/* hero-copy positioning moved to main block below HUD styles */
+.hero-copy {
+  position: relative;
+  z-index: 4;
+}
+
+.hero-summary {
+  color: rgba(242, 245, 251, 0.95);
+  font-size: 1.08rem;
+  line-height: 1.7;
+  max-width: 30rem;
+  text-shadow:
+    0 1px 12px rgba(3, 9, 21, 0.95),
+    0 2px 28px rgba(3, 9, 21, 0.8);
+}
 
 .hero-info-rail {
   position: absolute;
@@ -285,143 +297,69 @@ main {
   font-size: 0.96rem;
 }
 
-/* ── NEW VERTICAL PIPELINE HUD ──────────────────────────── */
+/* ── SYSTEM PIPELINE HUD ────────────────────────────────── */
 .hero-hud {
   position: absolute;
-  right: max(1.5rem, calc((100vw - var(--content-width)) / 2));
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(22rem, calc(50vw - 2rem));
+  left: 50%;
+  bottom: 6vh;
+  transform: translateX(-50%);
+  width: min(56rem, calc(100vw - 4rem));
   z-index: 3;
   pointer-events: none;
-  background: rgba(3, 9, 21, 0.78);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(142, 240, 255, 0.14);
-  border-radius: 20px;
-  overflow: hidden;
+  background: rgba(4, 10, 22, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(142, 240, 255, 0.08);
+  padding: 1.6rem 2.4rem 1.4rem;
+  border-radius: 28px;
   box-shadow:
-    0 0 0 1px rgba(142, 240, 255, 0.04) inset,
-    0 0 60px rgba(0, 0, 0, 0.5),
-    0 0 30px rgba(142, 240, 255, 0.05);
+    0 0 0 1px rgba(142, 240, 255, 0.03) inset,
+    0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-/* Progress bar at very top */
-.hud-progress-bar {
-  height: 2px;
-  background: rgba(142, 240, 255, 0.06);
-  position: relative;
-  overflow: hidden;
-}
-
-.hud-progress-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--success), var(--accent));
-  box-shadow: 0 0 10px rgba(142, 240, 255, 0.7);
-  transition: width 0.5s ease;
-}
-
-/* Window chrome header */
-.hud-chrome {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.8rem 1.1rem;
-  border-bottom: 1px solid rgba(142, 240, 255, 0.07);
-  background: rgba(142, 240, 255, 0.025);
-}
-
-.hud-chrome-dots {
-  display: flex;
-  gap: 0.32rem;
-}
-
-.hud-chrome-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.hud-chrome-title {
-  flex: 1;
-  font-size: 0.58rem;
+.hud-header {
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.2em;
-  color: rgba(142, 240, 255, 0.6);
+  color: rgba(142, 240, 255, 0.7);
+  letter-spacing: 0.22em;
+  margin-bottom: 1.4rem;
   text-align: center;
-  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(142, 240, 255, 0.5);
 }
 
-.hud-chrome-signal {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 6px var(--success);
-  animation: signalBlink 2s ease-in-out infinite;
-}
-
-@keyframes signalBlink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
-}
-
-/* Steps container */
-.hud-steps {
-  padding: 0.4rem 0;
-}
-
-/* Each step row */
-.hud-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  padding: 0.65rem 1.1rem;
-  position: relative;
-  transition: background 0.4s ease;
-}
-
-/* Vertical connector line between badge centres */
-.hud-step:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: calc(1.1rem + 0.875rem);
-  top: calc(0.65rem + 1.75rem);
-  width: 1px;
-  height: calc(100% - 0.65rem - 1.75rem + 0.65rem);
-  background: rgba(142, 240, 255, 0.06);
-  transition: background 0.5s ease;
-}
-
-.hud-step.active {
-  background: rgba(142, 240, 255, 0.04);
-}
-
-.hud-step.completed:not(:last-child)::after {
-  background: rgba(141, 240, 189, 0.28);
-}
-
-/* Badge circle */
-.hud-badge {
-  flex-shrink: 0;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  border: 1px solid rgba(156, 174, 200, 0.18);
-  background: rgba(5, 14, 28, 0.5);
+/* Horizontal pipeline row */
+.hud-pipeline {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  transition: border-color 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
+  gap: 0;
+  margin-bottom: 1.4rem;
 }
 
-.hud-badge::before {
+/* Individual step bubble */
+.hud-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+  transition: transform 0.35s ease;
+}
+
+.hud-step-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  border: 1px solid rgba(156, 174, 200, 0.2);
+  background: rgba(5, 14, 28, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
+  position: relative;
+}
+
+.hud-step-icon::before {
   content: '';
   position: absolute;
   inset: -4px;
@@ -430,177 +368,111 @@ main {
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-.hud-badge-num {
+.hud-step-icon span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  transition: color 0.4s ease;
+}
+
+.hud-step-label {
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 600;
   color: rgba(156, 174, 200, 0.35);
+  letter-spacing: 0.08em;
+  text-align: center;
+  line-height: 1.4;
   transition: color 0.4s ease;
-}
-
-.hud-badge-check {
-  display: none;
-  font-size: 0.68rem;
-  color: var(--success);
-}
-
-/* Step text content */
-.hud-step-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.hud-step-title {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: rgba(156, 174, 200, 0.35);
-  line-height: 1.2;
-  transition: color 0.4s ease;
-}
-
-.hud-step-desc {
-  font-size: 0.62rem;
-  color: rgba(156, 174, 200, 0.18);
-  line-height: 1.5;
-  margin-top: 0.12rem;
-  transition: color 0.4s ease;
-}
-
-/* Status chip */
-.hud-step-status {
-  flex-shrink: 0;
-  margin-top: 0.08rem;
-  font-size: 0.48rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 0.18rem 0.42rem;
-  border-radius: 999px;
-  border: 1px solid rgba(156, 174, 200, 0.1);
-  color: rgba(156, 174, 200, 0.28);
-  background: rgba(5, 14, 28, 0.3);
-  transition: all 0.4s ease;
   white-space: nowrap;
+  text-shadow: 0 0 8px rgba(0,0,0,0.8);
 }
 
-/* ── ACTIVE state ─── */
-.hud-step.active .hud-badge {
+/* Connector line between steps */
+.hud-connector {
+  flex: 1;
+  height: 1px;
+  background: rgba(142, 240, 255, 0.06);
+  position: relative;
+  margin: 0 0.4rem;
+  margin-bottom: 2.2rem;
+}
+
+.hud-connector-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--success), var(--accent));
+  transform-origin: left center;
+  transform: scaleX(0);
+  box-shadow: 0 0 8px rgba(142, 240, 255, 0.5);
+}
+
+/* ACTIVE step */
+.hud-step.active .hud-step-icon {
   border-color: var(--accent);
-  background: rgba(142, 240, 255, 0.1);
-  box-shadow: 0 0 14px rgba(142, 240, 255, 0.3), 0 0 4px rgba(142, 240, 255, 0.15) inset;
+  background: rgba(142, 240, 255, 0.08);
+  box-shadow: 0 0 16px rgba(142, 240, 255, 0.35), 0 0 4px rgba(142, 240, 255, 0.2) inset;
 }
 
-.hud-step.active .hud-badge::before {
+.hud-step.active .hud-step-icon::before {
   border-color: rgba(142, 240, 255, 0.2);
+  box-shadow: 0 0 20px rgba(142, 240, 255, 0.15);
   animation: pulsePing 1.8s ease-in-out infinite;
 }
 
-@keyframes pulsePing {
-  0%, 100% { transform: scale(1);    opacity: 0.8; }
-  50%       { transform: scale(1.18); opacity: 0.25; }
-}
-
-.hud-step.active .hud-badge-num  { color: var(--accent); }
-.hud-step.active .hud-step-title { color: var(--text); }
-.hud-step.active .hud-step-desc  { color: var(--muted); }
-.hud-step.active .hud-step-status {
+.hud-step.active .hud-step-icon span {
   color: var(--accent);
-  border-color: rgba(142, 240, 255, 0.3);
-  background: rgba(142, 240, 255, 0.07);
 }
 
-/* ── COMPLETED state ─── */
-.hud-step.completed .hud-badge {
-  border-color: rgba(141, 240, 189, 0.5);
-  background: rgba(141, 240, 189, 0.07);
-  box-shadow: 0 0 10px rgba(141, 240, 189, 0.18);
+.hud-step.active .hud-step-label {
+  color: var(--text);
 }
 
-.hud-step.completed .hud-badge-num   { display: none; }
-.hud-step.completed .hud-badge-check { display: block; }
-.hud-step.completed .hud-step-title  { color: rgba(141, 240, 189, 0.75); }
-.hud-step.completed .hud-step-desc   { color: rgba(141, 240, 189, 0.35); }
-.hud-step.completed .hud-step-status {
-  color: var(--success);
-  border-color: rgba(141, 240, 189, 0.28);
+/* COMPLETED step */
+.hud-step.completed .hud-step-icon {
+  border-color: var(--success);
   background: rgba(141, 240, 189, 0.06);
+  box-shadow: 0 0 10px rgba(141, 240, 189, 0.2);
 }
 
-/* ── TERMINAL LOG ─── */
-.hud-terminal {
-  border-top: 1px solid rgba(142, 240, 255, 0.07);
-  padding: 0.65rem 1.1rem;
-  background: rgba(0, 0, 0, 0.15);
+.hud-step.completed .hud-step-icon span {
+  color: var(--success);
 }
 
-.hud-terminal-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.45rem;
+.hud-step.completed .hud-step-label {
+  color: rgba(141, 240, 189, 0.65);
 }
 
-.hud-terminal-label {
-  font-size: 0.48rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: rgba(142, 240, 255, 0.38);
-  text-transform: uppercase;
-}
-
-.hud-terminal-line {
-  flex: 1;
-  height: 1px;
-  background: rgba(142, 240, 255, 0.07);
+@keyframes pulsePing {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50%       { transform: scale(1.12); opacity: 0.3; }
 }
 
 .hud-logs {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.65rem;
-  line-height: 1.5;
-  height: 1.6rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+  height: 1.4rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  text-align: center;
 }
 
 .log-line {
   opacity: 0;
-  animation: fadeInLog 0.35s ease forwards;
-  display: flex;
-  gap: 0.45rem;
-  align-items: baseline;
-}
-
-.log-time {
-  color: rgba(142, 240, 255, 0.35);
-  flex-shrink: 0;
-}
-
-.log-msg {
+  animation: fadeInLog 0.4s ease forwards;
   color: var(--accent-3);
   font-weight: 600;
 }
 
-.log-cursor {
-  display: inline-block;
-  width: 5px;
-  height: 0.7em;
-  background: var(--accent-3);
-  margin-left: 2px;
-  vertical-align: baseline;
-  animation: cursorBlink 1.1s step-end infinite;
-}
-
-@keyframes cursorBlink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-}
-
 @keyframes fadeInLog {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(-5px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
+.hero-copy,
 .scroll-cue {
   position: absolute;
   left: 50%;
@@ -608,23 +480,10 @@ main {
 }
 
 .hero-copy {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(48rem, calc(100% - 2rem));
-  padding: 3.5rem;
+  top: clamp(5.5rem, 10vh, 7rem);
+  width: min(var(--content-width), calc(100% - 2rem));
+  padding: 0 1rem;
   z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  background: rgba(4, 11, 22, 0.45);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(142, 240, 255, 0.15);
-  border-radius: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(142, 240, 255, 0.05) inset;
 }
 
 .eyebrow {
@@ -645,13 +504,13 @@ main {
 }
 
 .hero-copy h1 {
+  max-width: 12ch;
   font-size: clamp(3.5rem, 10vw, 7.5rem);
   line-height: 0.94;
   background: linear-gradient(110deg, #ffffff, var(--accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.5rem;
 }
 
 .hero-copy h1 span,
@@ -674,7 +533,6 @@ main {
 
 .hero-actions {
   display: flex;
-  justify-content: center;
   gap: 0.9rem;
   margin-top: 2rem;
 }
@@ -1029,11 +887,7 @@ main {
 
 @media (max-width: 980px) {
   .hero-copy {
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(42rem, calc(100% - 2rem));
-    padding: 2.5rem;
+    top: 6.25rem;
   }
 
   .hero-info-rail {
@@ -1079,13 +933,10 @@ main {
     height: 100vh;
   }
 
-  /* hero-copy stays centered even on mobile */
+  /* hero-copy stays absolute inside the stage, shifted down a bit */
   .hero-copy {
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: calc(100% - 1.5rem);
-    padding: 1.8rem 1.2rem;
+    top: 4.5rem;
+    padding: 0 1rem;
   }
 
   .hero-copy h1 {
