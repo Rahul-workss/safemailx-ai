@@ -1,5 +1,5 @@
 numpy==2.4.6
-pandas==3.0.1
+pandas==3.0.3
 scikit-learn==1.8.0
 joblib==1.5.3
 pytesseract==0.3.13
@@ -24,7 +24,7 @@ fastapi==0.124.0
 uvicorn[standard]==0.48.0
 pydantic==2.12.5
 redis==8.0.0
-python-multipart==0.0.20
+python-multipart==0.0.29
 cryptography==48.0.0
 httpx==0.28.1
 psycopg[binary]==3.3.2
