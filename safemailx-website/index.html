@@ -300,6 +300,7 @@
       background: var(--glass-bg);
       backdrop-filter: var(--glass-blur);
       -webkit-backdrop-filter: var(--glass-blur);
+      will-change: transform, opacity;
       border: 1px solid var(--glass-border);
       border-radius: 20px;
       box-shadow:
@@ -338,6 +339,11 @@
       .hud-status { text-align: left; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-top: 0.5rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); width: 100%; }
       .hud-badge { margin-bottom: 0; }
       .hud-stat-row { margin-bottom: 0; }
+
+      /* MOBILE PERFORMANCE OPTIMIZATIONS (Lag Fixes) */
+      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+      nav.glass, .wide-hud-card, .glass-panel, .how-card, footer { background-color: rgba(11, 15, 23, 0.98) !important; }
+      .sweep-overlay { mix-blend-mode: normal !important; opacity: 0.08 !important; }
     }
 
     .overlay-label {
@@ -656,7 +662,7 @@
       <!-- Cyber Background Overlay (screen blend to let opaque shield through) -->
       <div id="cyber-overlay" style="position:absolute; inset:-2%; width:104%; height:104%; z-index:1; mix-blend-mode: screen; background: url('/images/cyber-bg.png') center/cover no-repeat; pointer-events: none; animation: cyber-breathe 8s ease-in-out infinite;">
         <!-- The sweeping pulse for the hero section -->
-        <div style="position:absolute; top:-10%; left:-50%; width:50%; height:120%; background: linear-gradient(90deg, transparent 0%, rgba(93,228,216,0.0) 20%, rgba(93,228,216,0.4) 50%, rgba(255,255,255,0.8) 55%, rgba(93,228,216,0.4) 60%, transparent 80%, transparent 100%); transform: skewX(-25deg); mix-blend-mode: color-dodge; animation: data-sweep 6s infinite; pointer-events: none;"></div>
+        <div class="sweep-overlay" style="position:absolute; top:-10%; left:-50%; width:50%; height:120%; background: linear-gradient(90deg, transparent 0%, rgba(93,228,216,0.0) 20%, rgba(93,228,216,0.4) 50%, rgba(255,255,255,0.8) 55%, rgba(93,228,216,0.4) 60%, transparent 80%, transparent 100%); transform: skewX(-25deg); mix-blend-mode: color-dodge; animation: data-sweep 6s infinite; pointer-events: none;"></div>
       </div>
 
       <!-- Full-Screen Liquid Glass Overlay -->
