@@ -331,10 +331,8 @@
     .hud-stat-row { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--dim); margin-bottom: 3px; }
 
     @media(max-width: 900px) {
-      .wide-hud-card { width: min(500px, 92vw) !important; position: absolute !important; left: 0 !important; right: 0 !important; margin: 0 auto !important; padding: 1.2rem 1.4rem; }
-      #overlay-l1.wide-hud-card { top: auto !important; bottom: 4% !important; }
-      #overlay-l2.wide-hud-card { top: auto !important; bottom: 4% !important; }
-      #overlay-l3.wide-hud-card { top: auto !important; bottom: 4% !important; }
+      .wide-hud-card { width: 92vw !important; max-width: 520px; position: absolute !important; left: 50% !important; right: auto !important; top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) !important; margin: 0 !important; padding: 1.8rem 2rem; }
+      #overlay-l1.wide-hud-card, #overlay-l2.wide-hud-card, #overlay-l3.wide-hud-card { top: 50% !important; bottom: auto !important; left: 50% !important; }
       .hud-inner { flex-direction: column; align-items: flex-start; gap: 1rem; }
       .hud-status { text-align: left; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-top: 0.5rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); width: 100%; }
       .hud-badge { margin-bottom: 0; }
@@ -1050,24 +1048,32 @@
     });
 
     mm.add("(max-width: 900px)", () => {
-      // MOBILE: Subtitle Layout (Cards sit at the exact same spot at the bottom, so they must NOT overlap in time)
+      // MOBILE: Centered panel layout with scale-in materialize effect
+      // Shield dims when a card is visible, restores between cards
+
       // Card 1
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=30% top', end:'top+=38% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
+        .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
+        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=46% top', end:'top+=52% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:1, y:0}, {opacity:0, y:-20, ease:'power2.in', immediateRender:false});
+        .fromTo('#overlay-l1', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
+        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
 
       // Card 2
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=54% top', end:'top+=62% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
+        .fromTo('#overlay-l2', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
+        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=70% top', end:'top+=76% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:1, y:0}, {opacity:0, y:-20, ease:'power2.in', immediateRender:false});
+        .fromTo('#overlay-l2', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
+        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
 
       // Card 3
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=78% top', end:'top+=86% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
+        .fromTo('#overlay-l3', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
+        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=94% top', end:'top+=99% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:1, y:0}, {opacity:0, y:-20, ease:'power2.in', immediateRender:false});
+        .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
+        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
     });
 
     // ─── 6. SECTION SCROLL REVEAL ─────────────────────────
