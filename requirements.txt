@@ -1,5 +1,5 @@
 numpy==2.4.6
-pandas==3.0.1
+pandas==3.0.3
 scikit-learn==1.8.0
 joblib==1.5.3
 pytesseract==0.3.13
