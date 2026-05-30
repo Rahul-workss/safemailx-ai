@@ -345,6 +345,13 @@
       nav.glass, .wide-hud-card, .glass-panel, .how-card, footer { background-color: rgba(11, 15, 23, 0.98) !important; }
       .sweep-overlay { mix-blend-mode: normal !important; opacity: 0.08 !important; }
       #hero-sequence { height: 300vh !important; }
+
+      /* Bug #4: Remove invisible liquid glass layer */
+      #hero-liquid-glass { display: none !important; }
+      /* Bug #5: Disable duplicate cyber background pseudo-elements */
+      body::before, body::after { display: none !important; animation: none !important; }
+      /* Bug #6: Hide oversized hero cyber overlay with blend mode */
+      #cyber-overlay { display: none !important; }
     }
 
     .overlay-label {
@@ -888,15 +895,20 @@
     const bgCvs = document.getElementById('bg-canvas');
     const bgCtx = bgCvs.getContext('2d');
     let BW, BH, pts = [];
+    const isMobile = window.innerWidth <= 900;
     function resizeBg() { BW = bgCvs.width = window.innerWidth; BH = bgCvs.height = window.innerHeight; }
     resizeBg(); window.addEventListener('resize', resizeBg);
     const pcols = ['rgba(93,228,216,','rgba(59,168,245,','rgba(82,232,165,'];
-    for(let i=0;i<80;i++) pts.push({x:Math.random()*BW,y:Math.random()*BH,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.5+.4,c:pcols[Math.floor(Math.random()*3)],a:Math.random()*.45+.15});
+    const PARTICLE_COUNT = isMobile ? 25 : 80;
+    for(let i=0;i<PARTICLE_COUNT;i++) pts.push({x:Math.random()*BW,y:Math.random()*BH,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.5+.4,c:pcols[Math.floor(Math.random()*3)],a:Math.random()*.45+.15});
     function drawBg() {
       bgCtx.clearRect(0,0,BW,BH);
       const g1=bgCtx.createRadialGradient(BW*.22,BH*.32,0,BW*.22,BH*.32,BW*.48);g1.addColorStop(0,'rgba(93,228,216,0.04)');g1.addColorStop(1,'transparent');bgCtx.fillStyle=g1;bgCtx.fillRect(0,0,BW,BH);
       const g2=bgCtx.createRadialGradient(BW*.78,BH*.68,0,BW*.78,BH*.68,BW*.38);g2.addColorStop(0,'rgba(59,168,245,0.025)');g2.addColorStop(1,'transparent');bgCtx.fillStyle=g2;bgCtx.fillRect(0,0,BW,BH);
-      for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<120){bgCtx.beginPath();bgCtx.moveTo(pts[i].x,pts[i].y);bgCtx.lineTo(pts[j].x,pts[j].y);bgCtx.strokeStyle=`rgba(93,228,216,${(1-d/120)*0.11})`;bgCtx.lineWidth=0.55;bgCtx.stroke();}}
+      // Bug #3: Skip expensive line-connection math on mobile (saves ~90% CPU)
+      if(!isMobile) {
+        for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);if(d<120){bgCtx.beginPath();bgCtx.moveTo(pts[i].x,pts[i].y);bgCtx.lineTo(pts[j].x,pts[j].y);bgCtx.strokeStyle=`rgba(93,228,216,${(1-d/120)*0.11})`;bgCtx.lineWidth=0.55;bgCtx.stroke();}}
+      }
       pts.forEach(p=>{bgCtx.beginPath();bgCtx.arc(p.x,p.y,p.r,0,Math.PI*2);bgCtx.fillStyle=p.c+p.a+')';bgCtx.fill();p.x+=p.vx;p.y+=p.vy;if(p.x<-8)p.x=BW+8;if(p.x>BW+8)p.x=-8;if(p.y<-8)p.y=BH+8;if(p.y>BH+8)p.y=-8;});
       requestAnimationFrame(drawBg);
     }
@@ -906,12 +918,21 @@
     const shCvs = document.getElementById('shield-canvas');
     const shCtx = shCvs.getContext('2d');
     
-    // We use a high number of frames for desktop, fewer for mobile
-    const TOTAL = 192, STEP = (window.innerWidth <= 720) ? 4 : 1;
+    // Bug #1: Use STEP=8 on mobile (24 frames ~10.5MB) instead of STEP=4 (48 frames ~21MB)
+    const TOTAL = 192, STEP = isMobile ? 8 : 1;
     const idxs = []; for(let i=0;i<TOTAL;i+=STEP) idxs.push(i);
     const FC = idxs.length;
     const fp = ri => `/images/frame-${String(idxs[ri]+1).padStart(3,'0')}.webp`;
-    const imgs = Array.from({length:FC},(_,i)=>{const im=new Image();im.src=fp(i);return im;});
+
+    // Bug #2: Smart preloading — eagerly load first 5 frames, lazy-load the rest
+    const PRELOAD_COUNT = 5;
+    const imgs = Array.from({length:FC}, () => new Image());
+    // Immediately start loading the first few frames
+    for(let i = 0; i < Math.min(PRELOAD_COUNT, FC); i++) { imgs[i].src = fp(i); }
+    // Lazy-load remaining frames after a short delay to let the page settle
+    setTimeout(() => {
+      for(let i = PRELOAD_COUNT; i < FC; i++) { imgs[i].src = fp(i); }
+    }, 800);
     const ph = {frame:0};
     
     function sizeSh() {
