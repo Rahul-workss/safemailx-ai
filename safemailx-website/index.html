@@ -1011,8 +1011,8 @@
       dotWraps.forEach((w,i) => { w.classList.toggle('active', i===n); });
     }
 
-    // Chapter thresholds (% of hero-sequence scroll)
-    const chapBreaks = [0, 0.45, 0.6, 0.72, 0.88];
+    // Chapter thresholds (% of hero-sequence scroll) — aligned to card animation timings
+    const chapBreaks = [0, 0.30, 0.54, 0.78, 0.95];
     ScrollTrigger.create({
       trigger: '#hero-sequence', start: 'top top', end: 'bottom bottom',
       onUpdate: (self) => {
