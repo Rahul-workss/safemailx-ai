@@ -655,6 +655,32 @@
       85% { opacity: 0; transform: scaleX(1); transform-origin: right; }
     }
 
+    
+    @media (max-width: 900px) {
+      /* Hero Glass Box */
+      .hero-text-glass { padding: 2rem 1.5rem !important; margin-top: 2rem !important; margin-bottom: 1rem !important; }
+      
+      /* Video Alignment */
+      #hero-video { transform: scale(1) translate(0, 0) !important; object-fit: cover; object-position: center; width: 100% !important; height: 100% !important; }
+
+      /* Remove 250vh Black Void */
+      #hero-sequence { height: auto !important; padding-bottom: 2rem !important; }
+      #hero-stage { position: relative !important; height: auto !important; padding-top: 5rem !important; overflow: hidden !important; }
+      
+      /* Reset Hero Copy */
+      #hero-copy { position: relative !important; top: auto !important; left: auto !important; transform: none !important; padding: 0 1rem !important; margin: 0 auto !important; }
+      
+      /* Fix Overlay HUD Cards (Stack naturally) */
+      .hero-overlay { position: relative !important; top: auto !important; left: auto !important; transform: none !important; opacity: 1 !important; pointer-events: auto !important; }
+      .pipeline-card { position: relative !important; top: auto !important; left: auto !important; transform: none !important; margin: 1.5rem auto !important; width: 100% !important; opacity: 1 !important; margin-left: 0 !important; border: 1px solid rgba(255,255,255,0.1); }
+      
+      /* Bottom bar */
+      .pipeline-bottom-bar { position: relative !important; bottom: auto !important; left: auto !important; transform: none !important; margin: 1.5rem auto 0 auto !important; opacity: 1 !important; width: 100% !important; }
+
+      /* Hide GSAP Scroll Cue */
+      #scroll-cue { display: none !important; }
+    }
+
     /* Mobile Fallback to Grid */
     @media(max-width: 900px) {
       .how-circle-stage { height: auto; max-width: 100%; display: grid; gap: 1.5rem; margin-top: 2rem; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); }
@@ -788,9 +814,16 @@
     }
 
     @media (max-width: 1000px) {
-      .timeline-row { flex-direction: column; align-items: center; gap: 40px; margin: 2rem 0 4rem 0; }
-      .tl-line { width: 2px; height: 100%; top: 0; left: 50%; right: auto; transform: translateX(-50%); background: rgba(255,255,255,0.1); }
-      .tl-progress { top: 0; left: -1px; width: 4px; height: var(--tl-progress, 0%); background: linear-gradient(180deg, var(--cyan) 0%, var(--blue) 50%, var(--purple) 100%); }
+      .timeline-row { flex-direction: column; align-items: flex-start; gap: 40px; margin: 2rem 1rem 4rem 1rem; padding-left: 0; }
+      .tl-line { width: 2px; height: 100%; top: 0; left: 31px; right: auto; transform: none; background: rgba(255,255,255,0.1); z-index: 1; }
+      .tl-progress { top: 0; left: 30px; width: 4px; height: var(--tl-progress, 0%); background: linear-gradient(180deg, var(--cyan) 0%, var(--blue) 50%, var(--purple) 100%); z-index: 2; }
+      
+      .tl-node { width: 100%; text-align: left; padding-left: 80px; position: relative; z-index: 3; align-items: flex-start; }
+      .tl-circle { position: absolute; left: 0; top: 0; margin-bottom: 0; width: 64px; height: 64px; }
+      .tl-num { display: none; }
+      .tl-title { margin-top: 10px; font-size: 1.1rem; }
+      .tl-desc { text-align: left; font-size: 0.9rem; }
+      
       .tl-features-bar { flex-direction: column; gap: 24px; align-items: flex-start; padding: 30px; }
       .tl-feature-divider { width: 100%; height: 1px; margin: 0; }
     }
@@ -1170,11 +1203,13 @@
     // ─── 1. VIDEO BACKGROUND ───────────────────────────
     // Laggy canvas animations replaced by smooth hardware-accelerated video
 
-    // Fade out hero text slightly later
-    gsap.to('#hero-copy',{opacity:0,y:-30,
-      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=15% top',scrub:true}});
-    gsap.to('#scroll-cue',{opacity:0,
-      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
+    // Fade out hero text slightly later (DESKTOP ONLY)
+    mm.add("(min-width: 901px)", () => {
+      gsap.to('#hero-copy',{opacity:0,y:-30,
+        scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=15% top',scrub:true}});
+      gsap.to('#scroll-cue',{opacity:0,
+        scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
+    });
 
     // Hero copy children entrance
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
@@ -1296,32 +1331,7 @@
     });
 
     mm.add("(max-width: 900px)", () => {
-      // MOBILE: Centered panel layout with scale-in materialize effect
-      // Shield dims when a card is visible, restores between cards
-
-      // Card 1
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=32% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=46% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
-
-      // Card 2
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=48% top', end:'top+=55% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=63% top', end:'top+=69% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
-
-      // Card 3
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=71% top', end:'top+=78% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=86% top', end:'top+=92% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
+      // Disabled GSAP overrides for mobile. CSS handles the static natural stacked flow.
     });
 
     // ─── 6. SECTION SCROLL REVEAL ─────────────────────────
