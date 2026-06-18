@@ -665,17 +665,17 @@
 
       /* Remove 250vh Black Void */
       #hero-sequence { height: auto !important; padding-bottom: 2rem !important; }
-      #hero-stage { position: relative !important; height: auto !important; padding-top: 5rem !important; overflow: hidden !important; }
+      #hero-stage { position: relative !important; height: auto !important; padding-top: 8rem !important; padding-bottom: 6rem !important; overflow: hidden !important; display: block !important; }
       
       /* Reset Hero Copy */
       #hero-copy { position: relative !important; top: auto !important; left: auto !important; transform: none !important; padding: 0 1rem !important; margin: 0 auto !important; }
       
-      /* Fix Overlay HUD Cards (Stack naturally) */
-      .hero-overlay { position: relative !important; top: auto !important; left: auto !important; transform: none !important; opacity: 1 !important; pointer-events: auto !important; }
-      .pipeline-card { position: relative !important; top: auto !important; left: auto !important; transform: none !important; margin: 1.5rem auto !important; width: 100% !important; opacity: 1 !important; margin-left: 0 !important; border: 1px solid rgba(255,255,255,0.1); }
+      /* Hide Overlay HUD Cards on Mobile (They are redundant with the Timeline Stepper) */
+      .hero-overlay { display: none !important; }
+      .pipeline-card { display: none !important; }
       
       /* Bottom bar */
-      .pipeline-bottom-bar { position: relative !important; bottom: auto !important; left: auto !important; transform: none !important; margin: 1.5rem auto 0 auto !important; opacity: 1 !important; width: 100% !important; }
+      .pipeline-bottom-bar { display: none !important; }
 
       /* Hide GSAP Scroll Cue */
       #scroll-cue { display: none !important; }
