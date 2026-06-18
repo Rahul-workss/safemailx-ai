@@ -352,7 +352,7 @@
     /* ── SCROLL OVERLAY CARDS ───────────── */
     /* ── PIPELINE CARDS (Overlay layout) ───────────── */
     .pipeline-card {
-      position: absolute; z-index: 10;
+      position: absolute; z-index: 10; pointer-events: none;
       width: 320px;
       max-width: 90vw;
       background: rgba(4, 10, 22, 0.4);
@@ -388,7 +388,7 @@
     .pc-blue .pc-list li svg { stroke: #4287f5; }
     .pc-purple .pc-list li svg { stroke: #ba55d3; }
     .pipeline-bottom-bar {
-      position: absolute;
+      position: absolute; pointer-events: none;
       bottom: 8%; left: 50%; transform: translateX(-50%);
       width: min(1080px, 92vw);
       background: rgba(4, 10, 22, 0.45);
