@@ -5,6 +5,7 @@ from server.queue import ScanQueue
 from server.repository import ScanRepository
 from server.settings import GMAIL_POLL_INTERVAL_SECONDS
 from server.gmail_oauth import build_gmail_service_from_blob
+from server.gmail_labels import ensure_safemailx_label_ids, move_message_to_queued_label
 from utils.content_processor import clean_extracted_text
 from utils.email_parser import parse_email
 from utils.forwarding_parser import extract_forwarded_payload
@@ -79,7 +80,8 @@ def enqueue_unread_forwarded_messages(
             user_id=user_id,
             evidence={
                 "status": "queued",
-                "source": "gmail",
+                "source": "web_forwarding",
+                "legacy_source": "gmail",
                 "gmail_message_id": message_id,
                 "forwarder": sender,
                 "attachment_count": len(parsed.get("attachments", [])),
@@ -88,7 +90,7 @@ def enqueue_unread_forwarded_messages(
         )
         scan_queue.enqueue({
             "type": "manual_text",
-            "source": "gmail",
+            "source": "web_forwarding",
             "scan_id": scan_id,
             "user_id": user_id,
             "gmail_message_id": message_id,
@@ -105,39 +107,111 @@ def enqueue_unread_forwarded_messages(
     return enqueued
 
 
+def enqueue_labeled_gmail_messages(
+    *,
+    service: Any,
+    repository: ScanRepository | None = None,
+    scan_queue: ScanQueue | None = None,
+    limit: int = 10,
+    user_id: str = "local",
+) -> int:
+    repository = repository or ScanRepository()
+    scan_queue = scan_queue or ScanQueue()
+    label_ids = ensure_safemailx_label_ids(service)
+
+    results = service.users().messages().list(
+        userId="me",
+        labelIds=[label_ids["scan"]],
+        maxResults=limit,
+    ).execute()
+    messages = results.get("messages", [])
+
+    if not messages:
+        print("[GMAIL WATCHER] No SafeMail X-labeled messages found.")
+        return 0
+
+    enqueued = 0
+    processed_threads = set()
+
+    for msg in messages:
+        thread_id = msg.get("threadId")
+
+        # Deduplicate by thread when thread metadata exists.
+        if thread_id and thread_id in processed_threads:
+            continue
+        if thread_id:
+            processed_threads.add(thread_id)
+
+        try:
+            thread_messages = []
+            message_id = msg["id"]
+
+            threads_resource = getattr(service.users(), "threads", None)
+            if thread_id and callable(threads_resource):
+                thread_data = threads_resource().get(userId="me", id=thread_id).execute()
+                thread_messages = thread_data.get("messages", [])
+                if thread_messages:
+                    message_id = thread_messages[0]["id"]
+
+            scan_id = repository.create_queued_scan(
+                subject="Gmail label scan",
+                sender="gmail_label_app",
+                user_id=user_id,
+                evidence={
+                    "status": "queued",
+                    "source": "gmail_label_app",
+                    "permission": "user_applied_label",
+                    "privacy_mode": "label_only",
+                    "gmail_message_id": message_id,
+                    "thread_id": thread_id,
+                },
+            )
+
+            scan_queue.enqueue({
+                "type": "gmail_label_message",
+                "source": "gmail_label_app",
+                "scan_id": scan_id,
+                "user_id": user_id,
+                "gmail_message_id": message_id,
+            })
+
+            if thread_messages:
+                for t_msg in thread_messages:
+                    try:
+                        move_message_to_queued_label(service, t_msg["id"], label_ids)
+                    except Exception:
+                        pass
+            else:
+                move_message_to_queued_label(service, message_id, label_ids)
+
+            enqueued += 1
+            print(f"[GMAIL WATCHER] Enqueued labeled Gmail scan {scan_id} for original message {message_id} in thread {thread_id}")
+
+        except Exception as exc:
+            print(f"[GMAIL WATCHER] Failed to process thread {thread_id}: {exc}")
+
+    return enqueued
+
+
 def run_gmail_watcher() -> None:
     """
     24/7 Gmail watcher entrypoint.
-
-    Poll unread Gmail messages and push forwarded scan requests onto Redis.
+    Only checks for forwarded emails sent to the bot.
+    Label scanning for App Connect is strictly manual via the App REST API.
     """
     print("[GMAIL WATCHER] Started.")
     repository = ScanRepository()
     scan_queue = ScanQueue()
     while True:
         try:
-            user_ids = repository.list_gmail_user_ids()
-            if user_ids:
-                count = 0
-                for user_id in user_ids:
-                    token_blob = repository.get_gmail_token(user_id)
-                    if not token_blob:
-                        continue
-                    service = build_gmail_service_from_blob(token_blob)
-                    count += enqueue_unread_forwarded_messages(
-                        service=service,
-                        repository=repository,
-                        scan_queue=scan_queue,
-                        user_id=user_id,
-                    )
-            else:
-                count = enqueue_unread_forwarded_messages(repository=repository, scan_queue=scan_queue)
+            count = enqueue_unread_forwarded_messages(repository=repository, scan_queue=scan_queue)
             print(f"[GMAIL WATCHER] Poll complete. Enqueued {count} scan(s).")
         except KeyboardInterrupt:
             print("[GMAIL WATCHER] Shutting down gracefully.")
             break
         except Exception as exc:
             print(f"[GMAIL WATCHER] Poll failed: {exc}")
+            
         time.sleep(GMAIL_POLL_INTERVAL_SECONDS)
 
 

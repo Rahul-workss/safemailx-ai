@@ -63,7 +63,7 @@ def _redirect_status(redirect_uri: str, production: bool) -> dict[str, str]:
 
 
 def build_readiness() -> dict:
-    production = _is_truthy("TRUSTMAIL_PRODUCTION")
+    production = _is_truthy("SAFEMAILX_PRODUCTION")
     items: list[dict[str, str]] = []
 
     jwt_secret = _env("JWT_SECRET", "change-me-before-production")
@@ -74,10 +74,10 @@ def build_readiness() -> dict:
     else:
         items.append(_item("jwt_secret", "ready", "JWT signing secret is production-shaped."))
 
-    admin_email = _env("TRUSTMAIL_ADMIN_EMAIL", "admin@trustmail.local")
-    admin_password = _env("TRUSTMAIL_ADMIN_PASSWORD", "change-me-before-production")
+    admin_email = _env("SAFEMAILX_ADMIN_EMAIL", "admin@safemailx.local")
+    admin_password = _env("SAFEMAILX_ADMIN_PASSWORD", "change-me-before-production")
     if production and (admin_email.endswith(".local") or not _is_real_value(admin_password) or len(admin_password) < 12):
-        items.append(_item("admin_account", "missing", "Set a real TRUSTMAIL_ADMIN_EMAIL and a strong bootstrap admin password."))
+        items.append(_item("admin_account", "missing", "Set a real SAFEMAILX_ADMIN_EMAIL and a strong bootstrap admin password."))
     else:
         items.append(_item("admin_account", "ready", "Bootstrap admin account settings are present."))
 

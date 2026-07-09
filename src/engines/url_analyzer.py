@@ -1,169 +1,258 @@
+import math
 import requests
-import io
-import threading
-import contextlib
-from datetime import datetime
+import sqlite3
+import datetime
+import urllib.parse
 from urllib.parse import urlparse
+import logging
+from typing import List, Dict, Optional, Tuple
+import os
 
-from utils.config import SAFE_BROWSING_API_KEY, is_configured_secret
+logger = logging.getLogger("URL_ANALYZER")
+WHOIS_AVAILABLE = True
 
 try:
-    import whois as _whois_lib
-    WHOIS_AVAILABLE = True
+    from pybloom_live import BloomFilter
+    BLOOM_AVAILABLE = True
 except ImportError:
-    WHOIS_AVAILABLE = False
+    BLOOM_AVAILABLE = False
+    logger.warning("pybloom_live not installed. Whitelist Bloom Filter will be mocked.")
 
-# Maximum seconds to wait for a WHOIS response.
-# python-whois has no built-in timeout; slow/firewalled networks
-# (e.g. ISPs that block port 43) cause it to hang indefinitely.
-WHOIS_TIMEOUT_SECONDS = 3
+try:
+    from confusable_homoglyphs import confusables
+    IDN_AVAILABLE = True
+except ImportError:
+    IDN_AVAILABLE = False
+    logger.warning("confusable_homoglyphs not installed. IDN checks disabled.")
 
+def _base_domain(host: str) -> str:
+    parts = (host or "").split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else (host or "")
 
-def _whois_with_timeout(domain: str, timeout: int = WHOIS_TIMEOUT_SECONDS):
-    """
-    Run whois.whois() in a daemon thread and return the result within
-    `timeout` seconds. Returns None if it times out or fails.
-    """
-    result = [None]
-    error  = [None]
+# ==========================================
+# STAGE 1: Pre-Computation (Whitelist & Hash)
+# ==========================================
 
-    def _do_whois():
+from engines.offline_sync import check_url_prefix
+
+# Initialize Tranco Bloom Filter
+_TRANCO_BLOOM = None
+if BLOOM_AVAILABLE:
+    _TRANCO_BLOOM = BloomFilter(capacity=1000000, error_rate=0.001)
+    # Attempt to load from offline csv if it exists
+    csv_path = os.path.join(os.path.dirname(__file__), "tranco.csv")
+    if os.path.exists(csv_path):
         try:
-            # Suppress python-whois internal socket error messages
-            # (it prints directly to stdout/stderr on timeout)
-            devnull = io.StringIO()
-            with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
-                result[0] = _whois_lib.whois(domain)
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    domain = line.strip()
+                    if domain: _TRANCO_BLOOM.add(domain)
+            logger.info("Successfully loaded Tranco top sites into Bloom Filter.")
         except Exception as e:
-            error[0] = e
+            logger.error(f"Failed to load tranco.csv into Bloom Filter: {e}")
+    else:
+        # Add some top domains for testing
+        _TRANCO_BLOOM.add("google.com")
+        _TRANCO_BLOOM.add("microsoft.com")
+        _TRANCO_BLOOM.add("apple.com")
+        _TRANCO_BLOOM.add("github.com")
 
-    t = threading.Thread(target=_do_whois, daemon=True)
-    t.start()
-    t.join(timeout)
-
-    if t.is_alive():
-        # Thread is still blocked on the socket — give up gracefully
-        print(f"[URL_ANALYZER] WHOIS timed out for '{domain}' after {timeout}s — skipping")
-        return None
-
-    if error[0]:
-        return None
-
-    return result[0]
-
-
-def analyze_urls(urls):
-    """
-    Analyzes a list of URLs locally (for speed) and checks them against
-    Google Safe Browsing in a single batched API call.
-    """
-    suspicious = []
-
-    # -----------------------------------
-    # 1. FAST LOCAL HEURISTICS (INSTANT)
-    # -----------------------------------
-    normalized_urls = []
-    checked_base_domains = {}  # Cache base domains (e.g. google.com)
+def check_bloom_filter(url: str) -> bool:
+    """Check if the domain is in the highly-optimized Tranco top 1M Bloom filter."""
+    if not BLOOM_AVAILABLE or not _TRANCO_BLOOM:
+        # Fallback to hardcoded list if bloom filter library failed
+        parsed = urlparse(url)
+        host = (parsed.hostname or parsed.netloc).lower()
+        base = _base_domain(host)
+        return base in {"google.com", "microsoft.com", "apple.com", "github.com"}
+        
+    parsed = urlparse(url)
+    host = (parsed.hostname or parsed.netloc).lower()
+    base = _base_domain(host)
     
-    # VIP domains that are mathematically guaranteed to be old/safe
-    VIP_DOMAINS = {"google.com", "microsoft.com", "amazon.com", "apple.com", "github.com", 
-                   "linkedin.com", "facebook.com", "twitter.com", "netflix.com", "gmail.com"}
+    return base in _TRANCO_BLOOM
 
-    if urls:
-        print(f"[URL_ANALYZER] Scanning {len(urls)} unique URLs...")
+def check_offline_prefix(url: str) -> bool:
+    """
+    Check against local SQLite 32-bit SHA-256 hash prefixes
+    representing Google Safe Browsing / OpenPhish feeds.
+    """
+    return check_url_prefix(url)
 
-    for item in urls:
-        url = item.get("normalized_url") if isinstance(item, dict) else str(item)
-        if not url:
-            continue
-        normalized_urls.append(url)
-        try:
-            parsed = urlparse(url)
-            host = (parsed.hostname or parsed.netloc).lower()
-            
-            # Extract base domain (e.g. sub.example.com -> example.com)
-            parts = host.split(".")
-            base_domain = ".".join(parts[-2:]) if len(parts) >= 2 else host
 
-            if any(short in host for short in ["bit.ly", "tinyurl", "t.co", "ow.ly", "is.gd", "t.ly"]):
-                suspicious.append("shortened_url")
-            elif WHOIS_AVAILABLE:
-                # SKIP VIPs (No need to check WHOIS for Google/Microsoft)
-                if base_domain in VIP_DOMAINS:
-                    continue
+# ==========================================
+# STAGE 3: Machine Learning & Lexical Forensics
+# ==========================================
 
-                # DEDUPLICATION: Only check the base domain once
-                if base_domain not in checked_base_domains:
-                    w = _whois_with_timeout(base_domain)
-                    checked_base_domains[base_domain] = w
-                else:
-                    w = checked_base_domains[base_domain]
+# Initialize SQLite RDAP Cache
+RDAP_DB_PATH = os.path.join(os.path.dirname(__file__), "rdap_cache.db")
+def init_rdap_db():
+    conn = sqlite3.connect(RDAP_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS domain_age (domain TEXT PRIMARY KEY, age_days INTEGER)''')
+    conn.commit()
+    conn.close()
 
-                if w is not None:
-                    try:
-                        creation_date = w.creation_date
-                        if isinstance(creation_date, list):
-                            creation_date = creation_date[0]
-                        if creation_date:
-                            age_days = (datetime.now() - creation_date).days
-                            if age_days < 14:
-                                suspicious.append(f"domain_age_newly_registered:{base_domain}")
-                    except Exception:
-                        pass
+init_rdap_db()
 
-            # Check if domain is just an IP address
-            if host.replace(".", "").isdigit():
-                suspicious.append("ip_based_url")
+def get_rdap_age_days(url: str) -> Optional[int]:
+    """
+    Asynchronously queries RDAP JSON for domain age, or uses local SQLite cache.
+    Replaces legacy WHOIS on Port 43.
+    """
+    parsed = urlparse(url)
+    host = (parsed.hostname or parsed.netloc).lower()
+    base = _base_domain(host)
+    
+    if not base:
+        return None
 
-        except Exception:
-            pass
-
-    if urls:
-        print(f"[URL_ANALYZER] Completed local heuristics.")
-
-    # -----------------------------------
-    # 2. LIVE GOOGLE SAFE BROWSING CHECK
-    # -----------------------------------
-    if not normalized_urls or not is_configured_secret(SAFE_BROWSING_API_KEY):
-        return suspicious
-
-    # Build the massive JSON payload for the API
-    # We batch every url so it only costs 1 HTTP request!
-    threat_entries = [{"url": u} for u in set(normalized_urls)]
-
-    payload = {
-        "client": {
-            "clientId": "safemailx-extension",
-            "clientVersion": "1.1.0"
-        },
-        "threatInfo": {
-            "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
-            "platformTypes": ["ANY_PLATFORM"],
-            "threatEntryTypes": ["URL"],
-            "threatEntries": threat_entries
-        }
-    }
+    # Check local SQLite cache first
+    conn = sqlite3.connect(RDAP_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT age_days FROM domain_age WHERE domain = ?', (base,))
+    result = cursor.fetchone()
+    if result:
+        conn.close()
+        return result[0]
 
     try:
-        # Strict timeout of 1.5s ensures the extension NEVER feels slow
-        api_url = f"https://safebrowsing.googleapis.com/v4/threatMatches:find?key={SAFE_BROWSING_API_KEY}"
-        
-        response = requests.post(api_url, json=payload, timeout=1.5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            matches = data.get("matches", [])
-            
-            for match in matches:
-                matched_url = match.get("threat", {}).get("url", "unknown")
-                threat_type = match.get("threatType", "MALICIOUS")
-                suspicious.append(f"SafeBrowsing_Match:{threat_type}")
-                print(f"[ALERT] Safe Browsing caught: {matched_url} as {threat_type}")
-                
-    except requests.exceptions.Timeout:
-        print("[WARNING] Safe Browsing API timed out. Proceeding with local results to maintain speed.")
+        # We query the RDAP bootstrap 
+        rdap_url = f"https://rdap.org/domain/{base}"
+        res = requests.get(rdap_url, timeout=2.0)
+        if res.status_code == 200:
+            data = res.json()
+            events = data.get("events", [])
+            for event in events:
+                if event.get("eventAction") == "registration":
+                    date_str = event.get("eventDate")
+                    if date_str:
+                        # e.g. "1997-09-15T04:00:00Z"
+                        dt = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        age = (datetime.datetime.now(datetime.timezone.utc) - dt).days
+                        cursor.execute('INSERT OR IGNORE INTO domain_age (domain, age_days) VALUES (?, ?)', (base, age))
+                        conn.commit()
+                        conn.close()
+                        return age
     except Exception as e:
-        print(f"[ERROR] Safe Browsing integration failed: {str(e)}")
+        logger.debug(f"RDAP lookup failed for {base}: {e}")
+    
+    conn.close()
+    return None
 
-    # Return unique reasons only
-    return list(set(suspicious))
+def get_entropy_metrics(url: str) -> float:
+    """Calculate Shannon entropy of the URL path to detect DGAs."""
+    parsed = urlparse(url)
+    path = parsed.path
+    if not path or path == "/":
+        return 0.0
+        
+    # Shannon entropy calculation
+    prob = [float(path.count(c)) / len(path) for c in dict.fromkeys(list(path))]
+    entropy = - sum([p * math.log(p) / math.log(2.0) for p in prob])
+    return entropy
+
+def _levenshtein(s1: str, s2: str) -> int:
+    if len(s1) < len(s2):
+        return _levenshtein(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+TARGET_BRANDS = ["paypal.com", "microsoft.com", "apple.com", "amazon.com", "google.com", "netflix.com"]
+
+def get_typosquatting_metrics(url: str) -> List[str]:
+    """Check for IDN Homographs and Levenshtein distance against high-value targets."""
+    hits = []
+    parsed = urlparse(url)
+    host = (parsed.hostname or parsed.netloc).lower()
+    base = _base_domain(host)
+    
+    if not base:
+        return hits
+
+    # 1. IDN Homograph check
+    if IDN_AVAILABLE:
+        if confusables.is_mixed_script(base) or confusables.is_dangerous(base):
+            hits.append(f"idn_homograph_attack:{base}")
+            
+    # 2. Levenshtein / Bitsquatting check
+    for target in TARGET_BRANDS:
+        if base == target:
+            continue # Exact match is fine (it should be caught by Bloom Filter anyway)
+        dist = _levenshtein(base, target)
+        if dist > 0 and dist <= 2:
+            hits.append(f"typosquatting:{base}->{target}")
+            
+    return hits
+
+def analyze_urls(urls, sender_domain: str | None = None):
+    logger.warning("Legacy analyze_urls called. Use SmartVetoOrchestrator instead.")
+    suspicious: list[str] = []
+    normalized_sender = _base_domain((sender_domain or "").lower())
+
+    for item in urls:
+        if isinstance(item, str):
+            url_value = item
+            detail = {"raw_url": item}
+        else:
+            detail = item
+            url_value = (
+                detail.get("href")
+                or detail.get("raw_url")
+                or detail.get("normalized_url")
+                or detail.get("url")
+                or ""
+            )
+
+        if not url_value:
+            continue
+
+        if check_offline_prefix(url_value):
+            suspicious.append("offline_prefix_hard_fail")
+        if get_typosquatting_metrics(url_value):
+            suspicious.append("typosquatting_detected")
+
+        parsed = urlparse(url_value)
+        host = (parsed.hostname or "").lower()
+        base = _base_domain(host)
+        detail.setdefault("domain", host or base)
+
+        if detail.get("is_cta"):
+            suspicious.append("cta_link_present")
+
+        final_url, resolved_domain = _resolve_final_url(url_value)
+        if final_url:
+            detail["resolved_url"] = final_url
+        if resolved_domain:
+            detail["resolved_domain"] = resolved_domain
+            resolved_base = _base_domain(resolved_domain)
+            if detail.get("is_cta") and normalized_sender and resolved_base != normalized_sender:
+                suspicious.append(f"cta_resolved_domain_mismatch:{resolved_domain}")
+
+        href_domain = (detail.get("href_domain") or host).lower()
+        href_base = _base_domain(href_domain)
+        if detail.get("is_cta") and normalized_sender and href_base and href_base != normalized_sender:
+            suspicious.append(f"cta_sender_domain_mismatch:{href_domain}")
+
+    return list(dict.fromkeys(suspicious))
+
+def _resolve_final_url(url: str) -> tuple[str | None, str | None]:
+    try:
+        response = requests.get(url, timeout=2.0, allow_redirects=True, stream=True)
+        final_url = response.url
+        response.close()
+        if not final_url: return None, None
+        parsed = urlparse(final_url)
+        return final_url, (parsed.hostname or "").lower()
+    except Exception:
+        return None, None

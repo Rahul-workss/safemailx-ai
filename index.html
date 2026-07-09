@@ -392,149 +392,157 @@
     .section-title em { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; color: var(--muted); }
     .section-body { font-size: 0.97rem; line-height: 1.75; color: var(--muted); max-width: 540px; }
 
-    /* Circular Feature Chain */
-    .how-circle-stage {
-      position: relative;
+    /* #why section: full-cover video background */
+    #why {
+      position: relative !important;
+      isolation: isolate;
+      overflow: hidden;
+      z-index: 10;
+    }
+    #why-bg-video {
+      position: absolute;
+      top: 0; left: 0;
       width: 100%;
-      max-width: 900px;
-      height: 850px;
-      margin: 6rem auto 4rem auto;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      z-index: 1;
+      pointer-events: none;
+      display: block;
+    }
+    #why-bg-video-scrim {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(5, 8, 20, 0.50);
+      z-index: 2;
+      pointer-events: none;
+    }
+    #why > *:not(#why-bg-video):not(#why-bg-video-scrim) { position: relative; z-index: 3; }
+
+    .section-inner { max-width: 1100px; margin: 0 auto; padding: 5.5rem 2rem; }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.18em; color: var(--cyan); text-transform: uppercase;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;
+    }
+    .section-label::after { content: ''; flex: 0 0 36px; height: 1px; background: var(--cyan); opacity: 0.4; }
+
+    .section-title { font-size: clamp(1.8rem,4vw,2.9rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: #fff; margin-bottom: 0.9rem; }
+    .section-title em { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; color: var(--muted); }
+    .section-body { font-size: 0.97rem; line-height: 1.75; color: var(--muted); max-width: 540px; }
+
+    /* Orb Radial Layout for #why section */
+    #why .section-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1400px;
+      padding: 8rem 2rem;
+    }
+    #why .why-text-col {
+      flex: 0 0 35%;
+      padding-right: 2rem;
+    }
+    .how-circle-stage {
+      flex: 0 0 65%;
+      position: relative;
+      min-height: 800px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .how-circle-center {
       position: absolute;
       top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 140px; height: 140px;
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 50%;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 0 50px rgba(93,228,216,0.15);
-      display: flex; align-items: center; justify-content: center;
+      width: 320px; height: 320px;
       z-index: 5;
     }
-    .how-circle-center img { width: 70px; height: 70px; filter: drop-shadow(0 0 15px rgba(93,228,216,0.6)); }
-
-    .how-circle-svg {
-      position: absolute;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 180px; height: 180px;
-      pointer-events: none;
-      z-index: 0;
+    .how-circle-center img { 
+      width: 100%; height: 100%; 
+      object-fit: contain;
+      mix-blend-mode: screen;
+      filter: drop-shadow(0 0 15px rgba(93,228,216,0.3));
+      animation: orb-breathe 4s ease-in-out infinite;
     }
-    .how-chain-pulse {
-      transform-origin: 50% 50%;
-      animation: orbit-pulse 10s linear infinite;
-    }
-    @keyframes orbit-pulse {
-      0% { transform: rotate(-90deg); }
-      100% { transform: rotate(270deg); }
+    @keyframes orb-breathe {
+      0%, 100% { filter: drop-shadow(0 0 40px rgba(93,228,216,0.15)) scale(1); opacity: 0.8; }
+      50% { filter: drop-shadow(0 0 60px rgba(93,228,216,0.4)) scale(1.04); opacity: 1; }
     }
 
     .how-card { 
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2);
-      padding: 2rem; position: absolute; transition: transform .25s; 
-      width: 300px; z-index: 10;
+      background: rgba(11, 15, 23, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.5rem; 
+      position: absolute; 
+      width: 280px; 
+      z-index: 10;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      transition: transform .25s, box-shadow .25s, border-color .25s;
     }
-    .how-card:hover { transform: translateY(-4px) !important; }
+    .how-card:hover { box-shadow: 0 15px 40px rgba(0,0,0,0.5); }
 
-    /* Desktop Circle Positioning & Animation */
-    @media(min-width: 901px) {
-      .how-card:nth-child(7) { top: 0; left: calc(50% - 150px); animation: card-glow-1 10s infinite; } /* Top */
-      .how-card:nth-child(8) { top: calc(50% - 120px); right: -40px; animation: card-glow-2 10s infinite; } /* Right */
-      .how-card:nth-child(9) { bottom: 0; left: calc(50% - 150px); animation: card-glow-3 10s infinite; } /* Bottom */
-      .how-card:nth-child(10) { top: calc(50% - 120px); left: -40px; animation: card-glow-4 10s infinite; } /* Left */
-    }
-
-    @keyframes card-glow-1 {
-      0%, 20%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      2%, 12% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
-    }
-    @keyframes card-glow-2 {
-      0%, 23%, 45%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      25%, 35% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
-    }
-    @keyframes card-glow-3 {
-      0%, 48%, 70%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      50%, 60% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
-    }
-    @keyframes card-glow-4 {
-      0%, 73%, 95%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      75%, 85% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
-    }
-
-    /* Laser Beams */
-    .data-beam { position: absolute; opacity: 0; pointer-events: none; z-index: 1; filter: drop-shadow(0 0 10px var(--cyan)); }
+    .how-card.pos-top { bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 80px; border-color: rgba(93,228,216,0.3); }
+    .how-card.pos-top:hover { transform: translateX(-50%) translateY(-4px); border-color: rgba(93,228,216,0.8); }
     
-    .beam-1 { /* Top */
-      width: 2px; height: 160px;
-      top: calc(50% - 250px); left: calc(50% - 1px);
-      background: linear-gradient(to top, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-1 10s infinite;
-    }
-    .beam-2 { /* Right */
-      height: 2px; width: 160px;
-      top: calc(50% - 1px); left: calc(50% + 90px);
-      background: linear-gradient(to right, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-2 10s infinite;
-    }
-    .beam-3 { /* Bottom */
-      width: 2px; height: 160px;
-      top: calc(50% + 90px); left: calc(50% - 1px);
-      background: linear-gradient(to bottom, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-3 10s infinite;
-    }
-    .beam-4 { /* Left */
-      height: 2px; width: 160px;
-      top: calc(50% - 1px); left: calc(50% - 250px);
-      background: linear-gradient(to left, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-4 10s infinite;
-    }
+    .how-card.pos-bottom { top: 100%; left: 50%; transform: translateX(-50%); margin-top: 80px; border-color: rgba(255,105,180,0.3); }
+    .how-card.pos-bottom:hover { transform: translateX(-50%) translateY(-4px); border-color: rgba(255,105,180,0.8); }
 
-    @keyframes beam-fire-1 {
-      0%, 98%, 100% { opacity: 0; transform: scaleY(0); transform-origin: bottom; }
-      2% { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
-      12% { opacity: 0; transform: scaleY(1); transform-origin: bottom; }
-    }
-    @keyframes beam-fire-2 {
-      0%, 23%, 100% { opacity: 0; transform: scaleX(0); transform-origin: left; }
-      25% { opacity: 1; transform: scaleX(1); transform-origin: left; }
-      35% { opacity: 0; transform: scaleX(1); transform-origin: left; }
-    }
-    @keyframes beam-fire-3 {
-      0%, 48%, 100% { opacity: 0; transform: scaleY(0); transform-origin: top; }
-      50% { opacity: 1; transform: scaleY(1); transform-origin: top; }
-      60% { opacity: 0; transform: scaleY(1); transform-origin: top; }
-    }
-    @keyframes beam-fire-4 {
-      0%, 73%, 100% { opacity: 0; transform: scaleX(0); transform-origin: right; }
-      75% { opacity: 1; transform: scaleX(1); transform-origin: right; }
-      85% { opacity: 0; transform: scaleX(1); transform-origin: right; }
-    }
+    .how-card.pos-left { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 80px; border-color: rgba(66,135,245,0.3); }
+    .how-card.pos-left:hover { transform: translateY(-50%) translateY(-4px); border-color: rgba(66,135,245,0.8); }
 
-    /* Mobile Fallback to Grid */
-    @media(max-width: 900px) {
-      .how-circle-stage { height: auto; max-width: 100%; display: grid; gap: 1.5rem; margin-top: 2rem; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); }
-      .how-circle-center, .how-circle-svg, .data-beam { display: none; }
-      .how-card { position: relative !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; width: 100% !important; animation: none !important; }
+    .how-card.pos-right { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 80px; border-color: rgba(186,85,211,0.3); }
+    .how-card.pos-right:hover { transform: translateY(-50%) translateY(-4px); border-color: rgba(186,85,211,0.8); }
+
+    .orb-line {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.15);
+      z-index: 2;
     }
+    .orb-line::after {
+      content: '';
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 12px currentColor;
+    }
+    .orb-line.top { width: 1px; height: 80px; top: 100%; left: 50%; transform: translateX(-50%); color: var(--cyan); }
+    .orb-line.top::after { bottom: -4px; left: -3.5px; }
+    
+    .orb-line.bottom { width: 1px; height: 80px; bottom: 100%; left: 50%; transform: translateX(-50%); color: #ff69b4; }
+    .orb-line.bottom::after { top: -4px; left: -3.5px; }
+
+    .orb-line.left { width: 80px; height: 1px; left: 100%; top: 50%; transform: translateY(-50%); color: #4287f5; }
+    .orb-line.left::after { right: -4px; top: -3.5px; }
+
+    .orb-line.right { width: 80px; height: 1px; right: 100%; top: 50%; transform: translateY(-50%); color: #ba55d3; }
+    .orb-line.right::after { left: -4px; top: -3.5px; }
+
     .how-card-num { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 1rem; }
-    .how-card-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 1rem; }
-    .icon-cyan  { background: var(--cyan-dim);  border: 1px solid rgba(93,228,216,0.18); }
-    .icon-amber { background: var(--amber-dim); border: 1px solid rgba(245,166,35,0.18); }
-    .icon-red   { background: var(--red-dim);   border: 1px solid rgba(255,107,107,0.18); }
-    .icon-green { background: var(--green-dim); border: 1px solid rgba(82,232,165,0.18); }
-    .how-card-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-bottom: 0.5rem; }
-    .how-card-body  { font-size: 0.85rem; line-height: 1.7; color: var(--muted); }
-    .how-card-accent { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: transparent; transition: background .3s; }
-    .how-card:hover .how-card-accent { background: linear-gradient(90deg, var(--cyan), transparent); }
+    .how-card-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+    .icon-cyan-svg { background: rgba(93,228,216,0.1); border: 1px solid rgba(93,228,216,0.18); color: var(--cyan); }
+    .icon-blue-svg { background: rgba(66,135,245,0.1); border: 1px solid rgba(66,135,245,0.18); color: #4287f5; }
+    .icon-purple-svg { background: rgba(186,85,211,0.1); border: 1px solid rgba(186,85,211,0.18); color: #ba55d3; }
+    .icon-pink-svg { background: rgba(255,105,180,0.1); border: 1px solid rgba(255,105,180,0.18); color: #ff69b4; }
+    .how-card-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; margin-bottom: 0.5rem; }
+    .how-card-body  { font-size: 0.85rem; line-height: 1.6; color: var(--muted); }
 
+    @media(max-width: 1100px) {
+      #why .section-inner { flex-direction: column; padding: 4rem 2rem; }
+      #why .why-text-col { flex: 0 0 100%; text-align: center; padding-right: 0; margin-bottom: 4rem; }
+      #why .section-body { margin: 0 auto; }
+      .how-circle-stage { min-height: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+      .how-circle-center { position: relative; top: auto; left: auto; transform: none; width: 240px; height: 240px; margin: 0 auto 3rem; display: block; }
+      .how-card { position: relative !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; transform: none !important; margin: 0 auto 1.5rem !important; width: 100% !important; max-width: 400px; }
+      .how-card:hover { transform: none !important; }
+      .orb-line { display: none; }
+    }
     /* Pipeline */
     .pipeline-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; margin-top: 3rem; }
     @media(max-width:768px) { .pipeline-layout { grid-template-columns: 1fr; } }
@@ -759,62 +767,67 @@
 
   <!-- ── WHY DIFFERENT ── -->
   <section class="content-section" id="why">
+    <!-- Full-cover video background -->
+    <video id="why-bg-video" autoplay muted loop playsinline preload="auto">
+      <source src="/NEXT.mp4" type="video/mp4">
+    </video>
+    <div id="why-bg-video-scrim"></div>
     <div class="section-inner">
-      <div data-anim>
+      <div class="why-text-col" data-anim>
         <div class="section-label">What makes us different</div>
         <h2 class="section-title">Built to catch<br><em>what ordinary filters miss</em></h2>
         <p class="section-body">Phishing emails are crafted to look legitimate — they pass SPF, DKIM, and DMARC. TrustMail combines three distinct intelligence layers to find what others overlook.</p>
       </div>
       <div class="how-circle-stage" data-anim style="transition-delay:.12s">
-        <!-- Tight SVG Orbit Ring -->
-        <svg class="how-circle-svg" viewBox="0 0 180 180">
-          <circle cx="90" cy="90" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-dasharray="6 8" />
-          <circle class="how-chain-pulse" cx="90" cy="90" r="88" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-linecap="round" stroke-dasharray="30 600" />
-        </svg>
-
-        <!-- Laser Beams -->
-        <div class="data-beam beam-1"></div>
-        <div class="data-beam beam-2"></div>
-        <div class="data-beam beam-3"></div>
-        <div class="data-beam beam-4"></div>
-
-        <!-- Central Anchor -->
         <div class="how-circle-center">
-          <img src="/safemailx-website/public/images/new-logo.png" alt="TrustMail" />
+          <img src="/CENTRAL_GLOBE.png" alt="TrustMail Core" />
         </div>
 
-        <div class="how-card">
-          <div class="how-card-num">01 / 04</div>
-          <div class="how-card-icon icon-cyan">🔍</div>
-          <div class="how-card-title">Triple-Layer Engine</div>
-          <div class="how-card-body">Rule-based heuristics, TF-IDF semantic modelling, and deep LLM reasoning — working together, not in isolation.</div>
-          <div class="how-card-accent"></div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">02 / 04</div>
-          <div class="how-card-icon icon-amber">📎</div>
-          <div class="how-card-title">Attachment Forensics</div>
-          <div class="how-card-body">TrustMail dissects suspicious PDFs and Office docs, identifying hidden scripts and malicious macros buried inside.</div>
-          <div class="how-card-accent"></div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">03 / 04</div>
-          <div class="how-card-icon icon-red">🔒</div>
-          <div class="how-card-title">Zero Data Retention</div>
-          <div class="how-card-body">All analysis runs locally. Your communications never leave, never hit a server, never get logged anywhere.</div>
-          <div class="how-card-accent"></div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">04 / 04</div>
-          <div class="how-card-icon icon-green">📋</div>
-          <div class="how-card-title">Evidence-Based Reports</div>
-          <div class="how-card-body">Not just a verdict — a full forensic PDF: every red flag, every reason, fully documented.</div>
-          <div class="how-card-accent"></div>
-        </div>
+          <div class="how-card pos-top">
+            <div class="orb-line top"></div>
+            <div class="how-card-num">01 / 04</div>
+            <div class="how-card-icon icon-cyan-svg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 12 12 17 22 12"></polyline><polyline points="2 17 12 22 22 17"></polyline></svg>
+            </div>
+            <div class="how-card-title">Triple-Layer Engine</div>
+            <div class="how-card-body">Rule heuristics, ML models and LLM reasoning work together to uncover threats in layers.</div>
+          </div>
+
+          <div class="how-card pos-left">
+            <div class="orb-line left"></div>
+            <div class="how-card-num">02 / 04</div>
+            <div class="how-card-icon icon-blue-svg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10S2 17.52 2 12zm10 6c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"></path><path d="M12 6v2m0 8v2m-4-6h2m6 0h2"></path></svg>
+            </div>
+            <div class="how-card-title">Attachment Forensics</div>
+            <div class="how-card-body">Deeply inspects attachments and documents to reveal hidden payloads and malicious behaviour.</div>
+          </div>
+
+          <div class="how-card pos-right">
+            <div class="orb-line right"></div>
+            <div class="how-card-num">03 / 04</div>
+            <div class="how-card-icon icon-purple-svg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <div class="how-card-title">Zero Data Retention</div>
+            <div class="how-card-body">All analysis runs locally. Your data never leaves your environment, ever.</div>
+          </div>
+
+          <div class="how-card pos-bottom">
+            <div class="orb-line bottom"></div>
+            <div class="how-card-num">04 / 04</div>
+            <div class="how-card-icon icon-pink-svg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <div class="how-card-title">Evidence-Based Reports</div>
+            <div class="how-card-body">Every verdict is backed by clear evidence, full context, and audit-ready reports.</div>
+          </div>
       </div>
     </div>
   </section>
 
+  <!-- ── PIPELINE ── -->
+  
   <!-- ── PIPELINE ── -->
   <section class="content-section" id="pipeline">
     <div class="section-inner">
@@ -835,9 +848,9 @@
           </div>
         </div>
         <div class="steps-list" data-anim style="transition-delay:.2s">
-          <div class="step-item" data-step="0"><span class="step-num">01</span><div class="step-dot">📥</div><div class="step-info"><div class="step-name">Intake &amp; Isolation</div><div class="step-desc">Strip noise, extract raw signal</div></div><span class="step-status">IDLE</span></div>
-          <div class="step-item" data-step="1"><span class="step-num">02</span><div class="step-dot">⚙️</div><div class="step-info"><div class="step-name">Rule Engine</div><div class="step-desc">Headers, URLs, spoofing patterns</div></div><span class="step-status">IDLE</span></div>
-          <div class="step-item" data-step="2"><span class="step-num">03</span><div class="step-dot">🧠</div><div class="step-info"><div class="step-name">TF-IDF ML Model</div><div class="step-desc">Semantic vocabulary scoring</div></div><span class="step-status">IDLE</span></div>
+          <div class="step-item" data-step="0"><span class="step-num">01</span><div class="step-dot" style="color:var(--cyan)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><div class="step-info"><div class="step-name">Intake &amp; Isolation</div><div class="step-desc">Strip noise, extract raw signal</div></div><span class="step-status">IDLE</span></div>
+          <div class="step-item" data-step="1"><span class="step-num">02</span><div class="step-dot" style="color:#ba55d3"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><div class="step-info"><div class="step-name">Rule Engine</div><div class="step-desc">Headers, URLs, spoofing patterns</div></div><span class="step-status">IDLE</span></div>
+          <div class="step-item" data-step="2"><span class="step-num">03</span><div class="step-dot" style="color:#ff69b4"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="step-info"><div class="step-name">TF-IDF ML Model</div><div class="step-desc">Semantic vocabulary scoring</div></div><span class="step-status">IDLE</span></div>
           <div class="step-item" data-step="3"><span class="step-num">04</span><div class="step-dot">💬</div><div class="step-info"><div class="step-name">LLM Reasoning</div><div class="step-desc">Behavioural intent analysis</div></div><span class="step-status">IDLE</span></div>
           <div class="step-item" data-step="4"><span class="step-num">05</span><div class="step-dot">📄</div><div class="step-info"><div class="step-name">Forensic Report</div><div class="step-desc">PDF report generation</div></div><span class="step-status">IDLE</span></div>
         </div>

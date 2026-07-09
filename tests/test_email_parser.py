@@ -22,6 +22,7 @@ class EmailParserTests(unittest.TestCase):
           <body>
             <div class="preheader" style="display:none;max-height:0">hidden preview junk</div>
             <p>Security Scan Report</p>
+            <a href="https://example.test/claim">Claim Offer Now</a>
             <img src="https://example.test/report.png" />
           </body>
         </html>
@@ -41,7 +42,11 @@ class EmailParserTests(unittest.TestCase):
 
         self.assertIn("Security Scan Report", parsed["body"])
         self.assertNotIn("hidden preview junk", parsed["body"])
+        self.assertIn("Claim Offer Now -> https://example.test/claim", parsed["body"])
         self.assertEqual(parsed["images"], ["https://example.test/report.png"])
+        self.assertEqual(parsed["links"][0]["anchor_text"], "Claim Offer Now")
+        self.assertEqual(parsed["links"][0]["href"], "https://example.test/claim")
+        self.assertTrue(parsed["links"][0]["is_cta"])
 
 
 if __name__ == "__main__":

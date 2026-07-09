@@ -7,12 +7,13 @@ from dotenv import load_dotenv
 SRC_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = SRC_DIR.parent
 
-load_dotenv(PROJECT_ROOT / ".env", override=True)
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 MODEL_PATH = PROJECT_ROOT / "models" / "phishing_ai_model.joblib"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 TEMP_IMAGES_DIR = SRC_DIR / "temp_images"
 GMAIL_CREDENTIALS_PATH = SRC_DIR / "credentials.json"
+SIGNIN_CREDENTIALS_PATH = SRC_DIR / "server" / "signin_credentials.json"
 GMAIL_TOKEN_PATH = SRC_DIR / "token.pickle"
 GMAIL_TOKEN_ENCRYPTION_KEY = os.getenv("GMAIL_TOKEN_ENCRYPTION_KEY", "").strip()
 
@@ -47,6 +48,7 @@ SAFEMAILX_DEBUG = os.getenv("SAFEMAILX_DEBUG", "").strip().lower() in {
 
 SAFE_BROWSING_API_KEY = os.getenv("SAFE_BROWSING_API_KEY", "").strip()
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "").strip()
+IPQUALITYSCORE_API_KEY = os.getenv("IPQUALITYSCORE_API_KEY", "").strip()
 TESSERACT_CMD = os.getenv("TESSERACT_CMD", "").strip()
 
 

@@ -1,1 +1,1 @@
-# TrustMail Attachment Analyzers Package
+# SafeMail X Attachment Analyzers Package

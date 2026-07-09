@@ -1,1 +1,1 @@
-"""TrustMail mobile/server backend package."""
+"""SafeMail X mobile/server backend package."""

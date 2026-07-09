@@ -27,16 +27,29 @@ def extract_forwarded_payload(text: str) -> str:
     return text
 
 
-def extract_original_sender(text: str) -> str:
+def extract_original_sender(text: str, forwarder_email: str = "") -> str:
     """Extract the original sender address from a forwarded header block."""
     if not text:
         return "unknown_origin"
 
-    match = re.search(
-        r"(?im)^\s*(?:From|De|Von):\s*.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+    # Extract clean email from forwarder_email if it's formatted
+    fwd_match = re.search(r"<([^>]+)>", forwarder_email)
+    clean_fwd = fwd_match.group(1).lower() if fwd_match else forwarder_email.lower().strip()
+
+    # Use re.DOTALL (re.S) to allow .*? to match across newlines (which some clients insert)
+    matches = re.finditer(
+        r"(?im)^\s*(?:From|De|Von|Sender):.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
         text,
+        re.DOTALL
     )
-    return match.group(1).lower() if match else "unknown_origin"
+    
+    for match in matches:
+        candidate = match.group(1).lower()
+        if clean_fwd and candidate == clean_fwd:
+            continue
+        return candidate
+        
+    return "unknown_origin"
 
 
 def extract_original_headers(text: str) -> tuple[dict, str]:

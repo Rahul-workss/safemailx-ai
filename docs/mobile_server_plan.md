@@ -1,13 +1,29 @@
-# TrustMail AI Mobile + 24/7 Server Scaffold
+# SafeMail X AI Mobile + Server Runbook
 
-This scaffold turns the current local bot into a production-shaped app stack:
+This document reflects the current working scaffold and validation flow.
 
-- React Native Expo mobile app in `trustmail-mobile/`
-- FastAPI backend in `src/server/`
-- Docker Compose services for API, worker, Gmail watcher, Redis, Nginx, and Qwen/vLLM
-- Generic LLM configuration that can point at LM Studio locally or vLLM in production
+## Stack
 
-## Local API Development
+- FastAPI API in `src/server/app.py`
+- Redis-backed worker in `src/server/worker.py`
+- Optional Gmail watcher in `src/server/gmail_watcher.py`
+- Expo mobile app in `safemailx-mobile/`
+- Local SQLite by default, PostgreSQL when `DATABASE_URL` points to Postgres
+- OCR through Tesseract
+- Local or self-hosted LLM via `LM_STUDIO_URL` or `LLM_BASE_URL`
+
+## Main Features
+
+- Auth: login, register, forgot/reset password
+- Scan flows: manual text, queued text, SMS, upload, screenshot/image, URL
+- Gmail OAuth with label-only message selection
+- Report download links for PDF/JSON
+- Push token registration and persisted notification preferences
+- Optional Google Drive backup
+
+## Local Development
+
+### API
 
 ```powershell
 cd C:\Users\rahul\Desktop\safemailx-ai
@@ -16,194 +32,114 @@ $env:PYTHONPATH="src"
 .\venv\Scripts\uvicorn.exe server.app:app --reload --host 127.0.0.1 --port 8080
 ```
 
-Open:
-
-```text
-http://127.0.0.1:8080/docs
-```
-
-Auth is disabled by default for local development. To require bearer tokens:
-
-```env
-TRUSTMAIL_REQUIRE_AUTH=true
-TRUSTMAIL_PRODUCTION=true
-JWT_SECRET=replace-with-long-random-secret
-TRUSTMAIL_ADMIN_EMAIL=admin@example.com
-TRUSTMAIL_ADMIN_PASSWORD=replace-with-strong-password
-GMAIL_OAUTH_REDIRECT_URI=https://YOUR_DOMAIN/api/gmail/oauth/callback
-```
-
-Generate an encrypted Gmail token key:
+### Worker
 
 ```powershell
-.\venv\Scripts\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+cd C:\Users\rahul\Desktop\safemailx-ai
+$env:PYTHONPATH="src"
+.\venv\Scripts\python.exe -m server.worker
 ```
 
-Then set `GMAIL_TOKEN_ENCRYPTION_KEY` in `.env`.
-
-The first admin user is bootstrapped from `TRUSTMAIL_ADMIN_EMAIL` and
-`TRUSTMAIL_ADMIN_PASSWORD`. When auth is enabled, scans and push tokens are
-scoped to the signed-in user.
-
-Production readiness can be checked from the API:
-
-```text
-GET /api/readiness
-```
-
-The readiness endpoint validates deploy-time configuration such as JWT secret
-strength, Google OAuth credentials, HTTPS OAuth callback URL, Gmail token
-encryption, SMTP password reset delivery, and Expo push configuration. It also
-flags Google OAuth consent verification and app-store provider setup as external
-console work that must be completed outside the codebase.
-
-For password reset email delivery, set:
-
-```env
-PASSWORD_RESET_URL_BASE=https://YOUR_DOMAIN/reset-password
-SMTP_HOST=smtp.your-provider.com
-SMTP_PORT=587
-SMTP_USERNAME=your-user
-SMTP_PASSWORD=your-password
-SMTP_FROM_EMAIL=no-reply@your-domain.com
-SMTP_USE_TLS=true
-```
-
-Without SMTP config, the API falls back to printing the reset link in the server log for local testing.
-
-## Mobile App Development
+### Optional Watcher
 
 ```powershell
-cd trustmail-mobile
+cd C:\Users\rahul\Desktop\safemailx-ai
+$env:PYTHONPATH="src"
+.\venv\Scripts\python.exe -m server.gmail_watcher
+```
+
+### Mobile
+
+```powershell
+cd C:\Users\rahul\Desktop\safemailx-ai\safemailx-mobile
 npm install
 npx expo start
 ```
 
-For phone testing against your computer, set:
+For phone testing:
 
 ```env
 EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8080
 ```
 
-For an installable Android testing APK, log in to Expo and run the preview
-build profile:
+## Auth And Production-Shaped Local Testing
+
+Enable bearer auth:
+
+```env
+SAFEMAILX_REQUIRE_AUTH=true
+SAFEMAILX_PRODUCTION=true
+JWT_SECRET=replace-with-a-long-random-secret-of-at-least-32-characters
+SAFEMAILX_ADMIN_EMAIL=admin@example.com
+SAFEMAILX_ADMIN_PASSWORD=replace-with-a-strong-password
+GMAIL_OAUTH_REDIRECT_URI=https://YOUR_DOMAIN/api/gmail/oauth/callback
+```
+
+Generate Gmail token encryption:
 
 ```powershell
-cd trustmail-mobile
-npm run eas:login
-npm run build:android:apk
+.\venv\Scripts\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-The `preview` EAS profile in `trustmail-mobile/eas.json` produces an APK. The
-Android app also includes a Settings field for the API server URL; for a phone
-on the same Wi-Fi as your computer, set it to:
+Set the output as:
 
-```text
-http://YOUR_LAN_IP:8080
+```env
+GMAIL_TOKEN_ENCRYPTION_KEY=...
 ```
 
-Do not use `127.0.0.1` on a physical Android phone, because that points to the
-phone itself rather than your computer.
+## Gmail Flow
 
-## Quick Local End-to-End Test
+Connected Gmail uses explicit user labels:
 
-From the repo root, start Redis, the API, and the worker:
+1. Connect Gmail in the mobile app.
+2. Initialize labels from the app or `POST /api/gmail/labels/ensure`.
+3. Apply `SafeMail X Scan` inside Gmail.
+4. Trigger `POST /api/gmail/run-once` or tap `Run Inbox Scan`.
+
+Returned status payloads now include:
+
+- `privacy_mode`
+- `scan_label`
+- `queued_label`
+- `result_labels`
+
+## Validation Commands
+
+Backend:
 
 ```powershell
-.\scripts\start-local-stack.ps1
+cd C:\Users\rahul\Desktop\safemailx-ai
+$env:PYTHONPATH="src"
+.\venv\Scripts\python.exe -m compileall src tests
+.\venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-Skip Docker Redis only if you already have Redis running on `127.0.0.1:6379`:
+Mobile:
 
 ```powershell
-.\scripts\start-local-stack.ps1 -SkipRedis
+cd C:\Users\rahul\Desktop\safemailx-ai\safemailx-mobile
+npx tsc --noEmit
 ```
 
-Start the watcher too if you want Gmail polling locally:
+## Practical Smoke Test
 
-```powershell
-.\scripts\start-local-stack.ps1 -WithWatcher
-```
+1. Start API and worker.
+2. Log in with `admin@safemailx.local` / `change-me-before-production` if local auth defaults are still active.
+3. Register a fresh account.
+4. Test forgot/reset password.
+5. Submit:
+   - manual text scan
+   - SMS scan
+   - upload file scan
+   - screenshot scan
+   - URL scan
+6. Toggle notification preferences and register push token.
+7. Connect Gmail, ensure labels, and run a label scan.
+8. Open report download links for a finished scan.
 
-Start Expo from the same script if needed:
+## Notes
 
-```powershell
-.\scripts\start-local-stack.ps1 -WithMobile
-```
-
-Then run the local API smoke test:
-
-```powershell
-.\scripts\smoke-test-local.ps1
-```
-
-If auth is enabled, pass the bootstrap admin credentials:
-
-```powershell
-.\scripts\smoke-test-local.ps1 -Email admin@example.com -Password your-admin-password
-```
-
-This checks `/api/health`, submits a queued manual scan, and polls until the worker finishes it.
-If Redis is offline, it automatically falls back to the direct manual scan endpoint so local bring-up still works.
-
-## 24/7 Server Deployment Shape
-
-```bash
-docker compose up -d --build
-```
-
-Services:
-
-- `trustmail-api`: FastAPI backend
-- `trustmail-worker`: queued scan processor
-- `trustmail-gmail-watcher`: 24/7 Gmail polling shell
-- `trustmail-llm`: Qwen served through vLLM
-- `redis`: job queue
-- `nginx`: reverse proxy
-- `certbot`: optional HTTPS certificate helper profile
-
-For HTTPS on a VPS:
-
-```bash
-docker compose up -d nginx
-docker compose --profile https run --rm certbot certonly --webroot -w /var/www/certbot -d YOUR_DOMAIN --email YOU@example.com --agree-tos --no-eff-email
-cp deploy/nginx.https.conf.template deploy/nginx.conf
-# edit trustmail.example.com to YOUR_DOMAIN in deploy/nginx.conf
-docker compose restart nginx
-```
-
-## Current Scaffold Status
-
-Implemented now:
-
-- FastAPI health/dashboard/scans/settings endpoints
-- manual text scan endpoint
-- queued manual scan endpoint backed by Redis
-- upload scan endpoint for TXT/EML/HTML/PDF/DOCX/images
-- SQLite local scan history adapter
-- PostgreSQL scan history adapter for Docker/server deployment
-- report PDF/JSON download endpoints
-- WebSocket event scaffold
-- worker queue entrypoint that completes queued scans
-- Gmail watcher queue producer for unread forwarded mail
-- worker Gmail reply flow after queued scan completion
-- Expo mobile dashboard/scans/new scan/reports/settings UI
-- mobile file picker for upload scans
-- mobile Settings API server override for Android APK/LAN testing
-- mobile report actions backed by short-lived signed PDF/JSON download links
-- JWT login with optional production auth enforcement
-- local user table with hashed passwords and per-user scan history
-- password reset request/confirm endpoints
-- SMTP-backed password reset email delivery with local log fallback
-- encrypted Gmail token storage when `GMAIL_TOKEN_ENCRYPTION_KEY` is set
-- per-user Gmail OAuth start/callback/status endpoints
-- mobile Gmail connect/status controls
-- mobile password reset request/confirm controls
-- Expo push token registration and scan-complete push notification hook
-- Docker Compose production skeleton with PostgreSQL, Redis, API, worker, watcher, Nginx, Certbot, and vLLM
-- HTTPS Nginx template for Let's Encrypt certificates
-- production readiness endpoint for auth, Gmail OAuth, SMTP, encryption, push, and external consent checks
-
-Still to finish in next phase:
-
-- app-store OAuth consent verification and production provider credentials
+- If Redis is unavailable, the mobile app still falls back from queued manual scans to the direct manual endpoint.
+- If the LLM is unavailable, scans continue in degraded mode.
+- OCR quality still depends on local Tesseract installation and the screenshot quality.
+- External provider work remains outside repo scope: Google consent verification, Expo credentials, SMTP production delivery, and production HTTPS/domain setup.

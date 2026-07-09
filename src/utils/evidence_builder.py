@@ -56,7 +56,7 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
                              attachment_result=None, security_headers=None,
                              sender_raw="", url_details=None,
                              forwarder_headers=None, forwarder_raw="",
-                             auth_context="unknown"):
+                             auth_context="unknown", link_forensics=None):
 
     sec_hdrs = security_headers or {}
     sender_forensics = _extract_sender_forensics(sender_raw, sec_hdrs)
@@ -111,6 +111,8 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
             "conflict_detected": hybrid_result.get("conflict_detected", False)
         },
 
+        "trust_arbitration": hybrid_result.get("trust_arbitration", {}),
+
         "analysis_steps": hybrid_result.get("analysis_steps", []),
 
         # Transmission & sender security
@@ -124,6 +126,7 @@ def build_forensic_evidence(email_subject, email_body, hybrid_result,
 
         # Structured URL details (list of dicts, one per URL found)
         "url_details": url_details or [],
+        "link_forensics": link_forensics or {},
 
         # Attachment analysis results
         "attachment_analysis": {

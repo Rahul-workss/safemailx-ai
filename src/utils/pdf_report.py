@@ -1,5 +1,5 @@
 # =============================================
-# TrustMail PDF Report Generator
+# SafeMail X PDF Report Generator
 # Version 3.0
 # =============================================
 
@@ -88,10 +88,10 @@ def _dimension_interpretation(name, value):
 
 def _build_llm_analyst_notes(llm_data):
     score = llm_data.get("llm_score", 0.0) or 0.0
-    score_pct = int(score * 100)
+    score_pct = round(score * 100)
     confidence = llm_data.get("llm_confidence")
     try:
-        confidence_text = f"{int(float(confidence) * 100)}%" if confidence is not None else "not reported"
+        confidence_text = f"{round(float(confidence) * 100)}%" if confidence is not None else "not reported"
     except (TypeError, ValueError):
         confidence_text = "not reported"
     intent = _title_label(llm_data.get("llm_intent"))
@@ -175,7 +175,7 @@ def generate_pdf_report(evidence: dict) -> str:
     case_id    = evidence.get("case_id", "SMX-UNKNOWN")
     utc_ts     = evidence.get("timestamp", datetime.now(timezone.utc).isoformat())
     final_score_frac  = evidence["hybrid_decision"]["final_score"]
-    final_score_pct   = int(final_score_frac * 100)
+    final_score_pct   = round(final_score_frac * 100)
     final_label       = evidence["hybrid_decision"]["final_label"]
     score_col         = _score_color(final_score_frac)
 
@@ -244,7 +244,7 @@ def generate_pdf_report(evidence: dict) -> str:
 
     c.setFillColor(COL_BLUE)
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(40, height - 20, "TRUSTMAIL  ·  EMAIL ANALYSIS SYSTEM  ·  CONFIDENTIAL")
+    c.drawString(40, height - 20, "SAFEMAILX  ·  EMAIL ANALYSIS SYSTEM  ·  CONFIDENTIAL")
 
     c.setFillColor(COL_WHITE)
     c.setFont("Helvetica-Bold", 20)
@@ -253,7 +253,7 @@ def generate_pdf_report(evidence: dict) -> str:
     c.setFillColor(COL_GREY)
     c.setFont("Helvetica", 8)
     c.drawCentredString(width / 2, height - 65,
-                        f"Case ID: {case_id}   |   System: TrustMail v3.0   |   UTC: {utc_ts[:19]}")
+                        f"Case ID: {case_id}   |   System: SafeMail X v3.0   |   UTC: {utc_ts[:19]}")
 
     y = height - 110
 
@@ -336,7 +336,7 @@ def generate_pdf_report(evidence: dict) -> str:
         ("Analysis Time",    utc_ts[:19] + " UTC"),
         ("Subject Line",     subj[:90]),
         ("Body Size",        f"{evidence['email_metadata'].get('body_length', 0):,} bytes"),
-        ("Analysis Stack",   "TrustMail v3.0 - TF-IDF Logistic Regression + Rule Heuristics"),
+        ("Analysis Stack",   "SafeMail X v3.0 - TF-IDF Logistic Regression + Rule Heuristics"),
     ]
     for label, val in rows1:
         y = check_space(y, 18)
@@ -356,11 +356,15 @@ def generate_pdf_report(evidence: dict) -> str:
 
     sec = evidence.get("security_headers", {})
 
+    auth_context = evidence.get("auth_context", "unknown")
+
     def _auth_status(val):
         v = str(val).lower()
         if v == "pass":     return "PASS"
         if v in ("fail",):  return "FAIL"
         if v == "softfail": return "WARN"
+        if v == "none" and auth_context in ["forwarder_only", "unknown"]:
+            return "STRIPPED"
         return "UNKNOWN"
 
     tls_status   = "SECURED"   if sec.get("tls") else "WARN"
@@ -446,9 +450,46 @@ def generate_pdf_report(evidence: dict) -> str:
     y -= 6
 
     # ──────────────────────────────────────────────────────────────────────────
+    # SECTION 3.5 — DOMAIN TRUST ARBITER
+    # ──────────────────────────────────────────────────────────────────────────
+    arb_data = evidence.get("trust_arbitration", {})
+    if arb_data and arb_data.get("tier"):
+        tier = arb_data.get("tier")
+        score = arb_data.get("score", 0)
+        applied = arb_data.get("arbitration_applied", False)
+        
+        y = section_header(f"SECTION 3.5  DOMAIN TRUST ARBITER (Tier: {tier})", y)
+        
+        c.setFont("Helvetica-Bold", 9)
+        if applied:
+            y = draw_text("✅ BIAS NEUTRALIZATION APPLIED. Legitimate sender detected. Keyword bias silenced.", 50, y, color=COL_GREEN)
+        else:
+            y = draw_text("⚠️ NO NEUTRALIZATION. Sender not fully trusted or structural threats present.", 50, y, color=COL_AMBER)
+            
+        y -= 4
+        
+        signals = arb_data.get("signals", [])
+        if signals:
+            y = check_space(y, 20)
+            c.setFont("Helvetica-Bold", 8)
+            c.setFillColor(COL_GREY)
+            c.drawString(50, y, f"Trust Score: {score}. Signals detected:")
+            y -= 12
+            c.setFont("Helvetica", 8)
+            c.setFillColor(COL_WHITE)
+            for sig in signals:
+                y = check_space(y, 14)
+                col = COL_GREEN if "P" in sig else COL_RED
+                c.setFillColor(col)
+                c.drawString(60, y, "• " + str(sig))
+                y -= 12
+        y -= 6
+
+
+    # ──────────────────────────────────────────────────────────────────────────
     # SECTION 4 — STRUCTURAL HEURISTICS (Rule Engine)
     # ──────────────────────────────────────────────────────────────────────────
-    rule_score_pct = int(evidence["rule_analysis"]["rule_score"] * 100)
+    rule_score_pct = round(evidence["rule_analysis"]["rule_score"] * 100)
     y = section_header(f"SECTION 4  STRUCTURAL HEURISTICS  (Rule Score: {rule_score_pct}/100)", y)
 
     rule_reasons = evidence["rule_analysis"].get("rule_reasons", [])
@@ -468,7 +509,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # ──────────────────────────────────────────────────────────────────────────
     # SECTION 5 — TF-IDF TEXT MODEL ANALYSIS
     # ──────────────────────────────────────────────────────────────────────────
-    ai_score_pct = int(evidence["ai_analysis"]["ai_score"] * 100)
+    ai_score_pct = round(evidence["ai_analysis"]["ai_score"] * 100)
     y = section_header(f"SECTION 5  TF-IDF TEXT MODEL ANALYSIS  (Score: {ai_score_pct}/100)", y)
 
     ai_reasons = evidence["ai_analysis"].get("ai_reasons", [])
@@ -530,7 +571,7 @@ def generate_pdf_report(evidence: dict) -> str:
         y -= 36
     else:
         llm_score_val = llm_data.get("llm_score", 0.0) or 0.0
-        llm_score_pct = int(llm_score_val * 100)
+        llm_score_pct = round(llm_score_val * 100)
         llm_col       = _score_color(llm_score_val)
 
         # ── LLM threat score bar ─────────────────────────────────────────
@@ -697,7 +738,7 @@ def generate_pdf_report(evidence: dict) -> str:
             
             c.setFillColor(COL_PALE)
             c.setFont("Helvetica-Bold", 8)
-            c.drawString(bar_x + bar_w + 15, y_pos, f"{int(score * 100)}%")
+            c.drawString(bar_x + bar_w + 15, y_pos, f"{round(score * 100)}%")
         else:
             c.setFillColor(COL_GREY)
             c.setFont("Helvetica-Oblique", 8)
@@ -737,7 +778,7 @@ def generate_pdf_report(evidence: dict) -> str:
     c.roundRect(bar_x, y - 1, max(int(bar_w * final_s), 6), 10, 4, fill=1, stroke=0)
     
     c.setFillColor(COL_WHITE)
-    c.drawString(bar_x + bar_w + 15, y, f"{int(final_s * 100)}%")
+    c.drawString(bar_x + bar_w + 15, y, f"{round(final_s * 100)}%")
     
     lbl = evidence.get("hybrid_decision", {}).get("final_label", "").upper()
     c.setFillColor(COL_RED if final_s >= 0.5 else COL_GREEN)
@@ -753,18 +794,25 @@ def generate_pdf_report(evidence: dict) -> str:
     y -= 14
     
     c.setFont("Courier", 8)
+    
+    applied = evidence.get("hybrid_decision", {}).get("applied_weights", {})
+    w_r = applied.get("rule", 0.25 if llm_avail else 0.40)
+    w_a = applied.get("ai", 0.25 if llm_avail else 0.60)
+    w_l = applied.get("llm", 0.50 if llm_avail else 0.0)
+    is_dynamic = applied.get("dynamic", False)
+
     if llm_avail:
-        base_total = (r_score * 0.25) + (a_score * 0.25) + (l_score * 0.50)
-        c.drawString(60, y, f"Rule:    {r_score:.3f} × 0.25 = {r_score*0.25:.3f}")
+        base_total = (r_score * w_r) + (a_score * w_a) + (l_score * w_l)
+        c.drawString(60, y, f"Rule:    {r_score:.3f} × {w_r:.2f} = {r_score*w_r:.3f}")
         y -= 12
-        c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × 0.25 = {a_score*0.25:.3f}")
+        c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × {w_a:.2f} = {a_score*w_a:.3f}")
         y -= 12
-        c.drawString(60, y, f"LLM:     {l_score:.3f} × 0.50 = {l_score*0.50:.3f}")
+        c.drawString(60, y, f"LLM:     {l_score:.3f} × {w_l:.2f} = {l_score*w_l:.3f}")
     else:
-        base_total = (r_score * 0.40) + (a_score * 0.60)
-        c.drawString(60, y, f"Rule:    {r_score:.3f} × 0.40 = {r_score*0.40:.3f}")
+        base_total = (r_score * w_r) + (a_score * w_a)
+        c.drawString(60, y, f"Rule:    {r_score:.3f} × {w_r:.2f} = {r_score*w_r:.3f}")
         y -= 12
-        c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × 0.60 = {a_score*0.60:.3f}")
+        c.drawString(60, y, f"TF-IDF:  {a_score:.3f} × {w_a:.2f} = {a_score*w_a:.3f}")
         
     y -= 12
     c.drawString(60, y, "-" * 32)
@@ -772,19 +820,26 @@ def generate_pdf_report(evidence: dict) -> str:
     c.setFillColor(COL_WHITE)
     c.drawString(60, y, f"Base Sum:             = {base_total:.3f}")
     
-    if abs(final_s - base_total) > 0.001:
+    if abs(final_s - base_total) > 0.001 and not is_dynamic:
         y -= 12
         c.setFillColor(COL_AMBER)
-        c.drawString(60, y, f"SMART VETO APPLIED:   → {final_s:.3f}")
+        c.drawString(60, y, f"ESCALATION APPLIED:   → {final_s:.3f}")
+    elif is_dynamic:
+        y -= 12
+        c.setFillColor(COL_RED)
+        c.drawString(60, y, f"DYNAMIC SCALING USED: → {final_s:.3f}")
         
     y -= 20
     
     # --- Consensus / Conflict Badge ---
     conflict = evidence.get("hybrid_decision", {}).get("conflict_detected", False)
     
-    if conflict:
+    if is_dynamic:
+        badge_color = COL_RED
+        badge_text  = "DYNAMIC SCALING - LLM confidence overpowered base rules"
+    elif conflict:
         badge_color = COL_AMBER
-        badge_text  = "CONFLICT DETECTED - LLM weighted as contextual authority"
+        badge_text  = "CONFLICT DETECTED - Weak signals required escalation"
     elif (r_score > 0.7 and a_score > 0.7) or (r_score < 0.3 and a_score < 0.3):
         badge_color = COL_GREEN
         badge_text  = "ALL ENGINES AGREE - High confidence consensus"
@@ -822,6 +877,15 @@ def generate_pdf_report(evidence: dict) -> str:
     y = section_header("SECTION 7  URL & LINK FORENSICS", y)
 
     url_details = evidence.get("url_details", [])
+    link_forensics = evidence.get("link_forensics", {})
+    mode = link_forensics.get("link_evidence_mode", "unknown")
+    sender_domain = link_forensics.get("sender_domain", "unknown")
+    y = draw_text(f"Link evidence mode: {mode} | Sender domain: {sender_domain}", 50, y, size=8, color=COL_GREY)
+    cta_texts = link_forensics.get("cta_texts", [])
+    if cta_texts:
+        y = draw_text(f"Detected CTA text: {', '.join(cta_texts[:3])}", 50, y, size=8, color=COL_GREY)
+        y -= 2
+
     if not url_details:
         y = draw_text("No URLs detected in the email body.", 50, y, color=COL_GREY)
     else:
@@ -904,7 +968,7 @@ def generate_pdf_report(evidence: dict) -> str:
     att_data    = evidence.get("attachment_analysis", {})
     att_findings = att_data.get("findings", [])
     att_agg      = att_data.get("attachment_score")
-    att_pct      = int((att_agg or 0) * 100)
+    att_pct      = round((att_agg or 0) * 100)
 
     y = section_header(f"SECTION 9  ATTACHMENT FORENSICS  (Aggregate Score: {att_pct}/100)", y)
 
@@ -918,7 +982,7 @@ def generate_pdf_report(evidence: dict) -> str:
             inds    = finding.get("indicators", [])
             sha256  = finding.get("sha256", None)
             md5     = finding.get("md5", None)
-            f_pct   = int(f_score * 100)
+            f_pct   = round(f_score * 100)
             f_col   = _score_color(f_score)
 
             y = check_space(y, 50)
@@ -1030,7 +1094,7 @@ def generate_pdf_report(evidence: dict) -> str:
     legal_lines = [
         f"Case Reference:   {case_id}",
         f"Analysis Date:    {utc_ts[:19]} UTC",
-        f"System:           TrustMail v3.0",
+        f"System:           SafeMail X v3.0",
         f"Method:           TF-IDF Logistic Regression (83,000-sample Kaggle corpus) + Rule-Based Heuristics",
         "",
         "DATA RETENTION:   Report handling follows the project workflow defined in the running bot.",
@@ -1061,7 +1125,7 @@ def generate_pdf_report(evidence: dict) -> str:
     # Final footer
     c.setFont("Helvetica-Oblique", 7)
     c.setFillColor(COL_GREY)
-    c.drawCentredString(width / 2, 25, f"TrustMail  |  Case {case_id}  |  Local Analysis  |  {utc_ts[:10]}")
+    c.drawCentredString(width / 2, 25, f"SafeMail X  |  Case {case_id}  |  Local Analysis  |  {utc_ts[:10]}")
 
     c.save()
     return filepath

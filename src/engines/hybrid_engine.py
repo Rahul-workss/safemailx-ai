@@ -60,11 +60,23 @@ def _build_security_summary(security_headers: dict) -> str:
 
 def hybrid_detect(subject, email_text, sender="unknown_origin",
                   attachment_score=None, url_flags=None,
-                  security_headers=None, auth_context="unknown"):
+                  security_headers=None, auth_context="unknown",
+                  url_details=None, source_type="email",
+                  link_evidence_mode="none_visible"):
 
     analysis_steps = []
     sec_hdrs = security_headers or {}
     trust_original_auth = auth_context == "original_headers"
+
+    # -- Pre-extract authentication signals for trust arbitration --
+    sender_domain = sender.split("@")[-1].replace(">", "").strip().lower() if "@" in sender else ""
+    spf_pass  = sec_hdrs.get("spf", "").lower() == "pass"
+    dkim_pass = sec_hdrs.get("dkim", "").lower() == "pass"
+
+    if not trust_original_auth:
+        analysis_steps.append(
+            f"Authentication trust disabled ({auth_context}); headers belong to forwarder or are unavailable")
+
 
     # Combine subject and body so all detectors see the same text context.
     combined_text = f"Subject: {subject}\n\n{email_text}"
@@ -73,7 +85,7 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     # LAYER 1 -- Rule Engine (structural heuristics)
     # ================================================================
     rule_score, rule_reasons, rule_features = analyze_rules(
-        combined_text, sender)
+        combined_text, sender, url_records=url_details, source_type=source_type)
 
     # Merge URL analyzer flags into rule score
     if url_flags:
@@ -96,9 +108,23 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     # LAYER 3 -- LLM Analysis (Qwen 2.5 via LM Studio)
     # ================================================================
     security_summary = _build_security_summary(sec_hdrs) if trust_original_auth else ""
-    llm_result    = run_llm_analysis(combined_text,
-                                     subject=subject, sender=sender,
-                                     security_summary=security_summary)
+    llm_channel = "email"
+    if source_type == "sms":
+        llm_channel = "sms"
+    elif source_type == "text":
+        llm_channel = "text"
+    elif source_type == "url":
+        llm_channel = "url"
+    elif source_type in {"file", "screenshot"}:
+        llm_channel = "file"
+
+    llm_result    = run_llm_analysis(
+        channel=llm_channel,
+        email_text=combined_text,
+        subject=subject,
+        sender=sender,
+        security_summary=security_summary,
+    )
     llm_score     = None
     llm_reasons   = []
     llm_tactics   = []
@@ -107,6 +133,7 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     if llm_result is not None:
         llm_available = True
         llm_score     = llm_result["llm_score"]
+        llm_intent    = llm_result.get("intent", "")
         llm_tactics   = llm_result.get("tactics", [])
         llm_reasons   = [llm_result.get("reasoning", "")]
         analysis_steps.append(
@@ -144,9 +171,13 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
             elif llm_confidence > 0.6:
                 final_score = max(final_score, llm_score * 0.85)
                 analysis_steps.append(f"Smart Veto: SOFT VETO triggered (confidence {llm_confidence}).")
-        elif llm_score < 0.25 and llm_confidence > 0.8:
-             final_score = min(final_score, llm_score + 0.1)
-             analysis_steps.append(f"Smart Veto: SAFE override triggered by high LLM confidence ({llm_confidence}).")
+        elif (llm_score < 0.25 and llm_confidence >= 0.8) or (llm_score == 0.0 and llm_intent == "conversational"):
+            if llm_score == 0.0 and rule_score == 0.0:
+                final_score = 0.0
+                analysis_steps.append("Smart Veto: ABSOLUTE SAFE override triggered (score forced to 0).")
+            else:
+                final_score = min(final_score, llm_score + 0.1)
+                analysis_steps.append(f"Smart Veto: SAFE override triggered by high LLM confidence ({llm_confidence}).")
              
     else:
         # ---------- Fallback when the LLM path is unavailable ----------
@@ -169,7 +200,9 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]
     
     # Do NOT apply the extreme safety override if the LLM explicitly vetoed as SAFE
-    is_safe_veto = llm_available and (llm_score is not None) and (llm_score < 0.25) and (llm_confidence > 0.8)
+    is_safe_veto = llm_available and (llm_score is not None) and (
+        (llm_score < 0.25 and llm_confidence >= 0.8) or (llm_score == 0.0 and llm_intent == "conversational")
+    )
     
     if not is_safe_veto:
         if any(s > 0.95 for s in active_scores) or rule_score > 0.9:
@@ -181,10 +214,18 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     spf_pass  = sec_hdrs.get("spf", "").lower() == "pass"
     dkim_pass = sec_hdrs.get("dkim", "").lower() == "pass"
 
+    trust_arbitration = {"tier": None, "applied": False, "reason": None}
+
+    has_cta_mismatch = any(
+        reason.startswith("cta_sender_domain_mismatch:") or
+        reason.startswith("cta_resolved_domain_mismatch:")
+        for reason in rule_reasons
+    )
+
     if not trust_original_auth:
         analysis_steps.append(
             f"Authentication trust disabled ({auth_context}); headers belong to forwarder or are unavailable")
-    elif sender_domain in VIP_DOMAINS and spf_pass and dkim_pass:
+    elif sender_domain in VIP_DOMAINS and spf_pass and dkim_pass and not has_cta_mismatch:
         # Do not suppress a result that the LLM already pushed high.
         if final_score >= 0.7:
             analysis_steps.append(f"ALERT: VIP Domain '{sender_domain}' authenticated, but ignored due to high threat Veto (Compromised sender/Invoice scam).")
@@ -194,12 +235,26 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
             final_score = round(final_score * 0.75, 3)
             analysis_steps.append(f"VIP Domain '{sender_domain}' authenticated -- trust boost applied (score reduced from {old_score:.3f} to {final_score:.3f})")
             rule_reasons.append(f"vip_authenticated:{sender_domain}")
+            trust_arbitration = {"tier": "vip_authenticated", "applied": True, "reason": sender_domain}
     elif sender_domain in VIP_DOMAINS and (not spf_pass or not dkim_pass):
         # Claims to be a safelisted domain but authentication failed.
         boost = 0.15
         final_score = round(min(final_score + boost, 1.0), 3)
         analysis_steps.append(f"ALERT: Claims VIP domain '{sender_domain}' but SPF/DKIM failed -- possible spoofing (+{boost})")
         rule_reasons.append(f"vip_spoof_attempt:{sender_domain}")
+
+    if has_cta_mismatch:
+        analysis_steps.append("Trust arbitration disabled due to CTA destination mismatch.")
+
+    screenshot_cta_words = ("claim offer now", "claim now", "redeem", "verify", "unlock", "50% off", "limited time")
+    if (
+        source_type == "screenshot"
+        and link_evidence_mode == "none_visible"
+        and not url_details
+        and any(token in combined_text.lower() for token in screenshot_cta_words)
+    ):
+        final_score = max(final_score, 0.55)
+        analysis_steps.append("Screenshot CTA present without visible destination; capped at suspicious.")
 
     # -- Attachment score merge ------------------------------------------------
     if attachment_score is not None:
@@ -240,4 +295,5 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
         "analysis_steps":   analysis_steps,
         "conflict_detected": conflict_detected,
         "auth_context":     auth_context,
+        "trust_arbitration": trust_arbitration,
     }

@@ -446,6 +446,14 @@ class ScanRepository:
             return None
         return row["token_blob"] if isinstance(row, dict) else row["token_blob"]
 
+    def delete_gmail_token(self, user_id: str) -> None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"DELETE FROM gmail_tokens WHERE user_id = {placeholder}",
+                (user_id,),
+            )
+
     def list_gmail_user_ids(self) -> list[str]:
         with self._db() as conn:
             rows = conn.execute("SELECT user_id FROM gmail_tokens ORDER BY updated_at DESC").fetchall()
@@ -508,5 +516,227 @@ class ScanRepository:
             "final_score": row["final_score"],
             "llm_used": bool(row["llm_used"]),
             "degraded": bool(row["degraded"]),
+            "report_pdf": row["report_pdf"],
+            "report_json": row["report_json"],
             "created_at": created_at,
         }
+
+
+    def store_otp(self, email: str, otp: str, expires_at: str) -> None:
+        created_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS otp_tokens (email TEXT PRIMARY KEY, otp TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)"
+            )
+            if self.is_postgres:
+                conn.execute(
+                    f"INSERT INTO otp_tokens (email, otp, expires_at, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT (email) DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at",
+                    (email, otp, expires_at, created_at)
+                )
+            else:
+                conn.execute(
+                    f"INSERT INTO otp_tokens (email, otp, expires_at, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT(email) DO UPDATE SET otp = excluded.otp, expires_at = excluded.expires_at",
+                    (email, otp, expires_at, created_at)
+                )
+
+    def get_otp(self, email: str) -> dict | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                if not self.is_postgres:
+                    conn.row_factory = sqlite3.Row
+                row = conn.execute(f"SELECT * FROM otp_tokens WHERE email = {placeholder}", (email,)).fetchone()
+                if not row:
+                    return None
+                return dict(row)
+            except Exception:
+                return None
+
+    def delete_otp(self, email: str) -> None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                conn.execute(f"DELETE FROM otp_tokens WHERE email = {placeholder}", (email,))
+            except Exception:
+                pass
+
+    def store_backup_token(self, user_id: str, email: str, name: str, token_blob: str) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS google_backup_tokens (user_id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL, token_blob TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            if self.is_postgres:
+                conn.execute(
+                    f"INSERT INTO google_backup_tokens (user_id, email, name, token_blob, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT (user_id) DO UPDATE SET token_blob = EXCLUDED.token_blob, email = EXCLUDED.email, name = EXCLUDED.name, updated_at = EXCLUDED.updated_at",
+                    (user_id, email, name, token_blob, updated_at)
+                )
+            else:
+                conn.execute(
+                    f"INSERT INTO google_backup_tokens (user_id, email, name, token_blob, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT(user_id) DO UPDATE SET token_blob = excluded.token_blob, email = excluded.email, name = excluded.name, updated_at = excluded.updated_at",
+                    (user_id, email, name, token_blob, updated_at)
+                )
+
+    def get_backup_token(self, user_id: str) -> str | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                row = conn.execute(f"SELECT token_blob FROM google_backup_tokens WHERE user_id = {placeholder}", (user_id,)).fetchone()
+                if not row:
+                    return None
+                return row["token_blob"] if isinstance(row, dict) else row[0]
+            except Exception:
+                return None
+
+    def delete_backup_token(self, user_id: str) -> None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                conn.execute(f"DELETE FROM google_backup_tokens WHERE user_id = {placeholder}", (user_id,))
+            except Exception:
+                pass
+
+    def upsert_notification_preferences(self, user_id: str, critical_alerts: bool, weekly_summary: bool) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            if self.is_postgres:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS notification_preferences (user_id TEXT PRIMARY KEY, critical_alerts BOOLEAN NOT NULL, weekly_summary BOOLEAN NOT NULL, updated_at TEXT NOT NULL)"
+                )
+                conn.execute(
+                    f"INSERT INTO notification_preferences (user_id, critical_alerts, weekly_summary, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT (user_id) DO UPDATE SET critical_alerts = EXCLUDED.critical_alerts, weekly_summary = EXCLUDED.weekly_summary, updated_at = EXCLUDED.updated_at",
+                    (user_id, critical_alerts, weekly_summary, updated_at)
+                )
+            else:
+                critical_int = 1 if critical_alerts else 0
+                weekly_int = 1 if weekly_summary else 0
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS notification_preferences (user_id TEXT PRIMARY KEY, critical_alerts INTEGER NOT NULL, weekly_summary INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+                )
+                conn.execute(
+                    f"INSERT INTO notification_preferences (user_id, critical_alerts, weekly_summary, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT(user_id) DO UPDATE SET critical_alerts = excluded.critical_alerts, weekly_summary = excluded.weekly_summary, updated_at = excluded.updated_at",
+                    (user_id, critical_int, weekly_int, updated_at)
+                )
+
+    def get_notification_preferences(self, user_id: str) -> dict | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                if not self.is_postgres:
+                    conn.row_factory = sqlite3.Row
+                row = conn.execute(f"SELECT * FROM notification_preferences WHERE user_id = {placeholder}", (user_id,)).fetchone()
+                if not row:
+                    return None
+                d = dict(row)
+                d['critical_alerts'] = bool(d.get('critical_alerts', 1))
+                d['weekly_summary'] = bool(d.get('weekly_summary', 1))
+                return d
+            except Exception:
+                return None
+
+    def store_google_contacts_token(self, user_id: str, token_blob: str) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS google_contacts_tokens (user_id TEXT PRIMARY KEY, token_blob TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            if self.is_postgres:
+                conn.execute(
+                    f"INSERT INTO google_contacts_tokens (user_id, token_blob, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}) ON CONFLICT (user_id) DO UPDATE SET token_blob = EXCLUDED.token_blob, updated_at = EXCLUDED.updated_at",
+                    (user_id, token_blob, updated_at)
+                )
+            else:
+                conn.execute(
+                    f"INSERT INTO google_contacts_tokens (user_id, token_blob, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}) ON CONFLICT(user_id) DO UPDATE SET token_blob = excluded.token_blob, updated_at = excluded.updated_at",
+                    (user_id, token_blob, updated_at)
+                )
+
+    def get_google_contacts_token(self, user_id: str) -> str | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                row = conn.execute(f"SELECT token_blob FROM google_contacts_tokens WHERE user_id = {placeholder}", (user_id,)).fetchone()
+                if not row:
+                    return None
+                return row["token_blob"] if isinstance(row, dict) else row[0]
+            except Exception:
+                return None
+                
+    def delete_google_contacts_token(self, user_id: str) -> None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            try:
+                conn.execute(f"DELETE FROM google_contacts_tokens WHERE user_id = {placeholder}", (user_id,))
+            except Exception:
+                pass
+
+    def save_trust_rules(self, user_id: str, auto_trust_contacts: bool, whitelist: list[str], blacklist: list[str]) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        auto_trust = 1 if auto_trust_contacts else 0
+        import json
+        with self._db() as conn:
+            conn.execute(
+                f"CREATE TABLE IF NOT EXISTS trust_rules (user_id TEXT PRIMARY KEY, auto_trust_contacts INTEGER NOT NULL, whitelist TEXT NOT NULL, blacklist TEXT NOT NULL, updated_at TEXT NOT NULL)"
+            )
+            if self.is_postgres:
+                conn.execute(
+                    f"INSERT INTO trust_rules (user_id, auto_trust_contacts, whitelist, blacklist, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT (user_id) DO UPDATE SET auto_trust_contacts = EXCLUDED.auto_trust_contacts, whitelist = EXCLUDED.whitelist, blacklist = EXCLUDED.blacklist, updated_at = EXCLUDED.updated_at",
+                    (user_id, auto_trust, json.dumps(whitelist), json.dumps(blacklist), updated_at)
+                )
+            else:
+                conn.execute(
+                    f"INSERT INTO trust_rules (user_id, auto_trust_contacts, whitelist, blacklist, updated_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT(user_id) DO UPDATE SET auto_trust_contacts = excluded.auto_trust_contacts, whitelist = excluded.whitelist, blacklist = excluded.blacklist, updated_at = excluded.updated_at",
+                    (user_id, auto_trust, json.dumps(whitelist), json.dumps(blacklist), updated_at)
+                )
+
+    def get_trust_rules(self, user_id: str) -> dict | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        import json
+        with self._db() as conn:
+            try:
+                if not self.is_postgres:
+                    conn.row_factory = sqlite3.Row
+                row = conn.execute(f"SELECT * FROM trust_rules WHERE user_id = {placeholder}", (user_id,)).fetchone()
+                if not row:
+                    return None
+                d = dict(row)
+                d['auto_trust_contacts'] = bool(d.get('auto_trust_contacts', 0))
+                d['whitelist'] = json.loads(d.get('whitelist', '[]'))
+                d['blacklist'] = json.loads(d.get('blacklist', '[]'))
+                return d
+            except Exception:
+                return None
+
+    def set_scan_feedback(self, scan_id: str, user_id: str, feedback: str, note: str) -> dict | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        updated_at = datetime.now(timezone.utc).isoformat()
+        import json
+        with self._db() as conn:
+            if not self.is_postgres:
+                conn.row_factory = sqlite3.Row
+            row = conn.execute(f"SELECT evidence_json FROM scans WHERE id = {placeholder} AND user_id = {placeholder}", (scan_id, user_id)).fetchone()
+            if not row:
+                return None
+            
+            try:
+                evidence = json.loads(row["evidence_json"] if isinstance(row, dict) else row[0])
+            except Exception:
+                evidence = {}
+            
+            evidence["review_feedback"] = {
+                "feedback": feedback,
+                "note": note,
+                "updated_at": updated_at
+            }
+            
+            conn.execute(
+                f"UPDATE scans SET evidence_json = {placeholder} WHERE id = {placeholder} AND user_id = {placeholder}",
+                (json.dumps(evidence), scan_id, user_id)
+            )
+        return self.get_scan(scan_id, user_id)
+

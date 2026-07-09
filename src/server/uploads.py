@@ -10,8 +10,8 @@ from utils.ocr_engine import extract_text_from_image
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
 TEXT_EXTENSIONS = {".txt", ".eml", ".html", ".htm"}
 PDF_EXTENSIONS = {".pdf"}
-DOCX_EXTENSIONS = {".docx"}
-SUPPORTED_UPLOAD_EXTENSIONS = IMAGE_EXTENSIONS | TEXT_EXTENSIONS | PDF_EXTENSIONS | DOCX_EXTENSIONS
+OFFICE_EXTENSIONS = {".docx", ".doc", ".docm", ".xlsx", ".xls", ".xlsm", ".pptx", ".ppt", ".pptm"}
+SUPPORTED_UPLOAD_EXTENSIONS = IMAGE_EXTENSIONS | TEXT_EXTENSIONS | PDF_EXTENSIONS | OFFICE_EXTENSIONS
 
 
 def _extract_pdf_text(file_bytes: bytes) -> str:
@@ -57,9 +57,9 @@ def extract_upload_text(filename: str, file_bytes: bytes) -> tuple[str, list[str
     elif suffix in PDF_EXTENSIONS:
         text = _extract_pdf_text(file_bytes)
         notes.append("pdf_text_extraction")
-    elif suffix in DOCX_EXTENSIONS:
+    elif suffix in OFFICE_EXTENSIONS:
         text = _extract_docx_text(file_bytes)
-        notes.append("docx_text_extraction")
+        notes.append("office_text_extraction")
     elif suffix in IMAGE_EXTENSIONS:
         text = _extract_image_text(file_bytes, suffix)
         notes.append("image_ocr")

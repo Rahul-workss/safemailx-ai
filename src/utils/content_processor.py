@@ -1,6 +1,8 @@
 import re
 import unicodedata
 
+from bs4 import BeautifulSoup
+
 from .ocr_engine import extract_text_from_image
 from .config import debug_log
 
@@ -37,6 +39,21 @@ def _line_has_signal(line):
     return bool(re.search(r"[A-Za-z0-9]", line))
 
 
+def _html_to_text_preserving_links(text_str: str) -> str:
+    soup = BeautifulSoup(text_str, "html.parser")
+    for tag in soup(["script", "style", "head", "title", "meta", "link", "noscript"]):
+        tag.decompose()
+
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        anchor_text = re.sub(r"\s+", " ", a.get_text(" ", strip=True)).strip()
+        if href.startswith(("http://", "https://")):
+            replacement = f"{anchor_text} -> {href}" if anchor_text else href
+            a.replace_with(replacement)
+
+    return soup.get_text(separator="\n", strip=True)
+
+
 def clean_extracted_text(text):
     """
     Remove invisible email padding and normalize spacing while preserving
@@ -45,7 +62,16 @@ def clean_extracted_text(text):
     if not text:
         return ""
 
-    normalized = unicodedata.normalize("NFKC", str(text))
+    # Defense-in-depth: If the text is raw HTML (e.g. wrapped in text/plain MIME part),
+    # strip all HTML tags, scripts, and styles using BeautifulSoup first.
+    text_str = str(text)
+    if "<html" in text_str.lower() or "<!doctype" in text_str.lower() or "<body>" in text_str.lower() or "<p>" in text_str.lower():
+        try:
+            text_str = _html_to_text_preserving_links(text_str)
+        except Exception:
+            pass
+
+    normalized = unicodedata.normalize("NFKC", text_str)
     normalized = normalized.translate(_INVISIBLE_TRANSLATION)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
     normalized = normalized.replace("\xa0", " ")

@@ -1,5 +1,5 @@
 # ============================================================
-# TrustMail — DOCX / XLSX / PPTX Static Analyzer
+# SafeMail X — DOCX / XLSX / PPTX Static Analyzer
 # ============================================================
 # Office Open XML files (.docx, .xlsx, .pptx) are ZIP archives.
 # We inspect their internal structure without executing them.

@@ -6,7 +6,7 @@ import redis
 from server.settings import REDIS_URL
 
 
-QUEUE_NAME = "trustmail:scan-jobs"
+QUEUE_NAME = "safemailx:scan-jobs"
 
 
 class QueueUnavailable(RuntimeError):

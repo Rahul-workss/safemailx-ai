@@ -40,6 +40,21 @@ class ContentProcessorTests(unittest.TestCase):
         self.assertIn("Cold start complete. Time to heat", cleaned)
         self.assertNotIn("\u034f", cleaned)
 
+    def test_preserves_html_anchor_href_pairs(self):
+        raw = """
+        <html>
+          <body>
+            <p>OpenArt Birthday Offer</p>
+            <a href="https://promo.evil.test/claim">Claim Offer Now</a>
+          </body>
+        </html>
+        """
+
+        cleaned = clean_extracted_text(raw)
+
+        self.assertIn("OpenArt Birthday Offer", cleaned)
+        self.assertIn("Claim Offer Now -> https://promo.evil.test/claim", cleaned)
+
 
 if __name__ == "__main__":
     unittest.main()

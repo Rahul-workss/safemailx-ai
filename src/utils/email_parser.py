@@ -1,17 +1,40 @@
 import re
 import base64
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 
 def _decode_gmail_body(data):
     if not data:
         return ""
+    pad = len(data) % 4
+    if pad:
+        data += "=" * (4 - pad)
     return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
 
 
 def _append_unique(items, value):
     if value and value not in items:
         items.append(value)
+
+
+CTA_TOKENS = (
+    "claim", "offer", "unlock", "verify", "continue", "redeem",
+    "activate", "upgrade", "view now", "apply now", "get started",
+    "shop now", "open offer",
+)
+
+
+def _extract_domain(url: str) -> str:
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+
+
+def _is_cta_text(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+    return any(token in normalized for token in CTA_TOKENS)
 
 
 def _looks_hidden(tag):
@@ -55,7 +78,33 @@ def _html_text_and_images(html):
         if src.startswith(("http://", "https://", "data:image/")):
             _append_unique(image_sources, src)
 
-    return soup.get_text(separator="\n", strip=True), image_sources
+    links = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if href.startswith(("http://", "https://")):
+            anchor_text = re.sub(r"\s+", " ", a.get_text(" ", strip=True)).strip()
+            link_record = {
+                "anchor_text": anchor_text,
+                "href": href,
+                "href_domain": _extract_domain(href),
+                "is_cta": _is_cta_text(anchor_text),
+                "link_source": "raw_href",
+            }
+            if link_record not in links:
+                links.append(link_record)
+
+            replacement = f"{anchor_text} -> {href}" if anchor_text else href
+            a.replace_with(replacement)
+
+    extracted_text = soup.get_text(separator="\n", strip=True)
+
+    if links:
+        extracted_text += "\n" + "\n".join(
+            f"{link['anchor_text']} -> {link['href']}" if link.get("anchor_text") else link["href"]
+            for link in links
+        )
+
+    return extracted_text, image_sources, links
 
 
 # MIME types treated as scannable file attachments
@@ -145,7 +194,7 @@ _FILE_ATTACHMENT_MIME_TYPES = {
 }
 
 
-def _extract_parts(service, message_id, parts, body_list, images_list, attachments_list):
+def _extract_parts(service, message_id, parts, body_list, images_list, attachments_list, links_list):
     """
     Recursively scans nested MIME parts to pull text/plain strings,
     detects/downloads image attachments into base64 data URIs, and
@@ -192,14 +241,17 @@ def _extract_parts(service, message_id, parts, body_list, images_list, attachmen
             data = part.get("body", {}).get("data")
             if data:
                 decoded = _decode_gmail_body(data)
-                html_text, html_images = _html_text_and_images(decoded)
+                html_text, html_images, html_links = _html_text_and_images(decoded)
                 body_list.append(html_text)
                 for src in html_images:
                     _append_unique(images_list, src)
+                for link in html_links:
+                    if link not in links_list:
+                        links_list.append(link)
                 
         elif mime_type.startswith("multipart/"):
             nested_parts = part.get("parts", [])
-            _extract_parts(service, message_id, nested_parts, body_list, images_list, attachments_list)
+            _extract_parts(service, message_id, nested_parts, body_list, images_list, attachments_list, links_list)
             
         elif mime_type.startswith("image/"):
             body_data = part.get("body", {})
@@ -276,9 +328,10 @@ def parse_email(service, message_id, message):
     body_list       = []
     images_list     = []
     attachments_list = []
+    links_list = []
     
     if "parts" in message["payload"]:
-        _extract_parts(service, message_id, message["payload"]["parts"], body_list, images_list, attachments_list)
+        _extract_parts(service, message_id, message["payload"]["parts"], body_list, images_list, attachments_list, links_list)
     else:
         # Single payload email (no attachments or nesting)
         mime_type = message["payload"].get("mimeType", "")
@@ -287,10 +340,13 @@ def parse_email(service, message_id, message):
             if data:
                 decoded = _decode_gmail_body(data)
                 if mime_type == "text/html":
-                    html_text, html_images = _html_text_and_images(decoded)
+                    html_text, html_images, html_links = _html_text_and_images(decoded)
                     body_list.append(html_text)
                     for src in html_images:
                         _append_unique(images_list, src)
+                    for link in html_links:
+                        if link not in links_list:
+                            links_list.append(link)
                 else:
                     body_list.append(decoded)
                 
@@ -305,6 +361,7 @@ def parse_email(service, message_id, message):
         "sender":           sender,
         "body":             "\n".join(body_list),
         "images":           images_list,
+        "links":            links_list,
         "attachments":      attachments_list,
         "security_headers": security_headers,
     }

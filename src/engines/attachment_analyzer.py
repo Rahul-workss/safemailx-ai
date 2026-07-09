@@ -1,5 +1,5 @@
 # ============================================================
-# TrustMail — Attachment Analysis Orchestrator
+# SafeMail X — Attachment Analysis Orchestrator
 # ============================================================
 # Receives a list of { "filename": str, "bytes": bytes } dicts
 # from the email parser, routes each to the correct sub-analyzer,

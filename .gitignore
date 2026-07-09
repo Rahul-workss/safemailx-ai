@@ -5,6 +5,10 @@ env/
 trustmail_app.db
 trustmail-api.log
 trustmail-api.err.log
+trustmail-worker.log
+trustmail-worker.err.log
+trustmail-gmail-watcher.log
+trustmail-gmail-watcher.err.log
 trustmail-mobile/node_modules/
 trustmail-mobile/.expo/
 trustmail-mobile/dist/
@@ -13,6 +17,7 @@ trustmail-mobile/expo.err.log
 
 # Google API Credentials (CRITICAL - DO NOT UPLOAD)
 src/credentials.json
+src/credentials_*.json
 src/token.pickle
 
 # Byte-compiled / optimized / DLL files
@@ -41,3 +46,19 @@ data/splits/*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Extra ignores
+*.log
+*.db
+*.pid
+*credentials*.json
+.agents/
+safemailx-web/
+*.txt
+*.pyc
+
+trustmail-mobile/android/
+trustmail-mobile/ios/
+/*.py
+
+*.mp4

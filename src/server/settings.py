@@ -4,22 +4,23 @@ from pathlib import Path
 from utils.config import PROJECT_ROOT
 
 
-SERVER_HOST = os.getenv("TRUSTMAIL_API_HOST", "0.0.0.0")
-SERVER_PORT = int(os.getenv("TRUSTMAIL_API_PORT", "8080"))
+SERVER_HOST = os.getenv("SAFEMAILX_API_HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("SAFEMAILX_API_PORT", "8080"))
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    f"sqlite:///{PROJECT_ROOT / 'trustmail_app.db'}",
+    f"sqlite:///{PROJECT_ROOT / 'safemailx_app.db'}",
 )
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-before-production")
-TRUSTMAIL_ADMIN_EMAIL = os.getenv("TRUSTMAIL_ADMIN_EMAIL", "admin@trustmail.local")
-TRUSTMAIL_ADMIN_PASSWORD = os.getenv("TRUSTMAIL_ADMIN_PASSWORD", "change-me-before-production")
-TRUSTMAIL_REQUIRE_AUTH = os.getenv("TRUSTMAIL_REQUIRE_AUTH", "").strip().lower() in {
+SAFEMAILX_ADMIN_EMAIL = os.getenv("SAFEMAILX_ADMIN_EMAIL", "admin@safemailx.local")
+SAFEMAILX_ADMIN_PASSWORD = os.getenv("SAFEMAILX_ADMIN_PASSWORD", "change-me-before-production")
+SAFEMAILX_REQUIRE_AUTH = os.getenv("SAFEMAILX_REQUIRE_AUTH", "").strip().lower() in {
     "1", "true", "yes", "on"
 }
 JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "1440"))
 REPORT_BASE_DIR = Path(os.getenv("REPORT_BASE_DIR", str(PROJECT_ROOT / "reports")))
-SCAN_MODE_DEFAULT = os.getenv("TRUSTMAIL_SCAN_MODE", "balanced").lower()
+SCAN_MODE_DEFAULT = os.getenv("SAFEMAILX_SCAN_MODE", "balanced").lower()
 GMAIL_POLL_INTERVAL_SECONDS = int(os.getenv("GMAIL_POLL_INTERVAL_SECONDS", "60"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
 GMAIL_TOKEN_ENCRYPTION_KEY = os.getenv("GMAIL_TOKEN_ENCRYPTION_KEY", "").strip()

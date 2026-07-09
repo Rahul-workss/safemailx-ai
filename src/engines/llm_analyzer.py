@@ -21,8 +21,9 @@ from utils.config import (
     LM_STUDIO_AUTO_CONTEXT,
 )
 
-# -- System prompt -------------------------------------------------------------
-SYSTEM_PROMPT = """You are TrustMail Threat Intelligence Engine, a forensic email analyst.
+# -- System prompts -------------------------------------------------------------
+PROMPTS = {
+    "email": """You are TrustMail Threat Intelligence Engine, a forensic email analyst.
 
 Your job is to determine whether an email is PHISHING or LEGITIMATE.
 
@@ -73,7 +74,7 @@ Return a JSON object with EXACTLY these keys:
   "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
   "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
   "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
-  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "unknown"]>,
+  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
   "threat_probability": <float 0.0-1.0>,
   "reasoning": <string: 2-3 sentence professional assessment. Include the apparent intent, the strongest benign or suspicious evidence, and what factor most influenced the score. Do not expose hidden chain-of-thought.>
 }
@@ -94,7 +95,114 @@ RULES:
 - Return ONLY valid JSON. No markdown fences, no extra text, no thinking tags.
 - If the email is clearly a real service notification, give it LOW scores.
 - NEVER flag a legitimate marketing email as high-threat just because it uses urgency words.
-- Focus on INTENT and DECEPTION, not just keywords."""
+- Focus on INTENT and DECEPTION, not just keywords.
+- If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
+
+    "sms": """You are a Cybersecurity SMS Analyst specializing in SMISHING (SMS Phishing) detection.
+
+Your job is to determine whether an SMS text message is a PHISHING attempt or LEGITIMATE.
+
+CRITICAL FOCUS FOR SMS:
+- Smishing often relies on extremely short links (bit.ly, tinyurl) or deceptive typosquatting.
+- Attackers frequently impersonate delivery services (USPS, FedEx, UPS), banks, or government agencies (IRS).
+- Look for severe urgency: "Your package is held", "Your account is locked", "Final notice".
+
+You will be provided with the SMS text and hard forensic facts extracted by our engines.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "urgency_score": <integer 0-10, 0=no urgency, 10=extreme artificial panic>,
+  "legitimacy_score": <integer 0-10, 0=clearly genuine, 10=clearly impersonating>,
+  "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
+  "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
+  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
+  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
+  "threat_probability": <float 0.0-1.0>,
+  "reasoning": <string: 2-3 sentence professional assessment based on the text AND the provided metadata facts.>
+}
+
+RULES:
+- Return ONLY valid JSON. No markdown fences, no extra text.
+- Rely heavily on the provided metadata/features to inform your probability score.
+- If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
+
+    "text": """You are a Cybersecurity Text Analyst specializing in raw message detection.
+
+Your job is to determine whether a raw text message or email excerpt is a PHISHING attempt or LEGITIMATE.
+
+CRITICAL FOCUS FOR RAW TEXT:
+- Attackers frequently impersonate delivery services, banks, or corporate IT.
+- Look for severe urgency or demands to verify accounts.
+- If the text is just a standard system test or completely benign (e.g., 'test', 'hello'), score it very low.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "urgency_score": <integer 0-10, 0=no urgency, 10=extreme artificial panic>,
+  "legitimacy_score": <integer 0-10, 0=clearly genuine, 10=clearly impersonating>,
+  "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
+  "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
+  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
+  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
+  "threat_probability": <float 0.0-1.0>,
+  "reasoning": <string: 2-3 sentence professional assessment based on the text AND the provided metadata facts.>
+}
+
+RULES:
+- Return ONLY valid JSON. No markdown fences, no extra text.
+- If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
+
+    "url": """You are a Cybersecurity Web Analyst specializing in malicious URL detection and credential harvesting lures.
+
+Your job is to determine whether a given URL and its context represent a PHISHING threat or are LEGITIMATE.
+
+CRITICAL FOCUS FOR URLs:
+- Look closely at the provided heuristic metadata (domain age, typosquatting hits, entropy).
+- If the metadata shows typosquatting (e.g. "paypal.com" vs "paypa1.com"), score the threat VERY HIGH.
+- If the metadata shows a newly registered domain (age < 14 days), treat it with high suspicion.
+- Evaluate any contextual text provided along with the URL for deceptive lures.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "urgency_score": <integer 0-10, 0=no urgency, 10=extreme artificial panic>,
+  "legitimacy_score": <integer 0-10, 0=clearly genuine, 10=clearly impersonating>,
+  "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
+  "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
+  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
+  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
+  "threat_probability": <float 0.0-1.0>,
+  "reasoning": <string: 2-3 sentence professional assessment based heavily on the heuristic URL features.>
+}
+
+RULES:
+- Return ONLY valid JSON. No markdown fences, no extra text.""",
+
+    "file": """You are a Cybersecurity Malware Analyst specializing in document lures.
+
+Your job is to determine whether a file's extracted text and metadata represent a THREAT (e.g., dropper, macro-enabled lure) or are LEGITIMATE.
+
+CRITICAL FOCUS FOR FILES:
+- Threat actors use fake invoices, receipts, and encrypted document notifications to trick users into enabling macros or calling a fake phone number (Callback Phishing/BazarCall).
+- If the metadata indicates suspicious macros or YARA hits, score the threat probability extremely high.
+- If the text tells the user to "Enable Editing" or "Enable Content" to view the file, it is highly likely a malicious dropper.
+
+Return a JSON object with EXACTLY these keys:
+{
+  "urgency_score": <integer 0-10, 0=no urgency, 10=extreme artificial panic>,
+  "legitimacy_score": <integer 0-10, 0=clearly genuine, 10=clearly impersonating>,
+  "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
+  "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
+  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
+  "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
+  "threat_probability": <float 0.0-1.0>,
+  "reasoning": <string: 2-3 sentence professional assessment. Highlight if the text contains lure language like "Enable Macros".>
+}
+
+RULES:
+- Return ONLY valid JSON. No markdown fences, no extra text."""
+}
+
+def get_system_prompt(channel: str) -> str:
+    return PROMPTS.get(channel, PROMPTS["email"])
 
 
 def _estimate_tokens(text: str) -> int:
@@ -140,7 +248,8 @@ def _fit_email_to_context(prefix: str, suffix: str, email_text: str,
     if force_char_limit is not None:
         char_limit = force_char_limit
     else:
-        reserved_prompt_tokens = _estimate_tokens(SYSTEM_PROMPT + prefix + suffix)
+        # Fallback to estimating based on the email prompt
+        reserved_prompt_tokens = _estimate_tokens(PROMPTS["email"] + prefix + suffix)
         context_tokens = _detect_loaded_context_tokens()
         available_tokens = (
             context_tokens
@@ -188,9 +297,14 @@ def _is_context_error(resp: requests.Response) -> bool:
     )
 
 
-def run_llm_analysis(email_text: str, subject: str = "",
-                     sender: str = "",
-                     security_summary: str = "") -> dict | None:
+def run_llm_analysis(
+    channel: str = "email",
+    email_text: str = "",
+    subject: str = "",
+    sender: str = "",
+    security_summary: str = "",
+    text: str | None = None,
+) -> dict | None:
     """
     Send email content to Qwen 2.5 7B and return structured features.
 
@@ -202,28 +316,43 @@ def run_llm_analysis(email_text: str, subject: str = "",
     (hybrid_engine) will seamlessly fall back to TF-IDF only.
     """
 
+    # Backward compatibility:
+    # - older callers passed text="..."
+    # - some legacy callers passed the body as the first positional argument
+    if text is not None and not email_text:
+        email_text = text
+    if channel not in PROMPTS and not email_text:
+        email_text = channel
+        channel = "email"
+
+    system_prompt = get_system_prompt(channel)
+
     # Build the user message with the available forensic context.
     user_prefix = (
-        "Analyze this email using the 3-phase forensic protocol.\n\n"
-        f"SENDER: {sender}\n"
-        f"SUBJECT: {subject}\n"
+        f"Analyze this {channel} using the forensic protocol.\n\n"
+        f"SENDER/SOURCE: {sender}\n"
+        f"SUBJECT/TITLE: {subject}\n"
     )
 
     # Add authentication context when it is available.
     if security_summary:
-        user_prefix += f"AUTHENTICATION: {security_summary}\n"
+        user_prefix += f"AUTHENTICATION/FEATURES: {security_summary}\n"
 
     user_suffix = (
         "\n--- END ---\n\n"
-        "Apply the 3-phase protocol internally to evaluate the email. "
+        "Apply the protocol internally to evaluate the content. "
         "DO NOT output your internal reasoning steps. You must output ONLY the final JSON object."
     )
+    
+    # We must patch _fit_email_to_context and _build_user_message calls locally
+    # since they previously relied on the global SYSTEM_PROMPT. 
+    # For now, we will compute char_limit locally or rely on their default logic.
     user_msg = _build_user_message(user_prefix, user_suffix, email_text)
 
     payload = {
         "model": LLM_MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_msg},
         ],
         "temperature": 0.1,
@@ -407,7 +536,7 @@ def run_llm_analysis(email_text: str, subject: str = "",
         confidence += 0.1
     if intent in ["credential_theft", "financial_fraud", "malware_delivery", "coercion"]:
         confidence += 0.2
-    elif intent in ["benign_notification", "marketing"]:
+    elif intent in ["benign_notification", "marketing", "conversational"]:
         confidence += 0.2  # Strong confidence in a benign result
         
     confidence = min(1.0, confidence)

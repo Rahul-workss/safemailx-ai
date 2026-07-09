@@ -12,9 +12,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from server.settings import (
     JWT_EXPIRES_MINUTES,
     JWT_SECRET,
-    TRUSTMAIL_ADMIN_EMAIL,
-    TRUSTMAIL_ADMIN_PASSWORD,
-    TRUSTMAIL_REQUIRE_AUTH,
+    SAFEMAILX_ADMIN_EMAIL,
+    SAFEMAILX_ADMIN_PASSWORD,
+    SAFEMAILX_REQUIRE_AUTH,
 )
 
 
@@ -62,8 +62,11 @@ def create_signed_token(payload: dict[str, Any], expires_minutes: int = JWT_EXPI
     return f"{signing_input}.{_b64url_encode(signature)}"
 
 
-def create_access_token(email: str, user_id: str = "local") -> str:
-    return create_signed_token({"sub": email, "uid": user_id})
+def create_access_token(email: str, user_id: str = "local", name: str | None = None) -> str:
+    payload = {"sub": email, "uid": user_id}
+    if name:
+        payload["name"] = name
+    return create_signed_token(payload)
 
 
 def verify_access_token(token: str) -> dict[str, Any]:
@@ -91,12 +94,12 @@ def verify_password(password: str, password_hash: str, salt: str) -> bool:
 
 
 def ensure_admin_user(repository) -> dict[str, Any]:
-    user = repository.get_user_by_email(TRUSTMAIL_ADMIN_EMAIL)
+    user = repository.get_user_by_email(SAFEMAILX_ADMIN_EMAIL)
     if user:
         return user
-    password_hash, salt = hash_password(TRUSTMAIL_ADMIN_PASSWORD)
+    password_hash, salt = hash_password(SAFEMAILX_ADMIN_PASSWORD)
     user_id = repository.create_user(
-        email=TRUSTMAIL_ADMIN_EMAIL,
+        email=SAFEMAILX_ADMIN_EMAIL,
         password_hash=password_hash,
         salt=salt,
     )
@@ -116,7 +119,7 @@ def validate_login(repository, email: str, password: str) -> dict[str, Any] | No
 def require_auth(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, Any] | None:
-    if not TRUSTMAIL_REQUIRE_AUTH:
+    if not SAFEMAILX_REQUIRE_AUTH:
         return {"uid": "local", "sub": "local"}
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing bearer token")
