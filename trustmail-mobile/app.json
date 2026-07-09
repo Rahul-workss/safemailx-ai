@@ -1,24 +1,39 @@
 {
   "expo": {
-    "name": "TrustMail AI",
-    "slug": "trustmail-ai",
-    "version": "0.1.0",
+    "name": "SafeMail X AI",
+    "slug": "safemailx-ai",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/custom-shield.png",
     "userInterfaceStyle": "dark",
-    "scheme": "trustmailai",
+    "scheme": "safemailxai",
     "splash": {
+      "image": "./assets/custom-shield.png",
+      "resizeMode": "contain",
       "backgroundColor": "#080B12"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false
     },
     "android": {
-      "package": "tech.safemailx.trustmailai",
-      "usesCleartextTraffic": true,
+      "package": "tech.safemailx.safemailxai",
+      "usesCleartextTraffic": false,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/custom-shield.png",
         "backgroundColor": "#080B12"
       }
-    }
+    },
+    "updates": {
+      "enabled": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "687ea9b6-97d1-4434-b8cc-fcb57eeace22"
+      }
+    },
+    "owner": "jnvra"
   }
 }
