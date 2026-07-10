@@ -1,4 +1,4 @@
-let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://api.safemailx-ai.tech";
+let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 
 let accessToken = "";
 const DEFAULT_TIMEOUT_MS = 12000;
