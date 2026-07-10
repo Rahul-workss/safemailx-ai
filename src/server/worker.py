@@ -28,15 +28,25 @@ def run_worker() -> None:
     repository = ScanRepository()
     service = ScanService(repository)
     print("[WORKER] SafeMail X scan worker started.")
-    client = redis.from_url(REDIS_URL)
 
     while True:
         scan_id = None
         job = None
+        # Recreate the Redis client each iteration so a dropped
+        # Render/cloud Redis connection never permanently stalls the worker.
         try:
-            _, raw_job = client.blpop(QUEUE_NAME, timeout=5) or (None, None)
-            if not raw_job:
+            client = redis.from_url(REDIS_URL, socket_connect_timeout=10, socket_timeout=10)
+        except Exception as exc:
+            print(f"[WORKER] Redis connect failed: {exc}. Retrying in 5s...")
+            time.sleep(5)
+            continue
+
+        try:
+            result = client.blpop(QUEUE_NAME, timeout=5)
+            if not result:
                 continue
+            _, raw_job = result
+
             job = json.loads(raw_job)
             scan_id = job.get("scan_id")
             user_id = job.get("user_id", "local")

@@ -72,14 +72,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 import threading
+import time
 from server.worker import run_worker
 from server.gmail_watcher import run_gmail_watcher
+
+
+def _resilient_thread(name: str, target_fn):
+    """Wraps a worker function in an infinite restart loop so
+    the thread NEVER permanently dies — it auto-restarts after
+    any crash with a 5-second backoff."""
+    def wrapper():
+        while True:
+            try:
+                print(f"[APP] {name} thread starting...")
+                target_fn()
+            except Exception as exc:
+                print(f"[APP] {name} thread crashed: {exc}. Restarting in 5s...")
+            time.sleep(5)
+    return wrapper
+
 
 @app.on_event("startup")
 def startup_event():
     print("[APP] Starting background worker threads...")
-    threading.Thread(target=run_worker, daemon=True).start()
-    threading.Thread(target=run_gmail_watcher, daemon=True).start()
+    threading.Thread(
+        target=_resilient_thread("Worker", run_worker),
+        daemon=True,
+        name="scan-worker",
+    ).start()
+    threading.Thread(
+        target=_resilient_thread("GmailWatcher", run_gmail_watcher),
+        daemon=True,
+        name="gmail-watcher",
+    ).start()
 
 repository = ScanRepository()
 scan_service = ScanService(repository)
