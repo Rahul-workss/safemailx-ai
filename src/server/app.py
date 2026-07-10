@@ -71,6 +71,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+import threading
+from server.worker import run_worker
+from server.gmail_watcher import run_gmail_watcher
+
+@app.on_event("startup")
+def startup_event():
+    print("[APP] Starting background worker threads...")
+    threading.Thread(target=run_worker, daemon=True).start()
+    threading.Thread(target=run_gmail_watcher, daemon=True).start()
+
 repository = ScanRepository()
 scan_service = ScanService(repository)
 inline_scan_service = InlineScanService(repository)
