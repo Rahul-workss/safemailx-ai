@@ -1,4 +1,4 @@
-﻿/**
+/**
  * session.ts — Centralized secure session storage for SafeMail X.
  *
  * All reads/writes to secure storage go through this module.
@@ -42,9 +42,16 @@ export function triggerSessionExpired(): void {
  * will correctly trigger the logout flow again.
  */
 export async function saveSession(token: string, email: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
-  await SecureStore.setItemAsync(EMAIL_KEY, email);
-  hasTriggeredExpiry = false; // reset for the new session
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    await SecureStore.setItemAsync(EMAIL_KEY, email);
+    hasTriggeredExpiry = false; // reset for the new session
+  } catch {
+    // Partial write — clean up both keys to avoid half-state on next cold start
+    try { await SecureStore.deleteItemAsync(TOKEN_KEY); } catch {}
+    try { await SecureStore.deleteItemAsync(EMAIL_KEY); } catch {}
+    // Don't throw — session save failure is non-fatal, user is still logged in via memory
+  }
 }
 
 /**

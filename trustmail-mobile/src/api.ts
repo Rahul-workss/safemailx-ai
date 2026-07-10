@@ -49,7 +49,9 @@ async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEF
   }
 
   // 401 — token is invalid or expired. Trigger exactly-once logout flow.
-  if (response.status === 401) {
+  // EXCEPT for auth endpoints where 401 means "wrong credentials", not "expired session".
+  const isAuthEndpoint = path.startsWith("/auth/");
+  if (response.status === 401 && !isAuthEndpoint) {
     triggerSessionExpired();
     throw new UnauthorizedError();
   }

@@ -358,6 +358,7 @@ function App() {
   // Tab fade/slide animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   function switchTab(tab: Tab) {
     Animated.parallel([
@@ -374,8 +375,9 @@ function App() {
   }
 
   const showToast = (msg: string, type: "error" | "success" = "error") => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ msg, type });
-    setTimeout(() => setToast({ msg: "", type: "" }), 3500);
+    toastTimerRef.current = setTimeout(() => setToast({ msg: "", type: "" }), 3500);
   };
 
   async function refresh() {
@@ -391,7 +393,9 @@ function App() {
       setGoogleBackupUser(g.connected ? g.email : null);
       setGoogleBackupSyncTime(g.connected ? g.last_sync : null);
       setNotificationPreferences(p);
-    } catch {
+    } catch (e) {
+      // If session expired, the global handler already fired — don't mask it
+      if (e instanceof UnauthorizedError) return;
       setHealth({ api: "offline", database: "unknown", redis: "unknown", ocr: "unknown", llm: "unknown", gmail_watcher: "unknown" });
     }
   }
@@ -411,7 +415,9 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => { refresh(); registerForPushNotifications(); }, []);
+  // NOTE: Do NOT call refresh() here — it requires auth and will 401 on fresh installs.
+  // The cold-start session-restore effect below handles the first refresh after login.
+  useEffect(() => { registerForPushNotifications(); }, []);
   const onRefresh = React.useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, []);
 
   // ── Register the global 401 expiry handler (covers ALL API calls, not just cold-start) ──
@@ -439,8 +445,7 @@ function App() {
           setAccessToken(session.token); // restore in-memory token used by api.ts
           setAuthState("Signed in");
           try {
-            await fetchScans();
-            // token valid — stay signed in, dashboard will render normally
+            await refresh(); // validates token AND loads full dashboard data
           } catch (err) {
             if (err instanceof UnauthorizedError) {
               // Token expired — clear everything and go to login
@@ -466,7 +471,7 @@ function App() {
     })();
   }, []);
 
-  const processIncomingUrl = React.useCallback((url: string) => {
+  const processIncomingUrl = React.useCallback(async (url: string) => {
     if (!url) return;
     try {
       console.log("Incoming deep link:", url);
@@ -479,26 +484,37 @@ function App() {
         const emailVal = emailMatch ? decodeURIComponent(emailMatch[1]) : "";
         const nameVal = nameMatch ? decodeURIComponent(nameMatch[1]) : "User";
 
+        // Set token temporarily and validate against the backend
         setAccessToken(token);
         setEmail(emailVal);
-        saveSession(token, emailVal); // persist OAuth token to encrypted storage
-        setAuthState("Signed in");
-        setActiveTab("dashboard");
-        
-        if (url.includes("service=gmail")) {
-          showToast(`Gmail connected for ${emailVal}!`, "success");
-        } else if (url.includes("service=backup")) {
-          showToast(`Backup activated for ${emailVal}!`, "success");
-        } else {
-          showToast(`Welcome back, ${nameVal}!`, "success");
+        try {
+          await fetchScans(); // validate token is real
+          saveSession(token, emailVal); // persist only after validation
+          setAuthState("Signed in");
+          setActiveTab("dashboard");
+
+          if (url.includes("service=gmail")) {
+            showToast(`Gmail connected for ${emailVal}!`, "success");
+          } else if (url.includes("service=backup")) {
+            showToast(`Backup activated for ${emailVal}!`, "success");
+          } else {
+            showToast(`Welcome back, ${nameVal}!`, "success");
+          }
+          refresh();
+          refreshGmailStatus();
+        } catch {
+          // Token was invalid or expired — clear it
+          setAccessToken("");
+          setEmail("");
+          showToast("Invalid or expired authentication link");
         }
       } else {
         if (url.includes("gmail") || url.includes("backup") || url.includes("service=") || url.includes("status=")) {
           showToast("Sync connection completed successfully!", "success");
         }
+        refresh();
+        refreshGmailStatus();
       }
-      refresh();
-      refreshGmailStatus();
     } catch (e) {
       console.log("Deep link parse error:", e);
     }
@@ -522,7 +538,7 @@ function App() {
   useEffect(() => {
     const hasQueued = scans.some(s => s.final_label === "queued");
     if (!hasQueued) return;
-    const iv = setInterval(refresh, 3000);
+    const iv = setInterval(() => refresh(), 3000);
     return () => clearInterval(iv);
   }, [scans]);
 
@@ -649,12 +665,20 @@ function App() {
 
   function handleLogout() {
     clearSession(); // fire-and-forget — clears encrypted storage (Keychain/Keystore)
+    AsyncStorage.removeItem('gmailLabelsReady').catch(() => {}); // clear gmail label cache
     setAccessToken("");
     setAuthState("Local mode");
     setEmail("");
     setPassword("");
     setScans([]);
     setHealth(null);
+    setGmailState("not checked");
+    setGoogleBackupUser(null);
+    setGoogleBackupSyncTime(null);
+    setRegisterStep("none");
+    setRegisterName("");
+    setRegisterOtp("");
+    setNotificationPreferences({ critical_alerts: true, weekly_summary: true });
     setActiveTab("dashboard");
     showToast("Logged out successfully", "success");
   }
