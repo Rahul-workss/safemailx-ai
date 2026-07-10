@@ -270,6 +270,15 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
                 final_score = 0.60
                 conflict_detected = True
                 analysis_steps.append("Conflict: TF-IDF high but rules low — capped at 0.60.")
+            elif rule_score == 0.0 and not has_attack_vector:
+                # Rule engine found NOTHING and there are no links/attachments.
+                # TF-IDF alone cannot justify a score above 0.20.
+                # This is the final safety net for: short text, no URLs, no rule hits,
+                # intent unknown (e.g. typos like "heyy" the classifier missed).
+                final_score = min(base_blend, 0.20)
+                analysis_steps.append(
+                    f"Safety Net: rule=0, no attack vector, unknown intent — "
+                    f"TF-IDF alone capped at 0.20 (was {base_blend:.3f}).")
             else:
                 analysis_steps.append("Unknown intent: standard blend applied.")
 

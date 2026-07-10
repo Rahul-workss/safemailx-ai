@@ -11,10 +11,41 @@ import re
 # CONVERSATIONAL: short social messages — zero threat
 # -------------------------------------------------------
 _CONVERSATIONAL_PATTERNS = [
-    r"\bhey\b", r"\bhello\b", r"\bhow are you\b", r"\bwhat's up\b",
-    r"\bgood morning\b", r"\bgood evening\b", r"\bthank you\b",
-    r"\bthanks\b", r"\bcheers\b", r"\bsee you\b", r"\bfollowing up\b",
-    r"\bjust checking in\b", r"\bquick question\b",
+    r"\bhe+y+\b",            # hey, heyy, heyyy
+    r"\bhi+\b",              # hi, hii
+    r"\bhiya\b",
+    r"\bhello+\b",           # hello, helloo
+    r"\bhowdy\b",
+    r"\bwhat'?s\s*up\b",
+    r"\bwassup\b",
+    r"\bsup\b",
+    r"\bgood\s+(?:morning|afternoon|evening|night|day)\b",
+    r"\bthank\s*(?:you|s)\b",
+    r"\bthx\b",
+    r"\bcheers\b",
+    r"\bsee\s+you\b",
+    r"\bbye\b",
+    r"\btake\s+care\b",
+    r"\bfollowing\s+up\b",
+    r"\bjust\s+checking\s+in\b",
+    r"\bquick\s+question\b",
+    r"\bhope\s+(?:you\s+are|you're|this\s+finds\s+you)\b",
+    r"\b(?:how\s+are\s+you|how\s+r\s+u)\b",
+    r"\blol\b",
+    r"\bomg\b",
+    r"\bokay\b",
+    r"\bok\b",
+    r"\bwow\b",
+    r"\bnice\b",
+    r"\bcool\b",
+    r"\bnvm\b",
+    r"\bbrb\b",
+    r"\btalk\s+(?:soon|later)\b",
+    r"\bcatch\s+(?:you\s+)?later\b",
+    r"\bkk\b",
+    r"\byep\b",
+    r"\byup\b",
+    r"\bnope\b",
 ]
 _CONVERSATIONAL_RE = re.compile("|".join(_CONVERSATIONAL_PATTERNS), re.IGNORECASE)
 
@@ -209,8 +240,15 @@ def classify_intent(text: str, url_records: list[dict] | None = None) -> str:
     """
     has_urls = bool(url_records) or bool(re.search(r"https?://\S+", text, re.IGNORECASE))
 
-    # 1. Conversational: short + no links + social language
+    # 1a. Strict conversational: no links + social language pattern match
     if not has_urls and len(text.strip()) < 400 and _CONVERSATIONAL_RE.search(text):
+        return "conversational"
+
+    # 1b. Ultra-short text fallback: if body is ≤ 80 chars and has no links,
+    #     no URLs, and matches none of the threat patterns below, it is almost
+    #     certainly conversational/innocuous (covers 'heyy', 'hi', '😊', etc.)
+    body_only = text.split("\n\n", 1)[-1].strip()  # strip subject line added by hybrid engine
+    if not has_urls and len(body_only) <= 80:
         return "conversational"
 
     # 2. Malware delivery (highest priority — always dangerous)
