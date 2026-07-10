@@ -4,6 +4,7 @@ set -e
 if [ -n "$GOOGLE_CREDENTIALS_JSON" ]; then
     echo "Writing Google credentials from environment..."
     echo "$GOOGLE_CREDENTIALS_JSON" > /app/src/credentials.json
+    echo "$GOOGLE_CREDENTIALS_JSON" > /app/src/server/signin_credentials.json
 fi
 
 if [ -n "$GMAIL_TOKEN_BASE64" ]; then
