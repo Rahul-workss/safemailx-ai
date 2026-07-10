@@ -359,6 +359,7 @@ function App() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   function switchTab(tab: Tab) {
     Animated.parallel([
@@ -794,7 +795,8 @@ function App() {
     try {
       const { runGmailLabelScan } = await import("./src/api");
       const r = await runGmailLabelScan(); setGmailState(`${r.enqueued} queued from ${r.scanned_label}`);
-      await refresh(); showToast(`${r.enqueued} Gmail message(s) queued`, "success");
+      await refresh(); switchTab("scans");
+      showToast(`${r.enqueued} Gmail message(s) queued`, "success");
     } catch (e: any) { showToast(e.message || "Label scan failed"); }
     finally { setBusy(false); }
   }
@@ -865,6 +867,7 @@ function App() {
       ) : (
         <>
           <ScrollView
+            ref={scrollViewRef}
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 110 }}
             refreshControl={
@@ -900,6 +903,7 @@ function App() {
                   manualText={manualText} setManualText={setManualText}
                   onSubmitManual={submitManualScan}
                   refreshApp={refresh}
+                  scrollViewRef={scrollViewRef}
                 />
               </View>
               <View style={{ display: activeTab === "reports" ? "flex" : "none" }}>
@@ -1436,6 +1440,7 @@ function DashboardScreen({
   return (
     <View style={{ gap: 0, paddingBottom: 20 }}>
       <SafeMailEngineCore stats={stats} />
+      <SecurityBulletin />
       <ThreatMatrix scans={scans} />
       <LiveIntakeStream scans={scans} />
     </View>
@@ -1501,14 +1506,14 @@ function SafeMailEngineCore({ stats }: { stats: { safe: number; suspicious: numb
           {/* Deep Glow Base */}
           <Animated.View style={{ position: "absolute", width: 140, height: 140, borderRadius: 70, backgroundColor: `${coreColor}20`, transform: [{ scale: pulseAnim }], shadowColor: coreColor, shadowRadius: 50, shadowOpacity: 0.8, elevation: 15 }} />
           
-          {/* Orbital Ring 1 - Fast Clockwise */}
-          <Animated.View style={{ position: "absolute", width: 210, height: 210, borderRadius: 105, borderWidth: 1, borderColor: `${coreColor}15`, borderTopWidth: 3, borderTopColor: coreColor, transform: [{ rotate: spin1 }] }} />
+          {/* Orbital Ring 1 - Fast Clockwise, tilted 65° */}
+          <Animated.View style={{ position: "absolute", width: 210, height: 210, borderRadius: 105, borderWidth: 1, borderColor: `${coreColor}15`, borderTopWidth: 3, borderTopColor: coreColor, transform: [{ rotateX: "65deg" }, { rotate: spin1 }] }} />
           
-          {/* Orbital Ring 2 - Medium Counter-Clockwise */}
-          <Animated.View style={{ position: "absolute", width: 186, height: 186, borderRadius: 93, borderWidth: 2, borderColor: `${coreColor}25`, borderBottomColor: "rgba(255,255,255,0.8)", borderLeftColor: C.violetGlow, transform: [{ rotate: spin2 }] }} />
+          {/* Orbital Ring 2 - Medium Counter-Clockwise, tilted 75° + 25° Y */}
+          <Animated.View style={{ position: "absolute", width: 186, height: 186, borderRadius: 93, borderWidth: 2, borderColor: `${coreColor}25`, borderBottomColor: "rgba(255,255,255,0.8)", borderLeftColor: C.violetGlow, transform: [{ rotateX: "75deg" }, { rotateY: "25deg" }, { rotate: spin2 }] }} />
           
-          {/* Orbital Ring 3 - Slow Reverse with Dashed-like appearance using borders */}
-          <Animated.View style={{ position: "absolute", width: 160, height: 160, borderRadius: 80, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRightWidth: 4, borderRightColor: `${coreColor}90`, transform: [{ rotate: spin3 }] }} />
+          {/* Orbital Ring 3 - Slow Reverse, tilted 50° + -30° Y */}
+          <Animated.View style={{ position: "absolute", width: 160, height: 160, borderRadius: 80, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderRightWidth: 4, borderRightColor: `${coreColor}90`, transform: [{ rotateX: "50deg" }, { rotateY: "-30deg" }, { rotate: spin3 }] }} />
 
           {/* Central Hub with Breathing Pulse */}
           <Animated.View style={{ width: 124, height: 124, borderRadius: 62, backgroundColor: "rgba(6,8,15,0.85)", borderWidth: 2, borderColor: `${coreColor}99`, alignItems: "center", justifyContent: "center", transform: [{ scale: pulseAnim }], shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.6, shadowRadius: 10 }}>
@@ -1839,7 +1844,7 @@ function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
-  manualText, setManualText, onSubmitManual, refreshApp
+  manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef
 }: {
   gmailState: string; busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
@@ -1850,6 +1855,7 @@ function UnifiedScanScreen({
   manualText: string; setManualText: (v: string) => void;
   onSubmitManual: () => void;
   refreshApp: () => Promise<void>;
+  scrollViewRef: React.RefObject<ScrollView | null>;
 }) {
   const [mode, setMode] = useState<"email" | "sms" | "text" | "url">("email");
   const [showInfo, setShowInfo] = useState(false);
@@ -1857,12 +1863,28 @@ function UnifiedScanScreen({
   const [inlineResult, setInlineResult] = useState<InstantScanResult | null>(null);
   const [feedbackChoice, setFeedbackChoice] = useState<"correct" | "false_positive" | "false_negative" | null>(null);
   const [feedbackBusy, setFeedbackBusy] = useState<"correct" | "false_positive" | "false_negative" | null>(null);
+  const resultRef = useRef<View>(null);
 
   useEffect(() => {
     setInlineResult(null);
     setFeedbackChoice(null);
     setFeedbackBusy(null);
   }, [mode]);
+
+  // Auto-scroll to results when a scan completes
+  useEffect(() => {
+    if (inlineResult && resultRef.current && scrollViewRef?.current) {
+      setTimeout(() => {
+        resultRef.current?.measureLayout(
+          scrollViewRef.current as any,
+          (_x: number, y: number) => {
+            scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+          },
+          () => {} // onFail — do nothing
+        );
+      }, 150); // small delay for render to complete
+    }
+  }, [inlineResult]);
   
   const connected = gmailState.toLowerCase() !== "not connected" && gmailState.toLowerCase() !== "sign in required";
   const hasLabels = gmailState.toLowerCase().includes("labels ready");
@@ -1964,7 +1986,7 @@ function UnifiedScanScreen({
       </View>
 
       {mode === "email" && (
-        <TmCard style={{ padding: 24, gap: 20 }}>
+        <TmCard style={{ padding: 24, gap: 16 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: connected ? "rgba(111,217,184,0.15)" : "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: connected ? "rgba(111,217,184,0.3)" : "rgba(255,255,255,0.1)" }}>
@@ -2009,7 +2031,7 @@ function UnifiedScanScreen({
           </View>
 
           {connected && hasLabels && (
-            <View style={{ marginTop: 12, paddingTop: 20, borderTopWidth: 1, borderTopColor: C.line }}>
+            <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
               <TmPrimaryBtn label={busy ? "Scanning Inbox..." : "Run Inbox Scan"} onPress={onRunGmailScan} disabled={busy} icon="shield-checkmark" />
             </View>
           )}
@@ -2035,11 +2057,11 @@ function UnifiedScanScreen({
             multiline
             style={[S.scanInput, { minHeight: 120, marginBottom: 20 }]}
           />
+          <TmPrimaryBtn label={busy ? "Scanning SMS..." : "Scan SMS"} onPress={handleSmsScan} disabled={busy} icon="chatbubble-ellipses-outline" />
           <QuickScanNotice
             title="Hybrid Security Checks"
             body="SMS scans may use local AI plus Google Safe Browsing, VirusTotal, IPQualityScore, and local threat feeds when configured. If the message contains links, those URLs and domains may be checked externally."
           />
-          <TmPrimaryBtn label={busy ? "Scanning SMS..." : "Scan SMS"} onPress={handleSmsScan} disabled={busy} icon="chatbubble-ellipses-outline" />
         </TmCard>
       )}
 
@@ -2064,11 +2086,6 @@ function UnifiedScanScreen({
             <View style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.07)" }} />
           </View>
 
-          <QuickScanNotice
-            title="File Privacy Notice"
-            body="Quick file scans may use local AI plus Google Safe Browsing, VirusTotal, IPQualityScore, and local threat feeds when configured. Only extracted URLs, domains, and file hashes may be checked externally; raw file bytes are not sent to third-party providers."
-          />
-
           {/* Upload options side by side */}
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Pressable
@@ -2092,6 +2109,10 @@ function UnifiedScanScreen({
               <Text style={{ fontSize: 10, color: C.frost4 }}>Screenshot</Text>
             </Pressable>
           </View>
+          <QuickScanNotice
+            title="File Privacy Notice"
+            body="Quick file scans may use local AI plus Google Safe Browsing, VirusTotal, IPQualityScore, and local threat feeds when configured. Only extracted URLs, domains, and file hashes may be checked externally; raw file bytes are not sent to third-party providers."
+          />
         </TmCard>
       )}
 
@@ -2107,11 +2128,11 @@ function UnifiedScanScreen({
             autoCorrect={false}
             style={[S.tmInput, { marginBottom: 20 }]}
           />
+          <TmPrimaryBtn label={busy ? "Scanning URL..." : "Check URL"} onPress={handleUrlScan} disabled={busy} icon="link-outline" />
           <QuickScanNotice
             title="Controlled Link Fetching"
             body="URL scans may use Google Safe Browsing, VirusTotal, IPQualityScore, and local threat feeds when configured. Submitted URLs may also be fetched in a controlled no-login mode to resolve redirects and inspect lightweight HTML."
           />
-          <TmPrimaryBtn label={busy ? "Scanning URL..." : "Check URL"} onPress={handleUrlScan} disabled={busy} icon="link-outline" />
         </TmCard>
       )}
 
@@ -2123,6 +2144,7 @@ function UnifiedScanScreen({
       )}
 
       {!localBusy && inlineResult && (
+        <View ref={resultRef}>
         <TmCard style={{ padding: 20, marginTop: 10, backgroundColor: inlineResult.verdict === "phishing" ? "rgba(255, 69, 58, 0.1)" : inlineResult.verdict === "suspicious" ? "rgba(255, 159, 10, 0.1)" : "rgba(48, 209, 88, 0.1)", borderColor: inlineResult.verdict === "phishing" ? "rgba(255, 69, 58, 0.5)" : inlineResult.verdict === "suspicious" ? "rgba(255, 159, 10, 0.5)" : "rgba(48, 209, 88, 0.5)" }}>
            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
              <Ionicons name={inlineResult.verdict === "legitimate" ? "shield-checkmark" : "warning"} size={24} color={inlineResult.verdict === "legitimate" ? C.emerald : inlineResult.verdict === "phishing" ? C.rose : C.gold} />
@@ -2224,29 +2246,40 @@ function UnifiedScanScreen({
            </View>
            <Text style={{ color: "#fff", fontSize: 13, marginTop: 14, fontWeight: "600" }}>{inlineResult.recommended_action}</Text>
         </TmCard>
+        </View>
       )}
 
-      <SecurityBulletin />
     </View>
   );
 }
 
 // ─── Reports screen ───────────────────────────────────────────────────────────
 function QuickScanNotice({ title, body }: { title: string; body: string }) {
+  const [expanded, setExpanded] = React.useState(false);
   return (
-    <View style={{
-      marginBottom: 14,
-      padding: 12,
-      borderRadius: 12,
-      backgroundColor: "rgba(255,255,255,0.04)",
-      borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.08)",
-    }}>
-      <Text style={{ color: C.frost4, fontSize: 11, fontWeight: "700", marginBottom: 4, letterSpacing: 0.5 }}>
-        {title.toUpperCase()}
-      </Text>
-      <Text style={{ color: C.frost3, fontSize: 12, lineHeight: 18 }}>{body}</Text>
-    </View>
+    <Pressable
+      onPress={() => setExpanded(!expanded)}
+      style={{
+        marginTop: 10,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderWidth: 0.5,
+        borderColor: "rgba(255,255,255,0.08)",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Ionicons name="information-circle-outline" size={13} color={C.frost4} />
+        <Text style={{ color: C.frost4, fontSize: 10, fontWeight: "600", letterSpacing: 0.3, flex: 1 }}>
+          {title.toUpperCase()}
+        </Text>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={12} color={C.frost4} />
+      </View>
+      {expanded && (
+        <Text style={{ color: C.frost4, fontSize: 11, lineHeight: 16, marginTop: 6 }}>{body}</Text>
+      )}
+    </Pressable>
   );
 }
 
@@ -2470,7 +2503,26 @@ function PrivacyPolicyScreen({ onBack }: { onBack?: () => void }) {
 
         <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>3. Google Drive Cloud Backup</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          To provide a seamless cross-device experience without comprising your data, SafeMail X AI utilizes your personal Google Drive account to backup your scanning reports and settings. We do not host your historical threat data; it lives entirely within your designated Drive application folder.
+          To provide a seamless cross-device experience without compromising your data, SafeMail X AI utilizes your personal Google Drive account to backup your scanning reports and settings. We do not host your historical threat data; it lives entirely within your designated Drive application folder.
+        </Text>
+
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>4. Session Security</Text>
+        <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
+          Your login credentials are never stored in plaintext. Session tokens are persisted using your device's hardware-encrypted Keychain (iOS) or Android Keystore — both are hardware-backed encrypted stores that cannot be read by other apps or extracted without device unlock.
+          {"\n\n"}
+          Sessions automatically expire after 24 hours. You can manually log out at any time from Settings, which immediately clears all stored credentials from secure storage.
+        </Text>
+
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>5. URL & File Scanning</Text>
+        <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
+          When you scan a URL, it may be fetched in a controlled no-login mode to resolve redirects and inspect lightweight HTML. Only the URL itself is sent to third-party reputation services — no cookies, login sessions, or personal data are transmitted.
+          {"\n\n"}
+          For file scans (.eml, .pdf, .docx, images), only extracted URLs, domains, and cryptographic file hashes are checked externally. Raw file bytes are never sent to third-party providers. Image-based scans use local OCR to extract text before analysis.
+        </Text>
+
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>6. Push Notifications</Text>
+        <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
+          If you enable push notifications, only your Expo push token and device platform are stored for delivery purposes. No email content, scan results, or personal data is included in push payloads. You can disable notifications at any time from your device settings.
         </Text>
       </TmCard>
 
@@ -2511,6 +2563,22 @@ function HelpCenterScreen({ onBack }: { onBack?: () => void }) {
     {
       q: "Why does the app show 'OFFLINE'?",
       a: "The app periodically checks the backend API health. If you see OFFLINE, ensure your backend server is running and the API URL in Settings is correct. For local development, check that Docker containers are up and the Cloudflare tunnel is active.",
+    },
+    {
+      q: "Can I scan URLs for phishing?",
+      a: "Yes! Go to the Scan tab and switch to URL mode. Paste any suspicious link and tap 'Check URL'. SafeMail X AI will resolve redirects, inspect the landing page, and check the URL against Google Safe Browsing, VirusTotal, and IPQualityScore to detect phishing, malware, and brand impersonation.",
+    },
+    {
+      q: "Can I scan files and documents?",
+      a: "Yes! Use the Text/File tab to upload .eml, .pdf, .docx, .xlsx, .pptx files or screenshot images. Files are analyzed locally — only extracted URLs, domains, and file hashes are checked against external threat intelligence. Raw file bytes are never sent to third parties.",
+    },
+    {
+      q: "Does my session persist after closing the app?",
+      a: "Yes. Your login session is securely saved using your device's hardware-encrypted Keychain (iOS) or Android Keystore. You stay logged in until you explicitly log out from Settings or your session expires after 24 hours. Your credentials are never stored in plaintext.",
+    },
+    {
+      q: "What is Google Drive Cloud Backup?",
+      a: "SafeMail X AI can back up your scan reports and settings to your personal Google Drive. Your data stays in your Drive's application folder — we never host your historical threat data on our servers. Connect from Settings → Google Drive Backup.",
     },
   ];
 
