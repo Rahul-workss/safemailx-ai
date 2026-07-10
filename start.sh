@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [ -n "$GOOGLE_CREDENTIALS_JSON" ]; then
+    echo "Writing Google credentials from environment..."
+    echo "$GOOGLE_CREDENTIALS_JSON" > /app/src/credentials.json
+fi
+
 echo "Starting TrustMail Celery Worker..."
 python -m server.worker &
 
