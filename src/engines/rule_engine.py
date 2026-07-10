@@ -1,13 +1,20 @@
 # ================================
 # SafeMail X Rule-Based Engine
-# Phase 2.5 (Real-world rules)
-# Final Refined Version
+# Phase 3.0 — LLM-Parity Heuristics
+# Upgraded to mirror the LLM 3-phase forensic protocol
+# using deterministic sub-scorers.
 # ================================
 
 import re
 from urllib.parse import urlparse
 
 from utils.url_extractor import extract_urls
+from engines.intent_classifier import (
+    score_specificity,
+    score_manipulation,
+    score_grammar,
+    score_social_engineering_tactics,
+)
 
 
 # -------- REAL-WORLD URGENCY PHRASES --------
@@ -103,14 +110,14 @@ IP_PATTERN = re.compile(r"https?://\d+\.\d+\.\d+\.\d+")
 # -------- RULE WEIGHTS (0–1 scale) --------
 
 WEIGHTS = {
-    "high_urgency": 0.30,
-    "medium_urgency": 0.18,
+    "high_urgency": 0.25,        # Reduced slightly — tactics scorer now adds more precisely
+    "medium_urgency": 0.15,
     "short_url": 0.35,
     "ip_url": 0.40,
-    "urgency_plus_link": 0.20,
+    "urgency_plus_link": 0.18,
     "sms_scam_phrase": 0.45,
-    "promo_cta": 0.18,
-    "promo_deadline": 0.14,
+    "promo_cta": 0.10,           # Reduced — marketing intent cap handles this better
+    "promo_deadline": 0.10,
     "cta_domain_mismatch": 0.38,
     "screenshot_cta_no_visible_url": 0.45,
 }
@@ -263,12 +270,47 @@ def analyze_rules(
                 reasons.append(f"brand_spoof_mismatch:{brand}")
                 features["structural_risk"] = True
 
-    # -------------------------
-    # Cap score
-    # -------------------------
+    # ================================================================
+    # PHASE 2 — Social Engineering Tactics (LLM parity)
+    # Detects all 8 manipulation tactics with calibrated weights.
+    # ================================================================
+    tactic_adjustment, tactic_list = score_social_engineering_tactics(text)
+    score += tactic_adjustment
+    for t in tactic_list:
+        reasons.append(f"tactic:{t}")
+    if tactic_adjustment > 0:
+        features["structural_risk"] = True
 
-    score = min(score, 1.0)
-    
+    # ================================================================
+    # PHASE 3 — Specificity Scorer (False Positive Reducer)
+    # Real emails are specific (order ID, card digits, name).
+    # Phishing is always vague. Adjust score accordingly.
+    # ================================================================
+    spec_adjustment, spec_reasons = score_specificity(email_text)
+    score += spec_adjustment          # spec_adjustment is negative = reduces score
+    reasons.extend(spec_reasons)
+
+    # ================================================================
+    # PHASE 4 — Manipulation Language Scorer
+    # Generic greetings, vague references, extreme consequence language.
+    # ================================================================
+    manip_adjustment, manip_reasons = score_manipulation(text)
+    score += manip_adjustment
+    reasons.extend(manip_reasons)
+
+    # ================================================================
+    # PHASE 5 — Grammar & Coherence Scorer
+    # ALL CAPS ratio, excessive punctuation, non-ASCII mixed chars.
+    # ================================================================
+    gram_adjustment, gram_reasons = score_grammar(text)
+    score += gram_adjustment
+    reasons.extend(gram_reasons)
+
+    # -------------------------
+    # Cap score (0 to 1)
+    # -------------------------
+    score = max(0.0, min(score, 1.0))
+
     return float(score), list(set(reasons)), features
 
 

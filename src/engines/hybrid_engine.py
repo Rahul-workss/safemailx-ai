@@ -2,6 +2,7 @@ import joblib
 
 from engines.rule_engine import analyze_rules
 from engines.llm_analyzer import run_llm_analysis
+from engines.intent_classifier import classify_intent
 from utils.config import MODEL_PATH
 
 # Load the trained text classification model
@@ -10,14 +11,35 @@ model = joblib.load(MODEL_PATH)
 
 # Corporate domain safelist used for conditional trust checks.
 # Free mail providers are intentionally excluded.
+# Expanded to 60+ to cover global banks, payment apps, gov services.
 VIP_DOMAINS = {
+    # Global Tech
     "google.com", "youtube.com", "facebook.com", "instagram.com", "meta.com",
-    "microsoft.com", "apple.com", "icloud.com",
+    "microsoft.com", "apple.com", "icloud.com", "github.com",
     "amazon.com", "amazon.in", "paypal.com", "netflix.com",
-    "linkedin.com", "twitter.com", "x.com", "github.com",
-    "dropbox.com", "spotify.com", "uber.com",
+    "linkedin.com", "twitter.com", "x.com",
+    "dropbox.com", "spotify.com", "uber.com", "airbnb.com",
+    "notion.so", "slack.com", "zoom.us", "atlassian.com", "adobe.com",
+    # E-Commerce / Travel (India)
     "swiggy.in", "zomato.com", "flipkart.com", "myntra.com",
-    "paytm.com", "phonepe.com",
+    "bigbasket.com", "nykaa.com", "meesho.com",
+    "makemytrip.com", "goibibo.com", "irctc.co.in", "booking.com",
+    # Payments / Fintech
+    "paytm.com", "phonepe.com", "razorpay.com", "cashfree.com",
+    "payu.in", "juspay.com", "gpay.app", "stripe.com",
+    # Indian Banks
+    "hdfcbank.com", "icicibank.com", "sbi.co.in", "axisbank.com",
+    "kotak.com", "yesbank.in", "indusind.com", "pnb.co.in",
+    "unionbankofindia.co.in", "canarabank.com",
+    # Global Banks
+    "chase.com", "wellsfargo.com", "bankofamerica.com", "citibank.com",
+    "barclays.co.uk", "hsbc.com", "standardchartered.com",
+    # Government
+    "uidai.gov.in", "incometax.gov.in", "irs.gov", "gov.uk",
+    "mca.gov.in", "nsdl.co.in", "sebi.gov.in",
+    # OTT / Media
+    "hotstar.com", "disneyplus.com", "primevideo.com",
+    "jiocinema.com", "sonyliv.com",
 }
 
 
@@ -180,21 +202,72 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
                 analysis_steps.append(f"Smart Veto: SAFE override triggered by high LLM confidence ({llm_confidence}).")
              
     else:
-        # ---------- Fallback when the LLM path is unavailable ----------
-        if rule_score > 0.7 and ai_score > 0.7:
-            final_score = max(rule_score, ai_score)
-            analysis_steps.append("Rule engine and text model strongly agree on phishing")
-        elif rule_score < 0.3 and ai_score > 0.8:
-            final_score = 0.6
-            conflict_detected = True
-            analysis_steps.append("Conflict detected: text model high but rules low")
+        # ==========================================================
+        # FALLBACK SCORING — Intent-Gated Calibrated Blending
+        # Mirrors the LLM's calibrated score ranges per scenario.
+        # ==========================================================
+
+        # -- Step A: Determine intent for ceiling/floor logic --
+        detected_intent = classify_intent(combined_text, url_details)
+        analysis_steps.append(f"Intent classifier: {detected_intent}")
+
+        # -- Step B: Attack Vector Gate (most powerful false-positive killer) --
+        # If there are no URLs and no attachments, it is PHYSICALLY IMPOSSIBLE
+        # for this to be a credential-harvesting attack.
+        # Exception: BEC/financial fraud is conversational by design.
+        has_attack_vector = bool(url_details) or attachment_score is not None
+        bec_intent = detected_intent in {"financial_fraud", "malware_delivery"}
+
+        if not has_attack_vector and not bec_intent:
+            pre_gate_score = (0.7 * rule_score) + (0.3 * ai_score)
+            final_score = min(pre_gate_score, 0.35)
+            analysis_steps.append(
+                "Attack Vector Gate: No links or attachments detected. "
+                f"Credential theft impossible. Score capped at 0.35 (was {pre_gate_score:.3f}).")
         else:
+            # -- Step C: Blend with intent-weighted formula --
+            # Rule engine is now heavily enhanced so give it 70% weight.
             if rule_features.get("structural_risk", False):
-                final_score = (0.7 * rule_score) + (0.3 * ai_score)
-                analysis_steps.append("Structural indicators -- rule weighted higher")
+                base_blend = (0.70 * rule_score) + (0.30 * ai_score)
+                analysis_steps.append("Structural risk present — rule engine weighted 70%.")
             else:
-                final_score = (0.4 * rule_score) + (0.6 * ai_score)
-                analysis_steps.append("Language indicators -- text model weighted higher")
+                base_blend = (0.55 * rule_score) + (0.45 * ai_score)
+                analysis_steps.append("No structural risk — balanced blend (55/45).")
+
+            # -- Step D: Apply intent-based ceiling/floor (LLM calibrated ranges) --
+            if detected_intent == "conversational":
+                final_score = min(base_blend, 0.10)
+                analysis_steps.append("Intent ceiling: conversational → max 0.10")
+            elif detected_intent == "benign_notification":
+                final_score = min(base_blend, 0.30)
+                analysis_steps.append("Intent ceiling: benign_notification → max 0.30")
+            elif detected_intent == "marketing":
+                final_score = min(base_blend, 0.35)
+                analysis_steps.append("Intent ceiling: marketing → max 0.35")
+            elif detected_intent == "authority_impersonation":
+                final_score = max(base_blend, 0.50)
+                analysis_steps.append("Intent floor: authority_impersonation → min 0.50")
+            elif detected_intent == "financial_fraud":
+                final_score = max(base_blend, 0.55)
+                analysis_steps.append("Intent floor: financial_fraud/BEC → min 0.55")
+            elif detected_intent == "credential_theft":
+                final_score = max(base_blend, 0.65)
+                analysis_steps.append("Intent floor: credential_theft → min 0.65")
+            elif detected_intent == "malware_delivery":
+                final_score = max(base_blend, 0.70)
+                analysis_steps.append("Intent floor: malware_delivery → min 0.70")
+            else:
+                # Unknown intent: use plain blend, let conflict detection decide
+                if rule_score > 0.7 and ai_score > 0.7:
+                    final_score = max(rule_score, ai_score)
+                    analysis_steps.append("Strong agreement: both engines high — using max.")
+                elif rule_score < 0.3 and ai_score > 0.8:
+                    final_score = 0.60
+                    conflict_detected = True
+                    analysis_steps.append("Conflict: TF-IDF high but rules low — capped at 0.60.")
+                else:
+                    final_score = base_blend
+                    analysis_steps.append("Unknown intent: standard blend applied.")
 
     # -- Confidence override for extreme rule/model scores ----------------------
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]
