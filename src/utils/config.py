@@ -12,8 +12,9 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 MODEL_PATH = PROJECT_ROOT / "models" / "phishing_ai_model.joblib"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 TEMP_IMAGES_DIR = SRC_DIR / "temp_images"
-GMAIL_CREDENTIALS_PATH = SRC_DIR / "credentials.json"
-SIGNIN_CREDENTIALS_PATH = SRC_DIR / "server" / "signin_credentials.json"
+_RENDER_SECRETS = Path("/etc/secrets")
+GMAIL_CREDENTIALS_PATH = _RENDER_SECRETS / "credentials.json" if (_RENDER_SECRETS / "credentials.json").exists() else SRC_DIR / "credentials.json"
+SIGNIN_CREDENTIALS_PATH = _RENDER_SECRETS / "signin_credentials.json" if (_RENDER_SECRETS / "signin_credentials.json").exists() else SRC_DIR / "server" / "signin_credentials.json"
 GMAIL_TOKEN_PATH = SRC_DIR / "token.pickle"
 GMAIL_TOKEN_ENCRYPTION_KEY = os.getenv("GMAIL_TOKEN_ENCRYPTION_KEY", "").strip()
 
