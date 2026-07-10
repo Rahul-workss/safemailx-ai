@@ -716,20 +716,22 @@ class SmartVetoOrchestrator:
             "brand_claims": brand_claims,
             "reputation_hits": reputation_hits,
         }
+        # Always attempt LLM — Qwen validates URLs even when rule signals are absent.
+        # Returns None silently if LLM is offline, preserving the rule-based score.
         llm_result = None
-        if 25 <= score <= 75 or (not signals and fetch_snippet):
+        if url.strip():
             llm_input = "\n".join(part for part in [normalized, landing_page_title or "", fetch_snippet] if part)
             llm_result = _llm_assessment("url", llm_input, feature_summary, subject=normalized, sender=source_sender or "url")
-            if llm_result:
-                threat_probability = float(llm_result.get("llm_score", 0.0))
-                if threat_probability >= 0.82:
-                    signals.append(_make_signal("llm_url_deception", "The semantic model found strong credential-theft or impersonation cues.", 22, 0.76))
-                    score += 22
-                elif threat_probability >= 0.62:
-                    signals.append(_make_signal("llm_url_suspicion", "The semantic model found moderate deceptive web-lure cues.", 12, 0.62))
-                    score += 12
-                elif threat_probability <= 0.18 and score < 35:
-                    score -= 8
+        if llm_result:
+            threat_probability = float(llm_result.get("llm_score", 0.0))
+            if threat_probability >= 0.82:
+                signals.append(_make_signal("llm_url_deception", "The semantic model found strong credential-theft or impersonation cues.", 22, 0.76))
+                score += 22
+            elif threat_probability >= 0.62:
+                signals.append(_make_signal("llm_url_suspicion", "The semantic model found moderate deceptive web-lure cues.", 12, 0.62))
+                score += 12
+            elif threat_probability <= 0.18 and score < 35:
+                score -= 8
 
         artifacts = {
             "urls": [normalized],
@@ -869,29 +871,31 @@ class SmartVetoOrchestrator:
             score -= 18
             category = "transactional"
 
+        # Always attempt LLM — Qwen gives the most accurate verdict on short/ambiguous messages.
+        # If LLM is unavailable it returns None and we fall back to rule + TF-IDF naturally.
         llm_result = None
-        if 20 <= score <= 70 or (not urls and (has_delivery or has_reward or has_pressure)):
-            llm_features = {
-                "sender": sender,
-                "sender_type": sender_type,
-                "brand_claims": brand_claims,
-                "urls": [item["normalized_url"] for item in urls],
-                "urgency_markers": urgency_markers,
-                "intent_markers": intent_markers,
-            }
+        llm_features = {
+            "sender": sender,
+            "sender_type": sender_type,
+            "brand_claims": brand_claims,
+            "urls": [item["normalized_url"] for item in urls],
+            "urgency_markers": urgency_markers,
+            "intent_markers": intent_markers,
+        }
+        if cleaned.strip():
             llm_result = _llm_assessment("sms", cleaned, llm_features, sender=sender or "sms")
-            if llm_result:
-                llm_score = float(llm_result.get("llm_score", 0.0))
-                category = llm_result.get("intent") or category
-                llm_reasoning = llm_result.get("reasoning")
-                if llm_score >= 0.82:
-                    signals.append(_make_signal("llm_smishing_confirmed", "The semantic model found strong smishing or fraud patterns.", 18, 0.74))
-                    score += 18
-                elif llm_score >= 0.62:
-                    signals.append(_make_signal("llm_smishing_suspected", "The semantic model found moderate smishing patterns.", 10, 0.62))
-                    score += 10
-                elif llm_score <= 0.18 and score < 35:
-                    score -= 8
+        if llm_result:
+            llm_score = float(llm_result.get("llm_score", 0.0))
+            category = llm_result.get("intent") or category
+            llm_reasoning = llm_result.get("reasoning")
+            if llm_score >= 0.82:
+                signals.append(_make_signal("llm_smishing_confirmed", "The semantic model found strong smishing or fraud patterns.", 18, 0.74))
+                score += 18
+            elif llm_score >= 0.62:
+                signals.append(_make_signal("llm_smishing_suspected", "The semantic model found moderate smishing patterns.", 10, 0.62))
+                score += 10
+            elif llm_score <= 0.18 and score < 35:
+                score -= 8
 
         score = max(0, min(score, 100))
         degraded = bool(external_checks_failed)
