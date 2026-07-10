@@ -29,14 +29,23 @@ __pycache__/
 .vscode/
 .idea/
 
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE / Editor folders
+.vscode/
+.idea/
+
 # Reports and Temp Data
 reports/*.json
 reports/*.pdf
 src/temp_images/*
 !reports/.gitkeep
 
-# Machine Learning Models and Datasets (Too large for GitHub)
-models/*.joblib
+# Machine Learning Models and Datasets
 data/*.db
 data/*.sqlite
 data/*.csv
