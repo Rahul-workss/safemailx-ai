@@ -211,7 +211,16 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
         detected_intent = classify_intent(combined_text, url_details)
         analysis_steps.append(f"Intent classifier: {detected_intent}")
 
-        # -- Step B: Attack Vector Gate (most powerful false-positive killer) --
+        # -- Step B: Calculate Base Blend --
+        # Rule engine is now heavily enhanced so give it up to 70% weight.
+        if rule_features.get("structural_risk", False):
+            base_blend = (0.70 * rule_score) + (0.30 * ai_score)
+            analysis_steps.append("Structural risk present — rule engine weighted 70%.")
+        else:
+            base_blend = (0.55 * rule_score) + (0.45 * ai_score)
+            analysis_steps.append("No structural risk — balanced blend (55/45).")
+
+        # -- Step C: Attack Vector Gate (False Positive Killer) --
         # If there are no URLs and no attachments, it is PHYSICALLY IMPOSSIBLE
         # for this to be a credential-harvesting attack.
         # Exception: BEC/financial fraud is conversational by design.
@@ -219,55 +228,50 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
         bec_intent = detected_intent in {"financial_fraud", "malware_delivery"}
 
         if not has_attack_vector and not bec_intent:
-            pre_gate_score = (0.7 * rule_score) + (0.3 * ai_score)
-            final_score = min(pre_gate_score, 0.35)
+            final_score = min(base_blend, 0.35)
             analysis_steps.append(
                 "Attack Vector Gate: No links or attachments detected. "
-                f"Credential theft impossible. Score capped at 0.35 (was {pre_gate_score:.3f}).")
+                f"Credential theft impossible. Score capped at 0.35 (was {base_blend:.3f}).")
         else:
-            # -- Step C: Blend with intent-weighted formula --
-            # Rule engine is now heavily enhanced so give it 70% weight.
-            if rule_features.get("structural_risk", False):
-                base_blend = (0.70 * rule_score) + (0.30 * ai_score)
-                analysis_steps.append("Structural risk present — rule engine weighted 70%.")
-            else:
-                base_blend = (0.55 * rule_score) + (0.45 * ai_score)
-                analysis_steps.append("No structural risk — balanced blend (55/45).")
+            final_score = base_blend
 
-            # -- Step D: Apply intent-based ceiling/floor (LLM calibrated ranges) --
-            if detected_intent == "conversational":
-                final_score = min(base_blend, 0.10)
-                analysis_steps.append("Intent ceiling: conversational → max 0.10")
-            elif detected_intent == "benign_notification":
-                final_score = min(base_blend, 0.30)
-                analysis_steps.append("Intent ceiling: benign_notification → max 0.30")
-            elif detected_intent == "marketing":
-                final_score = min(base_blend, 0.35)
-                analysis_steps.append("Intent ceiling: marketing → max 0.35")
-            elif detected_intent == "authority_impersonation":
-                final_score = max(base_blend, 0.50)
-                analysis_steps.append("Intent floor: authority_impersonation → min 0.50")
-            elif detected_intent == "financial_fraud":
-                final_score = max(base_blend, 0.55)
-                analysis_steps.append("Intent floor: financial_fraud/BEC → min 0.55")
-            elif detected_intent == "credential_theft":
-                final_score = max(base_blend, 0.65)
-                analysis_steps.append("Intent floor: credential_theft → min 0.65")
-            elif detected_intent == "malware_delivery":
-                final_score = max(base_blend, 0.70)
-                analysis_steps.append("Intent floor: malware_delivery → min 0.70")
+        # -- Step D: Apply Intent-Based Ceiling/Floor (LLM calibrated ranges) --
+        if detected_intent == "conversational":
+            if rule_score == 0.0:
+                final_score = 0.0
+                analysis_steps.append("Intent ceiling: conversational with 0 rule score → forced to 0.0")
             else:
-                # Unknown intent: use plain blend, let conflict detection decide
-                if rule_score > 0.7 and ai_score > 0.7:
-                    final_score = max(rule_score, ai_score)
-                    analysis_steps.append("Strong agreement: both engines high — using max.")
-                elif rule_score < 0.3 and ai_score > 0.8:
-                    final_score = 0.60
-                    conflict_detected = True
-                    analysis_steps.append("Conflict: TF-IDF high but rules low — capped at 0.60.")
-                else:
-                    final_score = base_blend
-                    analysis_steps.append("Unknown intent: standard blend applied.")
+                final_score = min(final_score, 0.10)
+                analysis_steps.append("Intent ceiling: conversational → max 0.10")
+        elif detected_intent == "benign_notification":
+            final_score = min(final_score, 0.30)
+            analysis_steps.append("Intent ceiling: benign_notification → max 0.30")
+        elif detected_intent == "marketing":
+            final_score = min(final_score, 0.35)
+            analysis_steps.append("Intent ceiling: marketing → max 0.35")
+        elif detected_intent == "authority_impersonation":
+            final_score = max(final_score, 0.50)
+            analysis_steps.append("Intent floor: authority_impersonation → min 0.50")
+        elif detected_intent == "financial_fraud":
+            final_score = max(final_score, 0.55)
+            analysis_steps.append("Intent floor: financial_fraud/BEC → min 0.55")
+        elif detected_intent == "credential_theft":
+            final_score = max(final_score, 0.65)
+            analysis_steps.append("Intent floor: credential_theft → min 0.65")
+        elif detected_intent == "malware_delivery":
+            final_score = max(final_score, 0.70)
+            analysis_steps.append("Intent floor: malware_delivery → min 0.70")
+        else:
+            # Unknown intent: use plain blend, let conflict detection decide
+            if rule_score > 0.7 and ai_score > 0.7:
+                final_score = max(rule_score, ai_score)
+                analysis_steps.append("Strong agreement: both engines high — using max.")
+            elif rule_score < 0.3 and ai_score > 0.8:
+                final_score = 0.60
+                conflict_detected = True
+                analysis_steps.append("Conflict: TF-IDF high but rules low — capped at 0.60.")
+            else:
+                analysis_steps.append("Unknown intent: standard blend applied.")
 
     # -- Confidence override for extreme rule/model scores ----------------------
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]
