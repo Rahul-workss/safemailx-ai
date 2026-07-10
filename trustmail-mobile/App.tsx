@@ -51,8 +51,13 @@ import {
   setAccessToken, fetchThreatBulletin, register, sendRegistrationOtp, scanSms,
   uploadScreenshot, scanUrl, fetchNotificationPreferences,
   saveNotificationPreferences, NotificationPreferences,
-  InstantScanResult, scanInstantFile, submitScanFeedback
+  InstantScanResult, scanInstantFile, submitScanFeedback,
+  UnauthorizedError, NetworkError
 } from "./src/api";
+import {
+  saveSession, loadSession, clearSession,
+  registerSessionExpiredHandler,
+} from "./src/session";
 import { C, colors, verdictColor } from "./src/theme";
 const { width: SW } = Dimensions.get("window");
 
@@ -319,6 +324,10 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "" }>({ msg: "", type: "" });
 
+  // Blocks rendering login/dashboard until cold-start session restore completes
+  // (prevents the login-screen flash on valid session cold start)
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
+
   // Video Splash Screen State
   const [isVideoSplashFinished, setIsVideoSplashFinished] = useState(false);
   const splashOpacity = useRef(new Animated.Value(1)).current;
@@ -405,6 +414,58 @@ function App() {
   useEffect(() => { refresh(); registerForPushNotifications(); }, []);
   const onRefresh = React.useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, []);
 
+  // ── Register the global 401 expiry handler (covers ALL API calls, not just cold-start) ──
+  useEffect(() => {
+    registerSessionExpiredHandler(async () => {
+      await clearSession();
+      setAccessToken("");
+      setEmail("");
+      setAuthState("Local mode");
+      setScans([]);
+      setHealth(null);
+      showToast("Your session expired. Please sign in again.");
+    });
+  }, []);
+
+  // ── Cold-start session restore ────────────────────────────────────────────────
+  // TODO: Sessions hard-expire after JWT_EXPIRES_MINUTES with no silent renewal.
+  // A refresh-token flow would be needed to extend sessions automatically.
+  useEffect(() => {
+    (async () => {
+      try {
+        const session = await loadSession();
+        if (session) {
+          setEmail(session.email);
+          setAccessToken(session.token); // restore in-memory token used by api.ts
+          setAuthState("Signed in");
+          try {
+            await fetchScans();
+            // token valid — stay signed in, dashboard will render normally
+          } catch (err) {
+            if (err instanceof UnauthorizedError) {
+              // Token expired — clear everything and go to login
+              await clearSession();
+              setAccessToken("");
+              setEmail("");
+              setAuthState("Local mode");
+              showToast("Your session expired. Please sign in again.");
+            } else if (err instanceof NetworkError) {
+              // No internet — keep user logged in, do NOT clear session
+              // Dashboard will show an offline/retry state via existing health check
+            } else {
+              // Unexpected error — rethrow so ErrorBoundary catches it
+              throw err;
+            }
+          }
+        } else {
+          setAuthState("Local mode");
+        }
+      } finally {
+        setIsRestoringSession(false);
+      }
+    })();
+  }, []);
+
   const processIncomingUrl = React.useCallback((url: string) => {
     if (!url) return;
     try {
@@ -420,6 +481,7 @@ function App() {
 
         setAccessToken(token);
         setEmail(emailVal);
+        saveSession(token, emailVal); // persist OAuth token to encrypted storage
         setAuthState("Signed in");
         setActiveTab("dashboard");
         
@@ -546,7 +608,8 @@ function App() {
     if (!email.trim() || !password) return;
     setAuthState("Signing in…"); setBusy(true);
     try {
-      await login(email.trim(), password); setPassword("");
+      const token = await login(email.trim(), password); setPassword("");
+      await saveSession(token, email.trim()); // persist to encrypted storage
       setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
       setActiveTab("dashboard");
       showToast("Signed in successfully", "success");
@@ -574,7 +637,8 @@ function App() {
     if (!registerOtp.trim() || registerOtp.length !== 6) return showToast("Please enter a valid 6-digit OTP");
     setAuthState("Registering…"); setBusy(true);
     try {
-      await register(email.trim(), registerName.trim(), password, registerOtp.trim());
+      const token = await register(email.trim(), registerName.trim(), password, registerOtp.trim());
+      await saveSession(token, email.trim()); // persist to encrypted storage
       setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
       setActiveTab("dashboard");
       setRegisterStep("none");
@@ -584,9 +648,13 @@ function App() {
   }
 
   function handleLogout() {
+    clearSession(); // fire-and-forget — clears encrypted storage (Keychain/Keystore)
     setAccessToken("");
     setAuthState("Local mode");
+    setEmail("");
     setPassword("");
+    setScans([]);
+    setHealth(null);
     setActiveTab("dashboard");
     showToast("Logged out successfully", "success");
   }
@@ -736,6 +804,17 @@ function App() {
     <View style={S.root}>
       <StatusBar style="light" translucent />
       <TmBg />
+
+      {/* ── Session restore loading gate — prevents login-screen flash on cold start ── */}
+      {isRestoringSession && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000", alignItems: "center", justifyContent: "center", zIndex: 999 }]}>
+          <Image
+            source={require('./assets/new-logo.png')}
+            style={{ width: 80, height: 80, resizeMode: "contain", opacity: 0.7, marginBottom: 20 }}
+          />
+          <ActivityIndicator size="small" color="#8a8ff0" />
+        </View>
+      )}
 
       {/* ── Header ── */}
       {authState === "Signed in" && (

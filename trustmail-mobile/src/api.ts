@@ -1,7 +1,26 @@
+import { triggerSessionExpired } from "./session";
+
 let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 
 let accessToken = "";
 const DEFAULT_TIMEOUT_MS = 12000;
+
+// ─── Typed error classes ──────────────────────────────────────────────────────
+/** Thrown when the server returns HTTP 401. Triggers the global logout flow. */
+export class UnauthorizedError extends Error {
+  constructor(message = "Session expired. Please sign in again.") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+/** Thrown when the request never gets a response (timeout, no internet, etc). */
+export class NetworkError extends Error {
+  constructor(message = "Network request failed.") {
+    super(message);
+    this.name = "NetworkError";
+  }
+}
 
 async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -12,20 +31,30 @@ async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEF
     ...(options.headers || {})
   } as HeadersInit;
 
+  let response: Response;
   try {
-    return await fetch(`${apiBaseUrl}${path}`, {
+    response = await fetch(`${apiBaseUrl}${path}`, {
       ...options,
       headers,
       signal: controller.signal
     });
   } catch (error: any) {
+    clearTimeout(timeoutId);
     if (error?.name === "AbortError") {
-      throw new Error(`Request timed out. Check the API server URL: ${apiBaseUrl}`);
+      throw new NetworkError(`Request timed out. Check the API server URL: ${apiBaseUrl}`);
     }
-    throw new Error(`Network request failed. Check the API server URL: ${apiBaseUrl}`);
+    throw new NetworkError(`Network request failed. Check the API server URL: ${apiBaseUrl}`);
   } finally {
     clearTimeout(timeoutId);
   }
+
+  // 401 — token is invalid or expired. Trigger exactly-once logout flow.
+  if (response.status === 401) {
+    triggerSessionExpired();
+    throw new UnauthorizedError();
+  }
+
+  return response;
 }
 
 export function getApiBaseUrl() {
