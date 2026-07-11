@@ -1,5 +1,6 @@
 import json
 import time
+import threading
 
 import redis
 
@@ -15,6 +16,31 @@ from utils.content_processor import clean_extracted_text
 from utils.email_parser import parse_email
 from utils.gmail_fetcher import get_gmail_service
 
+# Feature 3: Offline safe-browsing periodic sync
+try:
+    from utils.config import FEATURE_OFFLINE_SAFEBROWSING_ENABLED, OFFLINE_HASH_FEED_URL, OFFLINE_HASH_SYNC_INTERVAL_HOURS
+    from engines.offline_sync import run_periodic_sync
+    _OFFLINE_SYNC_AVAILABLE = True
+except ImportError:
+    FEATURE_OFFLINE_SAFEBROWSING_ENABLED = False
+    OFFLINE_HASH_FEED_URL = ""
+    OFFLINE_HASH_SYNC_INTERVAL_HOURS = 6
+    _OFFLINE_SYNC_AVAILABLE = False
+
+# Feature 6: Second-Look Rescan
+try:
+    from utils.config import FEATURE_SECOND_LOOK_RESCAN_ENABLED, RESCAN_INTERVAL_HOURS, RESCAN_LOOKBACK_HOURS
+    from server.rescan_job import run_periodic_rescan
+    _RESCAN_AVAILABLE = True
+except ImportError:
+    FEATURE_SECOND_LOOK_RESCAN_ENABLED = False
+    RESCAN_INTERVAL_HOURS = 12
+    RESCAN_LOOKBACK_HOURS = 24
+    _RESCAN_AVAILABLE = False
+    def run_periodic_rescan(*a, **k): pass  # type: ignore[misc]
+
+
+
 
 def _extract_email_address(value: str | None) -> str:
     if not value:
@@ -28,6 +54,42 @@ def run_worker() -> None:
     repository = ScanRepository()
     service = ScanService(repository)
     print("[WORKER] SafeMail X scan worker started.")
+
+    # Feature 3: Start offline safe-browsing sync thread (daemon, starts once)
+    if FEATURE_OFFLINE_SAFEBROWSING_ENABLED and _OFFLINE_SYNC_AVAILABLE:
+        _sync_thread = threading.Thread(
+            target=run_periodic_sync,
+            args=(OFFLINE_HASH_FEED_URL, OFFLINE_HASH_SYNC_INTERVAL_HOURS),
+            daemon=True,
+            name="offline-safebrowsing-sync",
+        )
+        _sync_thread.start()
+        print(
+            f"[WORKER] Offline safe-browsing sync thread started. "
+            f"Feed: {OFFLINE_HASH_FEED_URL or '(unset — sync will no-op)'} | "
+            f"Interval: {OFFLINE_HASH_SYNC_INTERVAL_HOURS}h"
+        )
+
+    # Feature 6: Start second-look rescan thread (daemon, starts once)
+    if FEATURE_SECOND_LOOK_RESCAN_ENABLED and _RESCAN_AVAILABLE:
+        _rescan_thread = threading.Thread(
+            target=run_periodic_rescan,
+            kwargs={
+                "repository": repository,
+                "scan_service": service,
+                "user_id": "local",
+                "interval_hours": RESCAN_INTERVAL_HOURS,
+                "lookback_hours": RESCAN_LOOKBACK_HOURS,
+            },
+            daemon=True,
+            name="second-look-rescan",
+        )
+        _rescan_thread.start()
+        print(
+            f"[WORKER] Second-look rescan thread started. "
+            f"Interval: {RESCAN_INTERVAL_HOURS}h | Lookback: {RESCAN_LOOKBACK_HOURS}h"
+        )
+
 
     while True:
         scan_id = None

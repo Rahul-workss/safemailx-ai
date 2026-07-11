@@ -28,3 +28,15 @@ python-multipart==0.0.29
 cryptography==48.0.0
 httpx==0.28.1
 psycopg[binary]==3.3.2
+
+# Added for QR-code phishing (quishing) detection (Feature 1)
+# Note: also requires libzbar0 system package (see Dockerfile)
+pyzbar==0.1.9
+
+# Feature 7: Voice/Vishing detection — OPTIONAL
+# Uncomment the lines below only when FEATURE_VISHING_DETECTION_ENABLED=true
+# and you have enough RAM (whisper tiny ~75MB, base ~150MB).
+# On Koyeb/Render free tier (512MB limit) use tiny only.
+# openai-whisper==20240930
+# torch>=2.0.0          # pulled in automatically by whisper
+# ffmpeg-python==0.2.0  # also needs system ffmpeg (see Dockerfile comment)

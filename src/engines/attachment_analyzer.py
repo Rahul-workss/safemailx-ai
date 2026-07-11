@@ -21,6 +21,30 @@ import requests
 
 from utils.config import VIRUSTOTAL_API_KEY, is_configured_secret
 
+# -- QR quishing detection (Feature 1) --
+try:
+    from utils.config import FEATURE_QR_DETECTION_ENABLED
+    from engines.qr_analyzer import analyze_qr_from_bytes
+    _QR_ATT_AVAILABLE = True
+except ImportError:
+    _QR_ATT_AVAILABLE = False
+    FEATURE_QR_DETECTION_ENABLED = False
+
+# -- Voice/Vishing detection (Feature 7) --
+try:
+    from utils.config import FEATURE_VISHING_DETECTION_ENABLED, WHISPER_MODEL_SIZE
+    from engines.vishing_analyzer import analyze_audio_for_vishing
+    _VISHING_AVAILABLE = True
+except ImportError:
+    FEATURE_VISHING_DETECTION_ENABLED = False
+    WHISPER_MODEL_SIZE = "tiny"
+    _VISHING_AVAILABLE = False
+    def analyze_audio_for_vishing(b, **k):  # type: ignore[misc]
+        return {"success": False, "transcript": "", "text_for_analysis": "",
+                "language": "", "audio_duration_s": 0.0, "model": "tiny", "reason": "disabled"}
+
+
+
 
 HIGH_RISK_EXTENSIONS = {".exe", ".scr", ".bat", ".cmd", ".com", ".ps1"}
 SCRIPT_EXTENSIONS = {".js", ".vbs", ".jse", ".wsf", ".hta"}
@@ -157,7 +181,54 @@ def analyze_attachments(attachments: list) -> dict:
             # Unknown type — log and skip (don't crash the pipeline)
             print(f"[ATTACHMENT] Unsupported type '{ext}' for '{filename}' — skipping")
 
-    if not findings:
+        # -- QR quishing detection on image attachments (Feature 1) --
+        # Runs after type-routing so we don't double-process known-malicious files
+        # that already got a high score above (those already hit `continue`).
+        IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"}
+        if FEATURE_QR_DETECTION_ENABLED and _QR_ATT_AVAILABLE and ext in IMAGE_EXTENSIONS:
+            try:
+                qr_result = analyze_qr_from_bytes(raw_bytes, suffix=ext or ".png")
+                if qr_result["has_qr_url"]:
+                    print(f"[QR] Hidden QR URL(s) found in image attachment '{filename}': {qr_result['qr_urls']}")
+                    findings.append({
+                        "filename": filename,
+                        "file_type": ext.replace(".", "") or "image",
+                        "threat_score": 0.55,   # moderate — URL pipeline will score the URL itself
+                        "indicators": [f"qr_hidden_url:{u}" for u in qr_result["qr_urls"]],
+                        "qr_analysis": qr_result,
+                    })
+            except Exception as exc:
+                print(f"[QR] attachment QR scan error for '{filename}': {exc}")
+
+        # -- Voice/Vishing detection (Feature 7) --
+        AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac", ".wma", ".aiff"}
+        if FEATURE_VISHING_DETECTION_ENABLED and _VISHING_AVAILABLE and ext in AUDIO_EXTENSIONS:
+            try:
+                vishing_result = analyze_audio_for_vishing(
+                    raw_bytes, filename=filename, model_size=WHISPER_MODEL_SIZE
+                )
+                if vishing_result["success"] and vishing_result.get("transcript"):
+                    print(
+                        f"[VISHING] Audio transcribed: '{filename}' "
+                        f"({vishing_result['audio_duration_s']:.1f}s, "
+                        f"lang={vishing_result['language']})"
+                    )
+                    findings.append({
+                        "filename": filename,
+                        "file_type": "audio",
+                        # Moderate score — the transcript will flow to hybrid_detect
+                        # for actual verdict; this just signals presence of audio
+                        "threat_score": 0.30,
+                        "indicators": ["audio_attachment_transcribed_for_vishing_check"],
+                        "vishing_analysis": vishing_result,
+                        "transcript": vishing_result["transcript"],
+                    })
+                else:
+                    print(f"[VISHING] Transcription skipped for '{filename}': {vishing_result.get('reason')}")
+            except Exception as exc:
+                print(f"[VISHING] attachment audio analysis error for '{filename}': {exc}")
+
+
         return {
             "attachment_score":    None,
             "attachment_findings": [],

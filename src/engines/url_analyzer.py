@@ -33,7 +33,13 @@ def _base_domain(host: str) -> str:
 # STAGE 1: Pre-Computation (Whitelist & Hash)
 # ==========================================
 
-from engines.offline_sync import check_url_prefix
+from engines.offline_sync import check_url_prefix, check_url_against_offline_db
+
+# Feature 3: Offline safe-browsing config
+try:
+    from utils.config import FEATURE_OFFLINE_SAFEBROWSING_ENABLED
+except ImportError:
+    FEATURE_OFFLINE_SAFEBROWSING_ENABLED = False
 
 # Initialize Tranco Bloom Filter
 _TRANCO_BLOOM = None
@@ -74,9 +80,14 @@ def check_bloom_filter(url: str) -> bool:
 
 def check_offline_prefix(url: str) -> bool:
     """
-    Check against local SQLite 32-bit SHA-256 hash prefixes
-    representing Google Safe Browsing / OpenPhish feeds.
+    Check against local SQLite 32-bit SHA-256 hash prefixes.
+    Feature 3: now uses full-URL hash (not domain-only) for better accuracy.
+    Legacy callers that already use this function get the improved behavior.
     """
+    if FEATURE_OFFLINE_SAFEBROWSING_ENABLED:
+        # Full URL hash check (Feature 3 — more accurate)
+        return check_url_against_offline_db(url)
+    # Fallback: legacy domain-only check (pre-Feature 3 behavior)
     return check_url_prefix(url)
 
 

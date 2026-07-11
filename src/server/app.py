@@ -59,6 +59,22 @@ try:
 except ImportError:
     SIGNIN_CREDENTIALS_PATH = None
 
+# Feature 5: Adaptive Trust Baseline
+try:
+    from utils.config import FEATURE_ADAPTIVE_TRUST_ENABLED, ADAPTIVE_TRUST_MIN_SCANS
+    from engines.adaptive_trust_engine import (
+        list_baseline_summary,
+        clear_all_baseline_data,
+    )
+    _ADAPTIVE_TRUST_APP_AVAILABLE = True
+except ImportError:
+    FEATURE_ADAPTIVE_TRUST_ENABLED = False
+    ADAPTIVE_TRUST_MIN_SCANS = 3
+    _ADAPTIVE_TRUST_APP_AVAILABLE = False
+    def list_baseline_summary(user_id, **kw): return []  # type: ignore[misc]
+    def clear_all_baseline_data(user_id, **kw): return 0  # type: ignore[misc]
+
+
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -576,6 +592,28 @@ def update_settings(payload: SettingsUpdateRequest, _auth=Depends(require_auth))
         whitelist=rules["whitelist"],
         blacklist=rules["blacklist"]
     )
+
+
+# ── Feature 5: Adaptive Trust Baseline API Endpoints ──────────────────────
+
+@app.get("/api/settings/adaptive-trust/data")
+def get_adaptive_trust_data(_auth=Depends(require_auth)):
+    """Return a summary of all trusted sender domains for the current user."""
+    user_id = _user_id(_auth)
+    if not FEATURE_ADAPTIVE_TRUST_ENABLED or not _ADAPTIVE_TRUST_APP_AVAILABLE:
+        return {"enabled": False, "trusted_domains": [], "count": 0}
+    entries = list_baseline_summary(user_id)
+    return {"enabled": True, "trusted_domains": entries, "count": len(entries)}
+
+
+@app.delete("/api/settings/adaptive-trust/data")
+def clear_adaptive_trust_data(_auth=Depends(require_auth)):
+    """Delete all adaptive trust baseline data for the current user."""
+    user_id = _user_id(_auth)
+    if not FEATURE_ADAPTIVE_TRUST_ENABLED or not _ADAPTIVE_TRUST_APP_AVAILABLE:
+        return {"deleted": 0, "message": "Adaptive trust is disabled"}
+    deleted = clear_all_baseline_data(user_id)
+    return {"deleted": deleted, "message": f"Cleared {deleted} trusted domain record(s)"}
 
 
 @app.post("/api/notifications/register", response_model=PushTokenResponse)
