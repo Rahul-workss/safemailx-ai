@@ -228,7 +228,9 @@ def analyze_attachments(attachments: list) -> dict:
             except Exception as exc:
                 print(f"[VISHING] attachment audio analysis error for '{filename}': {exc}")
 
+    # ── End of per-attachment loop ───────────────────────────────────────────
 
+    if not findings:
         return {
             "attachment_score":    None,
             "attachment_findings": [],
