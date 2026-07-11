@@ -14,6 +14,41 @@ from utils.content_processor import clean_extracted_text
 
 from server.repository import ScanRepository
 
+# Feature 4: Campaign Correlation
+try:
+    from utils.config import (
+        FEATURE_CAMPAIGN_CORRELATION_ENABLED,
+        CAMPAIGN_CORRELATION_WINDOW_HOURS,
+        CAMPAIGN_CORRELATION_MIN_MATCHES,
+    )
+    from engines.campaign_correlator import analyze_campaign_correlation
+    _CAMPAIGN_AVAILABLE = True
+except ImportError:
+    FEATURE_CAMPAIGN_CORRELATION_ENABLED = False
+    CAMPAIGN_CORRELATION_WINDOW_HOURS = 48
+    CAMPAIGN_CORRELATION_MIN_MATCHES = 3
+    _CAMPAIGN_AVAILABLE = False
+
+    def analyze_campaign_correlation(*args, **kwargs):  # type: ignore[misc]
+        return {
+            "campaign_detected": False, "fingerprint": "",
+            "matching_scan_count": 0, "matching_scan_ids": [],
+            "campaign_confidence": 0.0, "window_hours": 48,
+        }
+
+# Feature 5: Adaptive Trust Baseline
+try:
+    from utils.config import FEATURE_ADAPTIVE_TRUST_ENABLED, ADAPTIVE_TRUST_MIN_SCANS
+    from engines.adaptive_trust_engine import record_trusted_sender, apply_adaptive_trust
+    _ADAPTIVE_TRUST_AVAILABLE = True
+except ImportError:
+    FEATURE_ADAPTIVE_TRUST_ENABLED = False
+    ADAPTIVE_TRUST_MIN_SCANS = 3
+    _ADAPTIVE_TRUST_AVAILABLE = False
+    def record_trusted_sender(*a, **k): pass  # type: ignore[misc]
+    def apply_adaptive_trust(score, *a, **k): return score, False, None  # type: ignore[misc]
+
+
 
 SCAN_STAGES = [
     "intake",
@@ -148,6 +183,42 @@ class ScanService:
                 report_json=str(Path(report_json)),
                 user_id=user_id,
             )
+
+        # Feature 4: Campaign Correlation (runs after scan is persisted)
+        if FEATURE_CAMPAIGN_CORRELATION_ENABLED and _CAMPAIGN_AVAILABLE and scan_id:
+            try:
+                with self.repository._db() as db_conn:
+                    campaign_result = analyze_campaign_correlation(
+                        db_conn=db_conn,
+                        scan_id=scan_id,
+                        user_id=user_id,
+                        sender_domain=_sender_domain_from_value(original_sender),
+                        tactics=result.get("llm_tactics") or [],
+                        intent=(
+                            result.get("llm_analysis", {}) or {}
+                        ).get("intent", ""),
+                        window_hours=CAMPAIGN_CORRELATION_WINDOW_HOURS,
+                        min_matches=CAMPAIGN_CORRELATION_MIN_MATCHES,
+                    )
+                    evidence["campaign_correlation"] = campaign_result
+                    if campaign_result["campaign_detected"]:
+                        # Update the stored evidence with the campaign finding
+                        self.repository.update_evidence(scan_id, evidence)
+            except Exception as exc:
+                import logging
+                logging.getLogger("SCAN_SERVICE").warning(
+                    "[CAMPAIGN] correlation post-process failed for %s: %s", scan_id, exc
+                )
+
+        # Feature 5: Adaptive Trust — record trusted sender / apply bonus
+        if FEATURE_ADAPTIVE_TRUST_ENABLED and _ADAPTIVE_TRUST_AVAILABLE:
+            final_verdict = result.get("final_label", "")
+            sender_domain_val = _sender_domain_from_value(original_sender)
+            if final_verdict == "legitimate":
+                try:
+                    record_trusted_sender(user_id, sender_domain_val)
+                except Exception:
+                    pass
 
         return self.repository.get_scan(scan_id)
 

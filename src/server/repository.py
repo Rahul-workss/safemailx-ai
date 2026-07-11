@@ -160,6 +160,25 @@ class ScanRepository:
                 )
                 """
             )
+            # Feature 4: Campaign Correlation fingerprint table (additive)
+            # Stores only structural signal hashes — no body text or PII.
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS scan_fingerprints (
+                    scan_id        TEXT NOT NULL,
+                    user_id        TEXT NOT NULL DEFAULT 'local',
+                    fingerprint    TEXT NOT NULL,
+                    sender_domain  TEXT NOT NULL DEFAULT '',
+                    intent         TEXT NOT NULL DEFAULT 'unknown',
+                    created_at     TEXT NOT NULL,
+                    PRIMARY KEY (scan_id)
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sf_user_fp "
+                "ON scan_fingerprints (user_id, fingerprint, created_at)"
+            )
 
     def _ensure_column(self, conn, table: str, column: str, definition: str) -> None:
         try:

@@ -85,3 +85,24 @@ FEATURE_PROMPT_INJECTION_GUARD_ENABLED = os.getenv("FEATURE_PROMPT_INJECTION_GUA
     "1", "true", "yes", "on"
 }
 
+FEATURE_OFFLINE_SAFEBROWSING_ENABLED = os.getenv("FEATURE_OFFLINE_SAFEBROWSING_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+# Empty by default — set to a feed URL to enable auto-sync.
+# Examples:
+#   OpenPhish:  https://openphish.com/feed.txt
+#   PhishTank:  https://data.phishtank.com/data/online-valid.csv (requires free API account)
+OFFLINE_HASH_FEED_URL = os.getenv("OFFLINE_HASH_FEED_URL", "").strip()
+OFFLINE_HASH_SYNC_INTERVAL_HOURS = float(os.getenv("OFFLINE_HASH_SYNC_INTERVAL_HOURS", "6"))
+
+FEATURE_CAMPAIGN_CORRELATION_ENABLED = os.getenv("FEATURE_CAMPAIGN_CORRELATION_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+CAMPAIGN_CORRELATION_WINDOW_HOURS = int(os.getenv("CAMPAIGN_CORRELATION_WINDOW_HOURS", "48"))
+CAMPAIGN_CORRELATION_MIN_MATCHES = int(os.getenv("CAMPAIGN_CORRELATION_MIN_MATCHES", "3"))
+
+FEATURE_ADAPTIVE_TRUST_ENABLED = os.getenv("FEATURE_ADAPTIVE_TRUST_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+ADAPTIVE_TRUST_MIN_SCANS = int(os.getenv("ADAPTIVE_TRUST_MIN_SCANS", "3"))
+
