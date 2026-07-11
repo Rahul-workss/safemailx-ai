@@ -179,6 +179,17 @@ class ScanRepository:
                 "CREATE INDEX IF NOT EXISTS idx_sf_user_fp "
                 "ON scan_fingerprints (user_id, fingerprint, created_at)"
             )
+            # Feature 6: Rescan deduplication table (additive)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rescan_events (
+                    scan_id       TEXT NOT NULL PRIMARY KEY,
+                    old_verdict   TEXT NOT NULL DEFAULT '',
+                    new_verdict   TEXT NOT NULL DEFAULT '',
+                    rescanned_at  TEXT NOT NULL
+                )
+                """
+            )
 
     def _ensure_column(self, conn, table: str, column: str, definition: str) -> None:
         try:
@@ -310,6 +321,38 @@ class ScanRepository:
                 WHERE id = {placeholder}
                 """,
                 ("failed", True if self.is_postgres else 1, json.dumps(evidence), scan_id),
+            )
+
+    # Feature 6: Rescan support methods
+
+    def update_scan_verdict(self, scan_id: str, new_verdict: str) -> None:
+        """Update the final_label of an existing scan (used by rescan job)."""
+        placeholder = "%s" if self.is_postgres else "?"
+        try:
+            with self._db() as conn:
+                conn.execute(
+                    f"UPDATE scans SET final_label = {placeholder} WHERE id = {placeholder}",
+                    (new_verdict, scan_id),
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger("REPOSITORY").warning(
+                "update_scan_verdict failed for %s: %s", scan_id, exc
+            )
+
+    def update_evidence(self, scan_id: str, evidence: dict) -> None:
+        """Overwrite evidence_json for an existing scan."""
+        placeholder = "%s" if self.is_postgres else "?"
+        try:
+            with self._db() as conn:
+                conn.execute(
+                    f"UPDATE scans SET evidence_json = {placeholder} WHERE id = {placeholder}",
+                    (json.dumps(evidence), scan_id),
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger("REPOSITORY").warning(
+                "update_evidence failed for %s: %s", scan_id, exc
             )
 
     def list_scans(self, user_id: str = "local") -> list[dict[str, Any]]:

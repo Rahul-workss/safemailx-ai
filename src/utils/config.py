@@ -106,3 +106,17 @@ FEATURE_ADAPTIVE_TRUST_ENABLED = os.getenv("FEATURE_ADAPTIVE_TRUST_ENABLED", "tr
 }
 ADAPTIVE_TRUST_MIN_SCANS = int(os.getenv("ADAPTIVE_TRUST_MIN_SCANS", "3"))
 
+FEATURE_SECOND_LOOK_RESCAN_ENABLED = os.getenv("FEATURE_SECOND_LOOK_RESCAN_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+RESCAN_INTERVAL_HOURS = float(os.getenv("RESCAN_INTERVAL_HOURS", "12"))
+RESCAN_LOOKBACK_HOURS = int(os.getenv("RESCAN_LOOKBACK_HOURS", "24"))
+
+FEATURE_VISHING_DETECTION_ENABLED = os.getenv("FEATURE_VISHING_DETECTION_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+# Whisper model size for vishing detection.
+# MUST be 'tiny' (~75MB) on Koyeb/Render free tier (512MB RAM limit).
+# Other valid values: 'base', 'small', 'medium', 'large' (for self-hosted).
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "tiny").strip().lower()
+

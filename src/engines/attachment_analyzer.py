@@ -30,6 +30,20 @@ except ImportError:
     _QR_ATT_AVAILABLE = False
     FEATURE_QR_DETECTION_ENABLED = False
 
+# -- Voice/Vishing detection (Feature 7) --
+try:
+    from utils.config import FEATURE_VISHING_DETECTION_ENABLED, WHISPER_MODEL_SIZE
+    from engines.vishing_analyzer import analyze_audio_for_vishing
+    _VISHING_AVAILABLE = True
+except ImportError:
+    FEATURE_VISHING_DETECTION_ENABLED = False
+    WHISPER_MODEL_SIZE = "tiny"
+    _VISHING_AVAILABLE = False
+    def analyze_audio_for_vishing(b, **k):  # type: ignore[misc]
+        return {"success": False, "transcript": "", "text_for_analysis": "",
+                "language": "", "audio_duration_s": 0.0, "model": "tiny", "reason": "disabled"}
+
+
 
 
 HIGH_RISK_EXTENSIONS = {".exe", ".scr", ".bat", ".cmd", ".com", ".ps1"}
@@ -186,8 +200,35 @@ def analyze_attachments(attachments: list) -> dict:
             except Exception as exc:
                 print(f"[QR] attachment QR scan error for '{filename}': {exc}")
 
+        # -- Voice/Vishing detection (Feature 7) --
+        AUDIO_EXTENSIONS = {".wav", ".mp3", ".ogg", ".m4a", ".flac", ".aac", ".wma", ".aiff"}
+        if FEATURE_VISHING_DETECTION_ENABLED and _VISHING_AVAILABLE and ext in AUDIO_EXTENSIONS:
+            try:
+                vishing_result = analyze_audio_for_vishing(
+                    raw_bytes, filename=filename, model_size=WHISPER_MODEL_SIZE
+                )
+                if vishing_result["success"] and vishing_result.get("transcript"):
+                    print(
+                        f"[VISHING] Audio transcribed: '{filename}' "
+                        f"({vishing_result['audio_duration_s']:.1f}s, "
+                        f"lang={vishing_result['language']})"
+                    )
+                    findings.append({
+                        "filename": filename,
+                        "file_type": "audio",
+                        # Moderate score — the transcript will flow to hybrid_detect
+                        # for actual verdict; this just signals presence of audio
+                        "threat_score": 0.30,
+                        "indicators": ["audio_attachment_transcribed_for_vishing_check"],
+                        "vishing_analysis": vishing_result,
+                        "transcript": vishing_result["transcript"],
+                    })
+                else:
+                    print(f"[VISHING] Transcription skipped for '{filename}': {vishing_result.get('reason')}")
+            except Exception as exc:
+                print(f"[VISHING] attachment audio analysis error for '{filename}': {exc}")
 
-    if not findings:
+
         return {
             "attachment_score":    None,
             "attachment_findings": [],
