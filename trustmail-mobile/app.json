@@ -34,6 +34,9 @@
         "projectId": "687ea9b6-97d1-4434-b8cc-fcb57eeace22"
       }
     },
-    "owner": "jnvra"
+    "owner": "jnvra",
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }
