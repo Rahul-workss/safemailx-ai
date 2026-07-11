@@ -5,6 +5,16 @@ import email
 
 logger = logging.getLogger("FILE_ANALYZER")
 
+# -- QR quishing detection (Feature 1) --
+try:
+    from utils.config import FEATURE_QR_DETECTION_ENABLED
+    from engines.qr_analyzer import analyze_qr_payload
+    _QR_MODULE_AVAILABLE = True
+except ImportError:
+    _QR_MODULE_AVAILABLE = False
+    FEATURE_QR_DETECTION_ENABLED = False
+
+
 try:
     from oletools.olevba import VBA_Parser, TYPE_OLE, TYPE_OpenXML, TYPE_Word2003_XML, TYPE_MHTML
     OLETOOLS_AVAILABLE = True
@@ -107,5 +117,33 @@ def extract_and_analyze_attachments(filename: str, file_bytes: bytes) -> dict:
 
     metrics["extracted_text"] = text.strip()
     metrics["extracted_urls"] = list(set(urls))
+    metrics["qr_analysis"] = None  # populated below if enabled
+
+    # -- QR quishing detection (Feature 1) --
+    # Only runs on image files that already exist on disk (images/PDFs passed
+    # via file path). Decoded URLs are appended to extracted_urls so they flow
+    # through the existing url_analyzer pipeline automatically.
+    if FEATURE_QR_DETECTION_ENABLED and _QR_MODULE_AVAILABLE:
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"}
+        ext_lower = os.path.splitext(filename)[1].lower()
+        if ext_lower in image_extensions:
+            # filename here is used as a path by some callers — only attempt if it's a real path
+            if os.path.isfile(filename):
+                try:
+                    qr_result = analyze_qr_payload(filename)
+                    metrics["qr_analysis"] = qr_result
+                    if qr_result["has_qr_url"]:
+                        logger.info(
+                            "[QR] Found %d QR URL(s) in %s — feeding into URL pipeline",
+                            len(qr_result["qr_urls"]), filename
+                        )
+                        # Merge decoded QR URLs into extracted_urls without duplicates
+                        existing = set(metrics["extracted_urls"])
+                        for qr_url in qr_result["qr_urls"]:
+                            if qr_url not in existing:
+                                metrics["extracted_urls"].append(qr_url)
+                                existing.add(qr_url)
+                except Exception as exc:
+                    logger.debug("[QR] file_analyzer QR scan error: %s", exc)
 
     return metrics

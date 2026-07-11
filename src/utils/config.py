@@ -71,3 +71,17 @@ def is_configured_secret(value: str | None) -> bool:
 def debug_log(message: str) -> None:
     if SAFEMAILX_DEBUG:
         print(message)
+
+
+# ── Feature flags ──────────────────────────────────────────────────────────
+# Each new feature ships behind a flag defaulting to a safe value.
+# Set to true in .env to enable.
+
+FEATURE_QR_DETECTION_ENABLED = os.getenv("FEATURE_QR_DETECTION_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+
+FEATURE_PROMPT_INJECTION_GUARD_ENABLED = os.getenv("FEATURE_PROMPT_INJECTION_GUARD_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+

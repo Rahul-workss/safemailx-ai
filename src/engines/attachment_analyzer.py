@@ -21,6 +21,16 @@ import requests
 
 from utils.config import VIRUSTOTAL_API_KEY, is_configured_secret
 
+# -- QR quishing detection (Feature 1) --
+try:
+    from utils.config import FEATURE_QR_DETECTION_ENABLED
+    from engines.qr_analyzer import analyze_qr_from_bytes
+    _QR_ATT_AVAILABLE = True
+except ImportError:
+    _QR_ATT_AVAILABLE = False
+    FEATURE_QR_DETECTION_ENABLED = False
+
+
 
 HIGH_RISK_EXTENSIONS = {".exe", ".scr", ".bat", ".cmd", ".com", ".ps1"}
 SCRIPT_EXTENSIONS = {".js", ".vbs", ".jse", ".wsf", ".hta"}
@@ -156,6 +166,26 @@ def analyze_attachments(attachments: list) -> dict:
         else:
             # Unknown type — log and skip (don't crash the pipeline)
             print(f"[ATTACHMENT] Unsupported type '{ext}' for '{filename}' — skipping")
+
+        # -- QR quishing detection on image attachments (Feature 1) --
+        # Runs after type-routing so we don't double-process known-malicious files
+        # that already got a high score above (those already hit `continue`).
+        IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif"}
+        if FEATURE_QR_DETECTION_ENABLED and _QR_ATT_AVAILABLE and ext in IMAGE_EXTENSIONS:
+            try:
+                qr_result = analyze_qr_from_bytes(raw_bytes, suffix=ext or ".png")
+                if qr_result["has_qr_url"]:
+                    print(f"[QR] Hidden QR URL(s) found in image attachment '{filename}': {qr_result['qr_urls']}")
+                    findings.append({
+                        "filename": filename,
+                        "file_type": ext.replace(".", "") or "image",
+                        "threat_score": 0.55,   # moderate — URL pipeline will score the URL itself
+                        "indicators": [f"qr_hidden_url:{u}" for u in qr_result["qr_urls"]],
+                        "qr_analysis": qr_result,
+                    })
+            except Exception as exc:
+                print(f"[QR] attachment QR scan error for '{filename}': {exc}")
+
 
     if not findings:
         return {

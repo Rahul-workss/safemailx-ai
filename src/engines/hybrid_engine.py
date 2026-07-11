@@ -3,7 +3,19 @@ import joblib
 from engines.rule_engine import analyze_rules
 from engines.llm_analyzer import run_llm_analysis
 from engines.intent_classifier import classify_intent
-from utils.config import MODEL_PATH
+from utils.config import MODEL_PATH, FEATURE_QR_DETECTION_ENABLED
+
+# Feature 2: Prompt injection guard (imported lazily so offline mode still works)
+try:
+    from utils.config import FEATURE_PROMPT_INJECTION_GUARD_ENABLED
+    from engines.prompt_injection_guard import scan_for_prompt_injection as _guard_scan
+    _GUARD_AVAILABLE = True
+except ImportError:
+    FEATURE_PROMPT_INJECTION_GUARD_ENABLED = False
+    _GUARD_AVAILABLE = False
+    def _guard_scan(text):  # type: ignore[misc]
+        return {"injection_detected": False, "matched_patterns": [], "encoding_hints": [], "confidence": 0.0}
+
 
 # Load the trained text classification model
 model = joblib.load(MODEL_PATH)
@@ -281,6 +293,36 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
                     f"TF-IDF alone capped at 0.20 (was {base_blend:.3f}).")
             else:
                 analysis_steps.append("Unknown intent: standard blend applied.")
+
+    # -- Feature 2: Prompt Injection Guard — score floor -------------------
+    # Placed AFTER the smart-veto block so this can only raise, never lower
+    # a score already computed by existing logic. This preserves all existing
+    # veto behavior and cannot introduce regressions in current tests.
+    #
+    # This check fires in TWO paths:
+    #   (a) LLM path: injection_finding comes from llm_result["prompt_injection"]
+    #   (b) Fallback path: guard scans the raw text independently (works offline)
+    _injection_finding = None
+    if FEATURE_PROMPT_INJECTION_GUARD_ENABLED and _GUARD_AVAILABLE:
+        # (a) prefer LLM path result if available
+        if llm_result is not None:
+            _injection_finding = llm_result.get("prompt_injection")
+        # (b) always run guard on the raw text (covers offline / LLM-skipped path)
+        _raw_guard = _guard_scan(combined_text)
+        if _injection_finding is None:
+            _injection_finding = _raw_guard
+        elif _raw_guard.get("injection_detected") and not _injection_finding.get("injection_detected"):
+            # rule engine found it but LLM path missed it — prefer the positive
+            _injection_finding = _raw_guard
+
+        if _injection_finding and _injection_finding.get("injection_detected"):
+            _inj_conf = _injection_finding.get("confidence", 0.0)
+            final_score = max(final_score, 0.85)
+            analysis_steps.append(
+                f"Feature 2 — Prompt-injection attempt detected in content "
+                f"(confidence={_inj_conf:.2f}) — score floor raised to 0.85."
+            )
+            rule_reasons.append("llm_prompt_injection_attempt")
 
     # -- Confidence override for extreme rule/model scores ----------------------
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]

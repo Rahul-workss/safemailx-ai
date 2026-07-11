@@ -120,6 +120,8 @@ WEIGHTS = {
     "promo_deadline": 0.10,
     "cta_domain_mismatch": 0.38,
     "screenshot_cta_no_visible_url": 0.45,
+    # Feature 1: QR quishing — QR code is the ONLY URL delivery mechanism
+    "qr_hidden_url": 0.30,
 }
 
 

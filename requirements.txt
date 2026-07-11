@@ -28,3 +28,7 @@ python-multipart==0.0.29
 cryptography==48.0.0
 httpx==0.28.1
 psycopg[binary]==3.3.2
+
+# Added for QR-code phishing (quishing) detection (Feature 1)
+# Note: also requires libzbar0 system package (see Dockerfile)
+pyzbar==0.1.9

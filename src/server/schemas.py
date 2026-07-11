@@ -246,3 +246,5 @@ class InstantScanResult(BaseModel):
     structural_score: float | None = None
     reputation_score: float | None = None
     llm_score: float | None = None
+    # Feature 1: QR quishing — None when no QR scan was performed or flag is off
+    qr_analysis: dict | None = None

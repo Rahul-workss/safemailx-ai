@@ -21,6 +21,18 @@ from utils.config import (
     LM_STUDIO_AUTO_CONTEXT,
 )
 
+# -- Feature 2: Prompt Injection Guard -----------------------------------------
+try:
+    from engines.prompt_injection_guard import scan_for_prompt_injection, sanitize_for_prompt
+    _INJECTION_GUARD_AVAILABLE = True
+except ImportError:
+    _INJECTION_GUARD_AVAILABLE = False
+    def scan_for_prompt_injection(text):  # type: ignore[misc]
+        return {"injection_detected": False, "matched_patterns": [], "encoding_hints": [], "confidence": 0.0}
+    def sanitize_for_prompt(text, max_len=8000):  # type: ignore[misc]
+        return text[:max_len] if text else ""
+
+
 # -- System prompts -------------------------------------------------------------
 PROMPTS = {
     "email": """You are TrustMail Threat Intelligence Engine, a forensic email analyst.
@@ -347,6 +359,14 @@ def run_llm_analysis(
     # We must patch _fit_email_to_context and _build_user_message calls locally
     # since they previously relied on the global SYSTEM_PROMPT. 
     # For now, we will compute char_limit locally or rely on their default logic.
+    # -- Feature 2: Prompt Injection Guard ------------------------------------
+    # sanitize_for_prompt runs UNCONDITIONALLY — zero scoring impact, pure defense.
+    # scan_for_prompt_injection result is attached to the returned dict so
+    # hybrid_engine can apply the score floor if injection is detected.
+    injection_finding = scan_for_prompt_injection(email_text)
+    if _INJECTION_GUARD_AVAILABLE:
+        email_text = sanitize_for_prompt(email_text)
+
     user_msg = _build_user_message(user_prefix, user_suffix, email_text)
 
     payload = {
@@ -552,8 +572,13 @@ def run_llm_analysis(
         "reasoning":        reasoning,
         "confidence":       round(confidence, 2),
         "llm_available":    True,
+        # Feature 2: prompt injection finding — new optional key, existing callers ignore it
+        "prompt_injection": injection_finding,
     }
 
     print(f"[LLM] Threat: {threat:.2f} | Confidence: {confidence:.2f} | "
           f"Intent: {intent} | Tactics: {tactics}")
+    if injection_finding.get("injection_detected"):
+        print(f"[LLM] ⚠️  Prompt injection attempt detected in content "
+              f"(confidence={injection_finding['confidence']})")
     return result
