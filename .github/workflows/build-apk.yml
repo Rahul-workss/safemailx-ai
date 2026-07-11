@@ -45,7 +45,7 @@ jobs:
         run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android --no-daemon
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: safemailx-mobile-app
           path: trustmail-mobile/android/app/build/outputs/apk/release/app-release.apk
