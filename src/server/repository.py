@@ -51,152 +51,157 @@ class ScanRepository:
             conn.close()
 
     def _init_db(self) -> None:
-        with self._db() as conn:
-            if self.is_postgres:
+        try:
+            with self._db() as conn:
+                if self.is_postgres:
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS scans (
+                            id TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL DEFAULT 'local',
+                            subject TEXT NOT NULL,
+                            sender TEXT NOT NULL,
+                            final_label TEXT NOT NULL,
+                            final_score DOUBLE PRECISION NOT NULL,
+                            llm_used BOOLEAN NOT NULL,
+                            degraded BOOLEAN NOT NULL,
+                            evidence_json TEXT NOT NULL,
+                            report_pdf TEXT,
+                            report_json TEXT,
+                            created_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS push_tokens (
+                            token TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL DEFAULT 'local',
+                            platform TEXT NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS gmail_tokens (
+                            user_id TEXT PRIMARY KEY,
+                            token_blob TEXT NOT NULL,
+                            updated_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                            token TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            expires_at TIMESTAMPTZ NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
+                else:
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS scans (
+                            id TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL DEFAULT 'local',
+                            subject TEXT NOT NULL,
+                            sender TEXT NOT NULL,
+                            final_label TEXT NOT NULL,
+                            final_score REAL NOT NULL,
+                            llm_used INTEGER NOT NULL,
+                            degraded INTEGER NOT NULL,
+                            evidence_json TEXT NOT NULL,
+                            report_pdf TEXT,
+                            report_json TEXT,
+                            created_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS push_tokens (
+                            token TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL DEFAULT 'local',
+                            platform TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS gmail_tokens (
+                            user_id TEXT PRIMARY KEY,
+                            token_blob TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                            token TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            expires_at TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                conn.execute("UPDATE scans SET final_label = 'queued' WHERE final_label = 'pending'")
+                self._ensure_column(conn, "scans", "user_id", "TEXT NOT NULL DEFAULT 'local'")
+                self._ensure_column(conn, "push_tokens", "user_id", "TEXT NOT NULL DEFAULT 'local'")
                 conn.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS scans (
+                    CREATE TABLE IF NOT EXISTS users (
                         id TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL DEFAULT 'local',
-                        subject TEXT NOT NULL,
-                        sender TEXT NOT NULL,
-                        final_label TEXT NOT NULL,
-                        final_score DOUBLE PRECISION NOT NULL,
-                        llm_used BOOLEAN NOT NULL,
-                        degraded BOOLEAN NOT NULL,
-                        evidence_json TEXT NOT NULL,
-                        report_pdf TEXT,
-                        report_json TEXT,
-                        created_at TIMESTAMPTZ NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS push_tokens (
-                        token TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL DEFAULT 'local',
-                        platform TEXT NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS gmail_tokens (
-                        user_id TEXT PRIMARY KEY,
-                        token_blob TEXT NOT NULL,
-                        updated_at TIMESTAMPTZ NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                        token TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL,
-                        expires_at TIMESTAMPTZ NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL
-                    )
-                    """
-                )
-            else:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS scans (
-                        id TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL DEFAULT 'local',
-                        subject TEXT NOT NULL,
-                        sender TEXT NOT NULL,
-                        final_label TEXT NOT NULL,
-                        final_score REAL NOT NULL,
-                        llm_used INTEGER NOT NULL,
-                        degraded INTEGER NOT NULL,
-                        evidence_json TEXT NOT NULL,
-                        report_pdf TEXT,
-                        report_json TEXT,
+                        email TEXT NOT NULL UNIQUE,
+                        password_hash TEXT NOT NULL,
+                        salt TEXT NOT NULL,
                         created_at TEXT NOT NULL
                     )
                     """
                 )
                 conn.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS push_tokens (
-                        token TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL DEFAULT 'local',
-                        platform TEXT NOT NULL,
-                        created_at TEXT NOT NULL
+                    CREATE TABLE IF NOT EXISTS scan_fingerprints (
+                        scan_id        TEXT NOT NULL,
+                        user_id        TEXT NOT NULL DEFAULT 'local',
+                        fingerprint    TEXT NOT NULL,
+                        sender_domain  TEXT NOT NULL DEFAULT '',
+                        intent         TEXT NOT NULL DEFAULT 'unknown',
+                        created_at     TEXT NOT NULL,
+                        PRIMARY KEY (scan_id)
                     )
                     """
                 )
                 conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS gmail_tokens (
-                        user_id TEXT PRIMARY KEY,
-                        token_blob TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                    """
+                    "CREATE INDEX IF NOT EXISTS idx_sf_user_fp "
+                    "ON scan_fingerprints (user_id, fingerprint, created_at)"
                 )
                 conn.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                        token TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL,
-                        expires_at TEXT NOT NULL,
-                        created_at TEXT NOT NULL
+                    CREATE TABLE IF NOT EXISTS rescan_events (
+                        scan_id       TEXT NOT NULL PRIMARY KEY,
+                        old_verdict   TEXT NOT NULL DEFAULT '',
+                        new_verdict   TEXT NOT NULL DEFAULT '',
+                        rescanned_at  TEXT NOT NULL
                     )
                     """
                 )
-            conn.execute("UPDATE scans SET final_label = 'queued' WHERE final_label = 'pending'")
-            self._ensure_column(conn, "scans", "user_id", "TEXT NOT NULL DEFAULT 'local'")
-            self._ensure_column(conn, "push_tokens", "user_id", "TEXT NOT NULL DEFAULT 'local'")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id TEXT PRIMARY KEY,
-                    email TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            # Feature 4: Campaign Correlation fingerprint table (additive)
-            # Stores only structural signal hashes — no body text or PII.
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS scan_fingerprints (
-                    scan_id        TEXT NOT NULL,
-                    user_id        TEXT NOT NULL DEFAULT 'local',
-                    fingerprint    TEXT NOT NULL,
-                    sender_domain  TEXT NOT NULL DEFAULT '',
-                    intent         TEXT NOT NULL DEFAULT 'unknown',
-                    created_at     TEXT NOT NULL,
-                    PRIMARY KEY (scan_id)
-                )
-                """
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_sf_user_fp "
-                "ON scan_fingerprints (user_id, fingerprint, created_at)"
-            )
-            # Feature 6: Rescan deduplication table (additive)
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS rescan_events (
-                    scan_id       TEXT NOT NULL PRIMARY KEY,
-                    old_verdict   TEXT NOT NULL DEFAULT '',
-                    new_verdict   TEXT NOT NULL DEFAULT '',
-                    rescanned_at  TEXT NOT NULL
-                )
-                """
-            )
+        except Exception as e:
+            print(f"[DB INIT] Concurrent initialization warning ignored: {e}")
 
     def _ensure_column(self, conn, table: str, column: str, definition: str) -> None:
         try:
             if self.is_postgres:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition}")
+                conn.execute("SAVEPOINT ensure_col")
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition}")
+                    conn.execute("RELEASE SAVEPOINT ensure_col")
+                except Exception:
+                    conn.execute("ROLLBACK TO SAVEPOINT ensure_col")
                 return
 
             existing = conn.execute(f"PRAGMA table_info({table})").fetchall()
