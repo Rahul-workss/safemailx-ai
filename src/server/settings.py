@@ -18,7 +18,11 @@ SAFEMAILX_ADMIN_PASSWORD = os.getenv("SAFEMAILX_ADMIN_PASSWORD", "change-me-befo
 SAFEMAILX_REQUIRE_AUTH = os.getenv("SAFEMAILX_REQUIRE_AUTH", "").strip().lower() in {
     "1", "true", "yes", "on"
 }
+FEATURE_REFRESH_TOKEN_ENABLED = os.getenv("FEATURE_REFRESH_TOKEN_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "1440"))
+REFRESH_TOKEN_EXPIRES_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRES_DAYS", "30"))
 REPORT_BASE_DIR = Path(os.getenv("REPORT_BASE_DIR", str(PROJECT_ROOT / "reports")))
 SCAN_MODE_DEFAULT = os.getenv("SAFEMAILX_SCAN_MODE", "balanced").lower()
 GMAIL_POLL_INTERVAL_SECONDS = int(os.getenv("GMAIL_POLL_INTERVAL_SECONDS", "60"))

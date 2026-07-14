@@ -7,14 +7,16 @@ from pathlib import Path
 from typing import Any
 
 from server.settings import DATABASE_URL
+from utils.config import PROJECT_ROOT
 
 
 def _sqlite_path() -> Path:
     if DATABASE_URL.startswith("sqlite:///"):
-        return Path(DATABASE_URL.replace("sqlite:///", "", 1))
+        path = Path(DATABASE_URL.replace("sqlite:///", "", 1))
+        return path if path.is_absolute() else PROJECT_ROOT / path
     # The production plan uses PostgreSQL; this sqlite adapter keeps local
     # development and tests lightweight until the Postgres adapter is added.
-    return Path("trustmail_app.db")
+    return PROJECT_ROOT / "trustmail_app.db"
 
 
 class ScanRepository:

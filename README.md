@@ -371,6 +371,8 @@ REDIS_URL=redis://127.0.0.1:6379/0
 # ─── Authentication ───────────────────────────────────────────
 JWT_SECRET=your-long-random-secret-min-32-chars
 JWT_EXPIRES_MINUTES=1440
+FEATURE_REFRESH_TOKEN_ENABLED=true
+REFRESH_TOKEN_EXPIRES_DAYS=30
 SAFEMAILX_REQUIRE_AUTH=true
 SAFEMAILX_ADMIN_EMAIL=admin@yourdomain.com
 SAFEMAILX_ADMIN_PASSWORD=strong-password-here
@@ -552,6 +554,19 @@ cloudflared tunnel run
 
 > **Important:** Set `LLM_BASE_URL` to your Cloudflare Tunnel URL for LM Studio if you want LLM analysis on cloud deployments.
 
+### Production Persistence Requirements
+
+- `DATABASE_URL` must point to a persistent managed Postgres instance in production.
+- `REDIS_URL` must point to a persistent managed Redis instance in production.
+- The SQLite fallback is for local development only. On platforms with ephemeral disks, local SQLite data can disappear after restarts, redeploys, or idle cycling.
+- After any first production deployment or database move, manually restart or redeploy the service once and confirm existing users and scan history still exist afterward.
+
+### Session Refresh Controls
+
+- `FEATURE_REFRESH_TOKEN_ENABLED=true` enables silent session renewal for supported clients.
+- `REFRESH_TOKEN_EXPIRES_DAYS=30` controls the refresh-token lifetime.
+- Set `FEATURE_REFRESH_TOKEN_ENABLED=false` to fall back to the older hard-expiry behavior if you need to disable refresh-token rollout quickly.
+
 ### Mobile — EAS Build (Production APK/IPA)
 
 ```bash
@@ -623,6 +638,21 @@ type(scope): description
 Types: feat, fix, docs, refactor, test, chore
 Scopes: engine, api, mobile, auth, llm, ui
 ```
+
+---
+
+## Production Deployment
+
+When deploying SafeMail X to a production environment (e.g. Render, Koyeb, AWS), you **must** configure persistent database connections. The default behavior is to use ephemeral SQLite/in-memory data for local development, which will be wiped on every container restart.
+
+**Required Environment Variables for Production:**
+- `DATABASE_URL`: Must point to a persistent, managed PostgreSQL instance (e.g., `postgresql://user:pass@host/dbname`). If left unset, it falls back to a local SQLite file which **will cause data loss** on restart.
+- `REDIS_URL`: Must point to a persistent, managed Redis instance.
+
+**Silent Refresh Token Flow:**
+The backend supports a silent refresh-token flow to prevent users from being forcibly logged out every 24 hours.
+- `FEATURE_REFRESH_TOKEN_ENABLED` (default: `true`): Enables the `/auth/refresh` endpoint.
+- `REFRESH_TOKEN_EXPIRES_DAYS` (default: `30`): Lifetime of the refresh token. Access tokens still hard-expire frequently (`JWT_EXPIRES_MINUTES`).
 
 ---
 

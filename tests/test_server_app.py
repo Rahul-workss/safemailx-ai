@@ -1,8 +1,9 @@
 import sys
 import unittest
+import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -14,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 import server.app as server_app
 import server.repository as repository_module
-from server.auth import hash_password
+from server.auth import create_signed_token, hash_password
 from server.schemas import InstantScanResult, QuickScanArtifacts, QuickScanSignal
 
 
@@ -486,6 +487,39 @@ class ServerAppTests(unittest.TestCase):
             build_auth.call_args.kwargs["redirect_uri"],
             "http://172.25.189.18:8080/api/gmail/oauth/callback",
         )
+
+    def test_google_oauth_callback_logs_when_creating_missing_user_record(self):
+        client = TestClient(app)
+        email = f"oauth-new-{uuid.uuid4().hex[:10]}@example.com"
+        state = create_signed_token(
+            {
+                "sub": "guest",
+                "uid": "temp_guest",
+                "oauth_redirect_uri": "http://testserver/api/auth/google/callback",
+                "purpose": "auth",
+                "return_url": "safemailxai://oauth-callback",
+            }
+        )
+        user_info_service = Mock()
+        user_info_service.userinfo.return_value.get.return_value.execute.return_value = {
+            "email": email,
+            "name": "OAuth User",
+        }
+
+        with patch("server.app.exchange_code_for_token", return_value=object()), patch(
+            "googleapiclient.discovery.build",
+            return_value=user_info_service,
+        ), patch("builtins.print") as print_mock:
+            response = client.get(
+                "/api/auth/google/callback",
+                params={"code": "oauth-code", "state": state},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Signed In Successfully!", response.text)
+        self.assertIsNotNone(server_app.repository.get_user_by_email(email))
+        printed = "\n".join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        self.assertIn(f"[AUTH] Creating new user record for {email} via Google OAuth", printed)
 
     def test_gmail_label_setup_and_run_once_use_connected_label_flow(self):
         from tests.test_gmail_watcher import FakeGmailService

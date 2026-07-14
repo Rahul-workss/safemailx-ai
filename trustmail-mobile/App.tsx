@@ -435,8 +435,6 @@ function App() {
   }, []);
 
   // ── Cold-start session restore ────────────────────────────────────────────────
-  // TODO: Sessions hard-expire after JWT_EXPIRES_MINUTES with no silent renewal.
-  // A refresh-token flow would be needed to extend sessions automatically.
   useEffect(() => {
     (async () => {
       try {
@@ -479,6 +477,7 @@ function App() {
       const tokenMatch = url.match(/[?&]token=([^&]+)/);
       const emailMatch = url.match(/[?&]email=([^&]+)/);
       const nameMatch = url.match(/[?&]name=([^&]+)/);
+      const refreshTokenMatch = url.match(/[?&]refresh_token=([^&]+)/);
 
       if (tokenMatch && tokenMatch[1]) {
         const token = decodeURIComponent(tokenMatch[1]);
@@ -490,7 +489,11 @@ function App() {
         setEmail(emailVal);
         try {
           await fetchScans(); // validate token is real
-          saveSession(token, emailVal); // persist only after validation
+          await saveSession(
+            token,
+            emailVal,
+            refreshTokenMatch && refreshTokenMatch[1] ? decodeURIComponent(refreshTokenMatch[1]) : null
+          ); // persist only after validation
           setAuthState("Signed in");
           setActiveTab("dashboard");
 
@@ -625,8 +628,8 @@ function App() {
     if (!email.trim() || !password) return;
     setAuthState("Signing in…"); setBusy(true);
     try {
-      const token = await login(email.trim(), password); setPassword("");
-      await saveSession(token, email.trim()); // persist to encrypted storage
+      const tokens = await login(email.trim(), password); setPassword("");
+      await saveSession(tokens.accessToken, email.trim(), tokens.refreshToken || null); // persist to encrypted storage
       setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
       setActiveTab("dashboard");
       showToast("Signed in successfully", "success");
@@ -654,8 +657,8 @@ function App() {
     if (!registerOtp.trim() || registerOtp.length !== 6) return showToast("Please enter a valid 6-digit OTP");
     setAuthState("Registering…"); setBusy(true);
     try {
-      const token = await register(email.trim(), registerName.trim(), password, registerOtp.trim());
-      await saveSession(token, email.trim()); // persist to encrypted storage
+      const tokens = await register(email.trim(), registerName.trim(), password, registerOtp.trim());
+      await saveSession(tokens.accessToken, email.trim(), tokens.refreshToken || null); // persist to encrypted storage
       setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
       setActiveTab("dashboard");
       setRegisterStep("none");

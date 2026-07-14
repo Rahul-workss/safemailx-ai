@@ -1,9 +1,15 @@
-import { triggerSessionExpired } from "./session";
+import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } from "./session";
 
 let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 
 let accessToken = "";
 const DEFAULT_TIMEOUT_MS = 12000;
+let refreshPromise: Promise<boolean> | null = null;
+
+export type AuthTokenSet = {
+  accessToken: string;
+  refreshToken?: string | null;
+};
 
 // ─── Typed error classes ──────────────────────────────────────────────────────
 /** Thrown when the server returns HTTP 401. Triggers the global logout flow. */
@@ -22,14 +28,52 @@ export class NetworkError extends Error {
   }
 }
 
-async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+async function attemptSilentRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const storedRefreshToken = await loadRefreshToken();
+      if (!storedRefreshToken) return false;
+
+      const session = await loadSession();
+      const storedEmail = session?.email || "";
+      const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Bypass-Tunnel-Reminder": "true",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: storedRefreshToken }),
+      });
+      if (!response.ok) return false;
+
+      const payload = await response.json();
+      setAccessToken(payload.access_token);
+      await saveSession(payload.access_token, storedEmail, payload.refresh_token || null);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS, allowRefresh = true) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const isAuthEndpoint = path.startsWith("/auth/");
 
   const headers = {
     "Bypass-Tunnel-Reminder": "true",
     ...(options.headers || {})
-  } as HeadersInit;
+  } as Record<string, string>;
+  if (!isAuthEndpoint && accessToken && "Authorization" in headers) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
 
   let response: Response;
   try {
@@ -50,8 +94,13 @@ async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEF
 
   // 401 — token is invalid or expired. Trigger exactly-once logout flow.
   // EXCEPT for auth endpoints where 401 means "wrong credentials", not "expired session".
-  const isAuthEndpoint = path.startsWith("/auth/");
   if (response.status === 401 && !isAuthEndpoint) {
+    if (allowRefresh) {
+      const refreshed = await attemptSilentRefresh();
+      if (refreshed) {
+        return apiFetch(path, options, timeoutMs, false);
+      }
+    }
     triggerSessionExpired();
     throw new UnauthorizedError();
   }
@@ -193,7 +242,7 @@ export async function fetchHealth(): Promise<Health> {
   return response.json();
 }
 
-export async function login(email: string, password: string): Promise<string> {
+export async function login(email: string, password: string): Promise<AuthTokenSet> {
   const response = await apiFetch("/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -202,7 +251,10 @@ export async function login(email: string, password: string): Promise<string> {
   if (!response.ok) throw new Error("Login failed");
   const payload = await response.json();
   setAccessToken(payload.access_token);
-  return payload.access_token;
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token || null,
+  };
 }
 
 export async function sendRegistrationOtp(email: string): Promise<void> {
@@ -226,7 +278,7 @@ export async function sendRegistrationOtp(email: string): Promise<void> {
   }
 }
 
-export async function register(email: string, name: string, password: string, otp: string): Promise<string> {
+export async function register(email: string, name: string, password: string, otp: string): Promise<AuthTokenSet> {
   const response = await apiFetch("/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -248,7 +300,10 @@ export async function register(email: string, name: string, password: string, ot
   
   const payload = await response.json();
   setAccessToken(payload.access_token);
-  return payload.access_token;
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token || null,
+  };
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

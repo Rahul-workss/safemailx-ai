@@ -10,8 +10,10 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from server.settings import (
+    FEATURE_REFRESH_TOKEN_ENABLED,
     JWT_EXPIRES_MINUTES,
     JWT_SECRET,
+    REFRESH_TOKEN_EXPIRES_DAYS,
     SAFEMAILX_ADMIN_EMAIL,
     SAFEMAILX_ADMIN_PASSWORD,
     SAFEMAILX_REQUIRE_AUTH,
@@ -67,6 +69,15 @@ def create_access_token(email: str, user_id: str = "local", name: str | None = N
     if name:
         payload["name"] = name
     return create_signed_token(payload)
+
+
+def create_refresh_token(email: str, user_id: str) -> str | None:
+    if not FEATURE_REFRESH_TOKEN_ENABLED:
+        return None
+    return create_signed_token(
+        {"uid": user_id, "sub": email, "type": "refresh"},
+        expires_minutes=REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60,
+    )
 
 
 def verify_access_token(token: str) -> dict[str, Any]:

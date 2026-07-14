@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse
 
-from server.auth import create_access_token, create_signed_token, require_auth, validate_login, verify_access_token
+from server.auth import create_access_token, create_refresh_token, create_signed_token, require_auth, validate_login, verify_access_token
 from server.gmail_watcher import enqueue_unread_forwarded_messages
 from server.gmail_oauth import build_authorization_url, build_gmail_service_from_blob, encode_credentials, exchange_code_for_token
 try:
@@ -14,6 +14,7 @@ except ImportError:
     ensure_safemailx_labels = None
 from server.health import build_health, check_llm_health
 from server.mailer import send_password_reset_email
+from server.persistence_checks import check_database_persistence
 from google.auth.exceptions import RefreshError
 from server.queue import QueueUnavailable, ScanQueue
 from server.readiness import build_readiness
@@ -33,6 +34,7 @@ from server.schemas import (
     PushTokenRequest,
     PushTokenResponse,
     ReadinessResponse,
+    RefreshRequest,
     ReportDownloadLinkResponse,
     ResetPasswordRequest,
     ScanFeedbackRequest,
@@ -52,6 +54,7 @@ try:
 except ImportError:
     from server.settings import MAX_UPLOAD_BYTES
     GMAIL_OAUTH_REDIRECT_URI = ""
+from server.settings import DATABASE_URL, FEATURE_REFRESH_TOKEN_ENABLED
 from server.uploads import SUPPORTED_UPLOAD_EXTENSIONS, extract_upload_text
 from server.uploads import IMAGE_EXTENSIONS
 try:
@@ -111,6 +114,9 @@ def _resilient_thread(name: str, target_fn):
 @app.on_event("startup")
 def startup_event():
     print("[APP] Starting background worker threads...")
+    persistence_warning = check_database_persistence(DATABASE_URL)
+    if persistence_warning:
+        print(persistence_warning)
     threading.Thread(
         target=_resilient_thread("Worker", run_worker),
         daemon=True,
@@ -140,7 +146,10 @@ def login(payload: LoginRequest):
     user = validate_login(repository, payload.email, payload.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return TokenResponse(access_token=create_access_token(user["email"], user["id"]))
+    return TokenResponse(
+        access_token=create_access_token(user["email"], user["id"]),
+        refresh_token=create_refresh_token(user["email"], user["id"]),
+    )
 
 import random
 from datetime import datetime, timedelta, timezone
@@ -193,7 +202,29 @@ def register(payload: RegisterRequest):
         password_hash=password_hash,
         salt=salt
     )
-    return TokenResponse(access_token=create_access_token(payload.email, user_id))
+    return TokenResponse(
+        access_token=create_access_token(payload.email, user_id),
+        refresh_token=create_refresh_token(payload.email, user_id),
+    )
+
+
+@app.post("/auth/refresh", response_model=TokenResponse)
+def refresh_token(payload: RefreshRequest):
+    if not FEATURE_REFRESH_TOKEN_ENABLED:
+        raise HTTPException(status_code=404, detail="Refresh token flow disabled")
+
+    decoded = verify_access_token(payload.refresh_token)
+    if decoded.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Not a refresh token")
+
+    user = repository.get_user_by_id(decoded.get("uid", ""))
+    if not user:
+        raise HTTPException(status_code=401, detail="Account no longer exists")
+
+    return TokenResponse(
+        access_token=create_access_token(user["email"], user["id"]),
+        refresh_token=create_refresh_token(user["email"], user["id"]),
+    )
 
 
 @app.post("/auth/forgot-password")
@@ -731,6 +762,11 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
         user = repository.get_user_by_email(email)
         if not user:
             import uuid
+            print(
+                f"[AUTH] Creating new user record for {email} via Google OAuth "
+                f"(no existing record found - this is expected for new users, "
+                f"but check for a database reset if this email should already exist)"
+            )
             user_id = repository.create_user(
                 email=email,
                 password_hash="google-oauth-user-" + str(uuid.uuid4()),
@@ -750,10 +786,13 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
             threading.Thread(target=backup_svc.sync_scans_to_drive, args=(user_id,), daemon=True).start()
 
     access_token = create_access_token(email, user_id, name)
+    refresh_token_value = create_refresh_token(email, user_id)
     deep_link_base = payload.get("return_url") or "safemailxai://oauth-callback"
     join_char = "&" if "?" in deep_link_base else "?"
     
     base_params = f"token={access_token}&email={email}&name={name}"
+    if refresh_token_value:
+        base_params += f"&refresh_token={refresh_token_value}"
     
     if purpose == "auth":
         deep_link_url = f"{deep_link_base}{join_char}{base_params}"
