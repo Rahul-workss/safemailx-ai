@@ -37,3 +37,19 @@ SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "").strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+# Bot integration (WhatsApp + Telegram SMS forwarding)
+# Twilio (WhatsApp Business API)
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "").strip()
+# Telegram
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+# Feature flags -- default off; set to true once credentials are configured
+FEATURE_WHATSAPP_BOT_ENABLED = os.getenv("FEATURE_WHATSAPP_BOT_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+FEATURE_TELEGRAM_BOT_ENABLED = os.getenv("FEATURE_TELEGRAM_BOT_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}

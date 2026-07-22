@@ -539,6 +539,35 @@ function App() {
     };
   }, [processIncomingUrl]);
 
+  // ── Android Share Intent handler ("Share to SafeMail X") ───────────────
+  // When user long-presses an SMS and taps "Share → SafeMail X", Android
+  // opens the app with a safemailxai://share?text=<url-encoded-sms> URL.
+  // We pre-fill the SMS scanner and switch to the SMS tab automatically.
+  // This is entirely additive — the existing deep-link handler is untouched.
+  useEffect(() => {
+    function handleShareIntent(event: { url: string }) {
+      const url = event.url || "";
+      if (!url.includes("safemailxai://share")) return;
+      try {
+        const textMatch = url.match(/[?&]text=([^&]*)/);
+        if (textMatch && textMatch[1]) {
+          const sharedText = decodeURIComponent(textMatch[1].replace(/\+/g, " "));
+          setSmsText(sharedText);
+          setActiveTab("sms");
+          showToast("SMS loaded — tap Scan SMS to analyse", "success");
+        }
+      } catch {
+        // Malformed share URL — ignore silently
+      }
+    }
+    const sub = Linking.addEventListener("url", handleShareIntent);
+    // Handle cold-start shares (app was closed when user tapped Share)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleShareIntent({ url });
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     const hasQueued = scans.some(s => s.final_label === "queued");
     if (!hasQueued) return;

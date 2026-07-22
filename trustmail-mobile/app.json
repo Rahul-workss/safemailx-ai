@@ -24,7 +24,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/custom-shield.png",
         "backgroundColor": "#080B12"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "data": [{"mimeType": "text/plain"}],
+          "category": ["DEFAULT"]
+        }
+      ]
     },
     "updates": {
       "enabled": false

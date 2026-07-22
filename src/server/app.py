@@ -98,7 +98,7 @@ from server.gmail_watcher import run_gmail_watcher
 
 def _resilient_thread(name: str, target_fn):
     """Wraps a worker function in an infinite restart loop so
-    the thread NEVER permanently dies — it auto-restarts after
+    the thread NEVER permanently dies â€” it auto-restarts after
     any crash with a 5-second backoff."""
     def wrapper():
         while True:
@@ -625,7 +625,7 @@ def update_settings(payload: SettingsUpdateRequest, _auth=Depends(require_auth))
     )
 
 
-# ── Feature 5: Adaptive Trust Baseline API Endpoints ──────────────────────
+# â”€â”€ Feature 5: Adaptive Trust Baseline API Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.get("/api/settings/adaptive-trust/data")
 def get_adaptive_trust_data(_auth=Depends(require_auth)):
@@ -1138,3 +1138,86 @@ def google_contacts_status(_auth=Depends(require_auth)):
     user_id = _user_id(_auth)
     record = repository.get_google_contacts_token(user_id)
     return {"connected": record is not None, "email": record["email"] if record else None}
+
+
+# ===========================================================================
+# Feature: SMS Bot Integration — WhatsApp (Twilio) + Telegram Webhooks
+# All new routes are /api/webhooks/* and are fully additive.
+# Existing routes are untouched.
+# ===========================================================================
+
+try:
+    from server.sms_webhook_handler import handle_whatsapp_webhook, handle_telegram_webhook, register_telegram_webhook
+    from server.settings import FEATURE_WHATSAPP_BOT_ENABLED, FEATURE_TELEGRAM_BOT_ENABLED, BACKEND_URL
+    _SMS_BOT_AVAILABLE = True
+except ImportError:
+    _SMS_BOT_AVAILABLE = False
+    FEATURE_WHATSAPP_BOT_ENABLED = False
+    FEATURE_TELEGRAM_BOT_ENABLED = False
+
+
+@app.on_event("startup")
+def _register_telegram_webhook_on_startup():
+    """Register Telegram webhook URL with BotFather on every cold start."""
+    if not _SMS_BOT_AVAILABLE or not FEATURE_TELEGRAM_BOT_ENABLED:
+        return
+    import threading as _threading
+    _threading.Thread(
+        target=register_telegram_webhook,
+        args=(BACKEND_URL,),
+        daemon=True,
+        name="telegram-webhook-reg",
+    ).start()
+
+
+@app.post("/api/webhooks/whatsapp", include_in_schema=False)
+async def whatsapp_webhook(request: Request):
+    """
+    Inbound WhatsApp messages via Twilio.
+    Twilio sends application/x-www-form-urlencoded POST.
+    Always returns TwiML XML (200 OK) — never 4xx/5xx to Twilio.
+    """
+    from fastapi.responses import Response as _Response
+    if not _SMS_BOT_AVAILABLE or not FEATURE_WHATSAPP_BOT_ENABLED:
+        return _Response(
+            content='<?xml version="1.0"?><Response></Response>',
+            media_type="application/xml",
+        )
+    form_data = dict(await request.form())
+    form_str = {k: str(v) for k, v in form_data.items()}
+    x_sig = request.headers.get("X-Twilio-Signature", "")
+    webhook_url = str(request.url)
+    twiml = handle_whatsapp_webhook(
+        form_data=form_str,
+        x_twilio_signature=x_sig,
+        webhook_url=webhook_url,
+        inline_scan_service=inline_scan_service,
+    )
+    return _Response(content=twiml, media_type="application/xml")
+
+
+@app.post("/api/webhooks/telegram", include_in_schema=False)
+async def telegram_webhook(request: Request):
+    """
+    Inbound Telegram updates via webhook.
+    Telegram requires a 200 OK response immediately.
+    Actual reply is sent asynchronously via Telegram Bot API.
+    """
+    if not _SMS_BOT_AVAILABLE or not FEATURE_TELEGRAM_BOT_ENABLED:
+        return {"ok": True}
+    try:
+        update = await request.json()
+    except Exception:
+        return {"ok": True}
+    x_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    import asyncio as _asyncio
+    import concurrent.futures as _cf
+    loop = _asyncio.get_event_loop()
+    loop.run_in_executor(
+        None,
+        handle_telegram_webhook,
+        update,
+        x_secret,
+        inline_scan_service,
+    )
+    return {"ok": True}
