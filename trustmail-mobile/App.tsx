@@ -315,7 +315,11 @@ function App() {
   const [password, setPassword] = useState("");
   const [registerStep, setRegisterStep] = useState<"none" | "form" | "otp">("none");
   const [registerName, setRegisterName] = useState("");
+  const [registerLastName, setRegisterLastName] = useState("");
   const [registerOtp, setRegisterOtp] = useState("");
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotBusy, setForgotBusy] = useState(false);
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const [authState, setAuthState] = useState("Local mode");
   const [gmailState, setGmailState] = useState("not checked");
@@ -607,7 +611,7 @@ function App() {
   }
 
   async function submitSmsScan() {
-    if (!smsText.trim()) return;
+    if (!smsText.trim()) { showToast("Your SMS box is empty. Please paste a message to scan."); return; }
     setBusy(true);
     try {
       await scanSms(smsText.trim(), smsSender.trim());
@@ -643,7 +647,7 @@ function App() {
   }
 
   async function submitUrlScan() {
-    if (!urlText.trim()) return;
+    if (!urlText.trim()) { showToast("Your URL box is empty. Please paste a URL to check."); return; }
     setBusy(true);
     try {
       await scanUrl(urlText.trim());
@@ -654,7 +658,7 @@ function App() {
   }
 
   async function submitLogin() {
-    if (!email.trim() || !password) return;
+    if (!email.trim() || !password) { showToast("Please enter your email and password to sign in."); return; }
     setAuthState("Signing in…"); setBusy(true);
     try {
       const tokens = await login(email.trim(), password); setPassword("");
@@ -753,17 +757,35 @@ function App() {
   }
 
   async function connectGmail() {
+    setBusy(true);
     setGmailState("connecting…");
     try {
       const returnUrl = Linking.createURL("oauth-callback");
       const { startGmailOAuth } = await import("./src/api");
       const url = await startGmailOAuth(returnUrl);
       Linking.openURL(url);
-      showToast("Google Backup flow opened...", "success");
+      showToast("Google account flow opened...", "success");
     } catch (e: any) {
       showToast(e.message || "Failed to start Google Sign-In");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitForgotPassword() {
+    if (!forgotEmail.trim()) { showToast("Please enter your email address."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) { showToast("Please enter a valid email address."); return; }
+    setForgotBusy(true);
+    try {
+      const { requestPasswordReset } = await import("./src/api");
+      await requestPasswordReset(forgotEmail.trim());
+      setShowForgotModal(false);
+      setForgotEmail("");
+      showToast("If that email exists, a reset link has been sent.", "success");
+    } catch (e: any) {
+      showToast(e?.name === "NetworkError" ? "Connection failed. Please try again." : "Failed to send reset email. Try again.");
+    } finally {
+      setForgotBusy(false);
     }
   }
 
@@ -892,8 +914,10 @@ function App() {
             onLogin={submitLogin} onGoogleAuth={startGoogleLogin} busy={busy}
             registerStep={registerStep} setRegisterStep={setRegisterStep}
             registerName={registerName} setRegisterName={setRegisterName}
+            registerLastName={registerLastName} setRegisterLastName={setRegisterLastName}
             registerOtp={registerOtp} setRegisterOtp={setRegisterOtp}
             requestOtp={requestOtp} submitRegisterWithOtp={submitRegisterWithOtp}
+            onForgot={() => { setForgotEmail(email); setShowForgotModal(true); }}
           />
         </>
       ) : (
@@ -936,6 +960,7 @@ function App() {
                   onSubmitManual={submitManualScan}
                   refreshApp={refresh}
                   scrollViewRef={scrollViewRef}
+                  onShowToast={showToast}
                 />
               </View>
               <View style={{ display: activeTab === "reports" ? "flex" : "none" }}>
@@ -993,6 +1018,34 @@ function App() {
           <TmCard style={{ padding: 30, alignItems: "center" }}>
             <SpinIcon />
             <Text style={[S.frost, { fontWeight: "700", marginTop: 12 }]}>Processing…</Text>
+          </TmCard>
+        </View>
+      )}
+
+      {/* ── Forgot Password Modal ── */}
+      {showForgotModal && (
+        <View style={[S.overlay, { zIndex: 99998, elevation: 99998 }]}>
+          <TmCard style={{ padding: 24, width: "85%", maxWidth: 360 }}>
+            <Text style={[S.frost, { fontSize: 18, fontWeight: "700", marginBottom: 6 }]}>Reset Password</Text>
+            <Text style={[S.muted, { fontSize: 13, marginBottom: 18, lineHeight: 18 }]}>Enter your email address and we'll send you a password reset link.</Text>
+            <TextInput
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              placeholder="Email address"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!forgotBusy}
+              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", marginBottom: 16 }}
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable onPress={() => { setShowForgotModal(false); setForgotEmail(""); }} style={{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center" }}>
+                <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 14 }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={submitForgotPassword} disabled={forgotBusy} style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#0a6bff", alignItems: "center", opacity: forgotBusy ? 0.6 : 1 }}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>{forgotBusy ? "Sending…" : "Send Link"}</Text>
+              </Pressable>
+            </View>
           </TmCard>
         </View>
       )}
@@ -1148,15 +1201,19 @@ function GradientText({ text, style, colors }: { text: string; style: any; color
 
 function AuthScreen({
   email, password, onEmail, onPassword, onLogin, onGoogleAuth, busy,
-  registerStep, setRegisterStep, registerName, setRegisterName, registerOtp, setRegisterOtp,
-  requestOtp, submitRegisterWithOtp
+  registerStep, setRegisterStep, registerName, setRegisterName,
+  registerLastName, setRegisterLastName,
+  registerOtp, setRegisterOtp,
+  requestOtp, submitRegisterWithOtp, onForgot
 }: {
   email: string; password: string; onEmail: (v: string) => void; onPassword: (v: string) => void;
   onLogin: () => void; onGoogleAuth: () => void; busy: boolean;
   registerStep: "none" | "form" | "otp"; setRegisterStep: (v: "none" | "form" | "otp") => void;
   registerName: string; setRegisterName: (v: string) => void;
+  registerLastName: string; setRegisterLastName: (v: string) => void;
   registerOtp: string; setRegisterOtp: (v: string) => void;
   requestOtp: () => void; submitRegisterWithOtp: () => void;
+  onForgot: () => void;
 }) {
   const [authStep, setAuthStep] = useState<"splash" | "login" | "register" | "otp">("splash");
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -1260,7 +1317,7 @@ function AuthScreen({
                   <Text style={{ fontSize: 18, color: "rgba(0,180,255,0.5)" }}>◎</Text>
                 </View>
 
-                <Pressable style={authStyles.forgot}>
+                <Pressable style={authStyles.forgot} onPress={onForgot}>
                   <Text style={authStyles.forgotTxt}>Forgot password?</Text>
                 </Pressable>
 
@@ -1307,7 +1364,7 @@ function AuthScreen({
                   <View style={{ flex: 1 }}>
                     <Text style={authStyles.flabel}>Last Name</Text>
                     <View style={authStyles.fbox}>
-                      <TextInput placeholder="Last" placeholderTextColor="rgba(255,255,255,0.28)" style={authStyles.finput} editable={!busy} />
+                      <TextInput value={registerLastName} onChangeText={setRegisterLastName} placeholder="Last" placeholderTextColor="rgba(255,255,255,0.28)" style={authStyles.finput} editable={!busy} />
                     </View>
                   </View>
                 </View>
@@ -1364,14 +1421,23 @@ function AuthScreen({
                   <TextInput value={registerOtp} onChangeText={setRegisterOtp} placeholder="123456" maxLength={6} placeholderTextColor="rgba(255,255,255,0.28)" keyboardType="number-pad" style={[authStyles.finput, { fontSize: 24, letterSpacing: 10, textAlign: "center" }]} editable={!busy} />
                 </View>
 
-                <Pressable onPress={submitRegisterWithOtp} disabled={busy}>
-                  <View style={authStyles.btnP}>
+                <Pressable onPress={submitRegisterWithOtp} disabled={busy || registerOtp.length !== 6}>
+                  <View style={[authStyles.btnP, { opacity: registerOtp.length !== 6 ? 0.5 : 1 }]}>
                     <LinearGradient colors={['#0a6bff', '#00b4ff']} start={{x: 0, y: 0}} end={{x: 1, y: 1}} style={authStyles.btnPInner}>
                       <Text style={authStyles.btnPText}>VERIFY & CREATE</Text>
                     </LinearGradient>
                     <LinearGradient colors={['rgba(255,255,255,0.14)', 'transparent']} style={StyleSheet.absoluteFill} />
                   </View>
                 </Pressable>
+
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
+                  <Pressable onPress={() => setRegisterStep("form")} hitSlop={12}>
+                    <Text style={{ color: C.frost4, fontSize: 13 }}>← Back</Text>
+                  </Pressable>
+                  <Pressable onPress={requestOtp} disabled={busy} hitSlop={12}>
+                    <Text style={{ color: "#0a6bff", fontSize: 13, fontWeight: "600" }}>Resend Code</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
 
@@ -1716,12 +1782,23 @@ function LiveIntakeStream({ scans }: { scans: ScanSummary[] }) {
     ]).start();
   }, []);
 
-  const displayScans = scans.length > 0 ? scans.slice(0, 5) : [
-    { id: "1", subject: "New threat: precedent compromised...", sender: "Email.com", final_label: "phishing", timestamp: "7:27 AM" },
-    { id: "2", subject: "New mask precedent compromised...", sender: "Nestle.com", final_label: "phishing", timestamp: "7:27 AM" },
-    { id: "3", subject: "New threat: precedent compromised...", sender: "Email.com", final_label: "legitimate", timestamp: "7:27 AM" },
-    { id: "4", subject: "Soar fives conn on targeting coplica...", sender: "Parents.com", final_label: "suspicious", timestamp: "7:27 AM" }
-  ] as any[];
+  if (scans.length === 0) {
+    return (
+      <Animated.View style={{ opacity: bootOpacity, transform: [{ translateY: slideAnim }], marginBottom: 20 }}>
+        <TmCard style={{ padding: 16, backgroundColor: "rgba(5,5,5,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
+            <View>
+              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Live Intake Stream</Text>
+              <Text style={{ color: C.frost4, fontSize: 11 }}>Recently scanned emails</Text>
+            </View>
+          </View>
+          <Text style={{ color: C.frost4, fontSize: 12, textAlign: "center", paddingVertical: 20 }}>No scans yet. Use the scanner to analyze your first email.</Text>
+        </TmCard>
+      </Animated.View>
+    );
+  }
+
+  const displayScans = scans.slice(0, 5);
 
   return (
     <Animated.View style={{ opacity: bootOpacity, transform: [{ translateY: slideAnim }], marginBottom: 20 }}>
@@ -1768,7 +1845,7 @@ function IntakeRow({ scan, index }: { scan: any; index: number }) {
         <Text style={{ color: C.frost4, fontSize: 11 }} numberOfLines={1}>{scan.subject}</Text>
       </View>
       <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ color: C.frost4, fontSize: 10, marginBottom: 4 }}>{scan.timestamp || "7:27 AM"}</Text>
+        <Text style={{ color: C.frost4, fontSize: 10, marginBottom: 4 }}>{scan.created_at ? new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}</Text>
         <View style={{ backgroundColor: tagBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
           <Text style={{ color: tagColor, fontSize: 9, fontWeight: "700" }}>{tagText}</Text>
         </View>
@@ -1876,7 +1953,7 @@ function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
-  manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef
+  manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast
 }: {
   gmailState: string; busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
@@ -1888,6 +1965,7 @@ function UnifiedScanScreen({
   onSubmitManual: () => void;
   refreshApp: () => Promise<void>;
   scrollViewRef: React.RefObject<ScrollView | null>;
+  onShowToast: (msg: string, type?: "error" | "success" | "") => void;
 }) {
   const [mode, setMode] = useState<"email" | "sms" | "text" | "url">("email");
   const [showInfo, setShowInfo] = useState(false);
@@ -1924,7 +2002,7 @@ function UnifiedScanScreen({
 
   async function handleSmsScan() {
     if (!smsText.trim()) {
-      alert("Your SMS box is empty. Please paste a message to scan.");
+      onShowToast("Your SMS box is empty. Please paste a message to scan.");
       return;
     }
     setLocalBusy(true); setInlineResult(null);
@@ -1932,13 +2010,13 @@ function UnifiedScanScreen({
     try {
       const res = await scanSms(smsText.trim(), smsSender.trim());
       setInlineResult(res); await refreshApp();
-    } catch (e: any) { alert(e.message || "SMS scan failed"); }
+    } catch (e: any) { onShowToast(e.message || "SMS scan failed"); }
     finally { setLocalBusy(false); }
   }
 
   async function handleUrlScan() {
     if (!urlText.trim()) {
-      alert("Your URL box is empty. Please paste a URL to scan.");
+      onShowToast("Your URL box is empty. Please paste a URL to scan.");
       return;
     }
     setLocalBusy(true); setInlineResult(null);
@@ -1946,7 +2024,7 @@ function UnifiedScanScreen({
     try {
       const res = await scanUrl(urlText.trim());
       setInlineResult(res); await refreshApp();
-    } catch (e: any) { alert(e.message || "URL scan failed"); }
+    } catch (e: any) { onShowToast(e.message || "URL scan failed"); }
     finally { setLocalBusy(false); }
   }
 
@@ -1968,7 +2046,7 @@ function UnifiedScanScreen({
       const a = r.assets[0];
       const res = await scanInstantFile({ uri: a.uri, name: a.name, mimeType: a.mimeType });
       setInlineResult(res); await refreshApp();
-    } catch (e: any) { alert(e.message || "Upload failed"); }
+    } catch (e: any) { onShowToast(e.message || "Upload failed"); }
     finally { setLocalBusy(false); }
   }
 
@@ -1981,7 +2059,7 @@ function UnifiedScanScreen({
       const a = r.assets[0];
       const res = await scanInstantFile({ uri: a.uri, name: a.name, mimeType: a.mimeType });
       setInlineResult(res); await refreshApp();
-    } catch (e: any) { alert(e.message || "Screenshot scan failed"); }
+    } catch (e: any) { onShowToast(e.message || "Screenshot scan failed"); }
     finally { setLocalBusy(false); }
   }
 
@@ -1991,9 +2069,9 @@ function UnifiedScanScreen({
     try {
       await submitScanFeedback(inlineResult.scan_id, choice);
       setFeedbackChoice(choice);
-      Alert.alert("Feedback saved", "Your review was saved for future tuning.");
+      onShowToast("Feedback saved — thanks for tuning!", "success");
     } catch (e: any) {
-      Alert.alert("Feedback failed", e.message || "Could not save scan feedback.");
+      onShowToast(e.message || "Could not save scan feedback.");
     } finally {
       setFeedbackBusy(null);
     }
@@ -2516,7 +2594,7 @@ function PrivacyPolicyScreen({ onBack }: { onBack?: () => void }) {
         <Ionicons name="shield-checkmark" size={32} color={C.emerald} />
         <Text style={S.pageTitle}>Privacy Policy</Text>
       </View>
-      <Text style={[S.muted, { fontSize: 13, lineHeight: 20 }]}>Effective Date: {new Date().toLocaleDateString()}</Text>
+      <Text style={[S.muted, { fontSize: 13, lineHeight: 20 }]}>Effective Date: January 1, 2025</Text>
 
       <TmCard style={{ padding: 20, gap: 16 }}>
         <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow }]}>1. Data Retention Policy</Text>

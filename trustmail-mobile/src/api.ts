@@ -71,7 +71,7 @@ async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEF
     "Bypass-Tunnel-Reminder": "true",
     ...(options.headers || {})
   } as Record<string, string>;
-  if (!isAuthEndpoint && accessToken && "Authorization" in headers) {
+  if (!isAuthEndpoint && accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
