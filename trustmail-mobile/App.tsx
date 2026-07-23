@@ -662,7 +662,7 @@ function App() {
       setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
       setActiveTab("dashboard");
       showToast("Signed in successfully", "success");
-    } catch { setAuthState("Local mode"); showToast("Invalid email or password"); }
+    } catch (e: any) { setAuthState("Local mode"); showToast(e?.name === "NetworkError" || e?.message?.includes("timed out") || e?.message?.includes("failed") ? "Connection timed out. Please try again." : "Invalid email or password"); }
     finally { setBusy(false); }
   }
 

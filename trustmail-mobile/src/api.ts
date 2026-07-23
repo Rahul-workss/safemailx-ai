@@ -3,7 +3,7 @@ import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } fro
 let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 
 let accessToken = "";
-const DEFAULT_TIMEOUT_MS = 12000;
+const DEFAULT_TIMEOUT_MS = 20000;
 let refreshPromise: Promise<boolean> | null = null;
 
 export type AuthTokenSet = {
@@ -247,7 +247,7 @@ export async function login(email: string, password: string): Promise<AuthTokenS
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password })
-  }, 10000);
+  }, 20000);
   if (!response.ok) throw new Error("Login failed");
   const payload = await response.json();
   setAccessToken(payload.access_token);
