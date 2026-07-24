@@ -320,6 +320,12 @@ function App() {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotBusy, setForgotBusy] = useState(false);
+  // Reset password (from email deep-link)
+  const [resetToken, setResetToken] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [showResetScreen, setShowResetScreen] = useState(false);
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const [authState, setAuthState] = useState("Local mode");
   const [gmailState, setGmailState] = useState("not checked");
@@ -480,6 +486,21 @@ function App() {
       const parsed = Linking.parse(url);
       const isOAuthCallback = parsed.scheme === "safemailxai" &&
         (parsed.hostname === "oauth-callback" || parsed.path === "oauth-callback" || parsed.path === "/oauth-callback");
+      const isResetCallback = parsed.scheme === "safemailxai" &&
+        (parsed.hostname === "reset-password" || parsed.path === "reset-password" || parsed.path === "/reset-password");
+
+      if (isResetCallback) {
+        const params = parsed.queryParams || {};
+        const token = typeof params.token === "string" ? params.token : "";
+        if (token) {
+          setResetToken(token);
+          setResetNewPassword("");
+          setResetConfirmPassword("");
+          setShowResetScreen(true);
+        }
+        return;
+      }
+
       if (!isOAuthCallback) return;
       const params = parsed.queryParams || {};
       const code = typeof params.code === "string" ? params.code : "";
@@ -1017,30 +1038,43 @@ function App() {
 
       {/* ── Forgot Password Modal ── */}
       {showForgotModal && (
-        <View style={[S.overlay, { zIndex: 99998, elevation: 99998 }]}>
-          <TmCard style={{ padding: 24, width: "85%", maxWidth: 360 }}>
-            <Text style={[S.frost, { fontSize: 18, fontWeight: "700", marginBottom: 6 }]}>Reset Password</Text>
-            <Text style={[S.muted, { fontSize: 13, marginBottom: 18, lineHeight: 18 }]}>Enter your email address and we'll send you a password reset link.</Text>
-            <TextInput
-              value={forgotEmail}
-              onChangeText={setForgotEmail}
-              placeholder="Email address"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!forgotBusy}
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#fff", fontSize: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", marginBottom: 16 }}
-            />
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <Pressable onPress={() => { setShowForgotModal(false); setForgotEmail(""); }} style={{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center" }}>
-                <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 14 }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={submitForgotPassword} disabled={forgotBusy} style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: "#0a6bff", alignItems: "center", opacity: forgotBusy ? 0.6 : 1 }}>
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>{forgotBusy ? "Sending…" : "Send Link"}</Text>
-              </Pressable>
-            </View>
-          </TmCard>
-        </View>
+        <ForgotPasswordModal
+          forgotEmail={forgotEmail}
+          setForgotEmail={setForgotEmail}
+          forgotBusy={forgotBusy}
+          onClose={() => { setShowForgotModal(false); setForgotEmail(""); }}
+          onSubmit={submitForgotPassword}
+        />
+      )}
+
+      {/* ── Reset Password Screen (from email deep-link) ── */}
+      {showResetScreen && (
+        <ResetPasswordScreen
+          token={resetToken}
+          newPassword={resetNewPassword}
+          setNewPassword={setResetNewPassword}
+          confirmPassword={resetConfirmPassword}
+          setConfirmPassword={setResetConfirmPassword}
+          busy={resetBusy}
+          onClose={() => { setShowResetScreen(false); setResetToken(""); setResetNewPassword(""); setResetConfirmPassword(""); }}
+          onSubmit={async () => {
+            if (!resetNewPassword.trim()) { showToast("Please enter a new password."); return; }
+            if (resetNewPassword.length < 8) { showToast("Password must be at least 8 characters."); return; }
+            if (resetNewPassword !== resetConfirmPassword) { showToast("Passwords do not match."); return; }
+            setResetBusy(true);
+            try {
+              const { confirmPasswordReset } = await import("./src/api");
+              await confirmPasswordReset(resetToken, resetNewPassword);
+              setShowResetScreen(false);
+              setResetToken(""); setResetNewPassword(""); setResetConfirmPassword("");
+              showToast("Password updated! Please sign in.", "success");
+            } catch (e: any) {
+              showToast(e?.message === "Password reset confirmation failed" ? "Reset link expired or already used." : "Failed to reset. Please try again.");
+            } finally {
+              setResetBusy(false);
+            }
+          }}
+        />
       )}
 
       {/* ── Video Splash Screen ── */}
@@ -1189,6 +1223,211 @@ function GradientText({ text, style, colors }: { text: string; style: any; color
         <Text style={[style, { opacity: 0 }]}>{text}</Text>
       </LinearGradient>
     </MaskedView>
+  );
+}
+
+// ─── Forgot Password Modal ────────────────────────────────────────────────────
+function ForgotPasswordModal({ forgotEmail, setForgotEmail, forgotBusy, onClose, onSubmit }: {
+  forgotEmail: string; setForgotEmail: (v: string) => void;
+  forgotBusy: boolean; onClose: () => void; onSubmit: () => void;
+}) {
+  const slideAnim = useRef(new Animated.Value(40)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(4,8,16,0.88)", zIndex: 99998, elevation: 99998, justifyContent: "center", alignItems: "center" }]}>
+      <LinearGradient colors={['rgba(10,40,90,0.5)', 'rgba(4,8,16,0.0)']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ width: "100%", alignItems: "center" }}>
+        <Animated.View style={{ width: "88%", maxWidth: 380, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          {/* Card */}
+          <View style={{ backgroundColor: "rgba(11,19,34,0.97)", borderRadius: 24, borderWidth: 0.5, borderColor: "rgba(0,180,255,0.18)", padding: 28, overflow: "hidden" }}>
+            <LinearGradient colors={['rgba(0,107,255,0.07)', 'transparent']} start={{x:0,y:0}} end={{x:1,y:1}} style={StyleSheet.absoluteFillObject} />
+
+            {/* Icon + title */}
+            <View style={{ alignItems: "center", marginBottom: 20 }}>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(0,107,255,0.12)", borderWidth: 0.5, borderColor: "rgba(0,180,255,0.3)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+                <Text style={{ fontSize: 24 }}>🔑</Text>
+              </View>
+              <Text style={{ fontFamily: "CormorantGaramond_300Light", fontSize: 28, color: "#fff", letterSpacing: 0.5, textAlign: "center" }}>Reset Password</Text>
+              <Text style={{ fontFamily: "DMSans_300Light", fontSize: 13, color: "rgba(255,255,255,0.38)", textAlign: "center", marginTop: 6, lineHeight: 18, letterSpacing: 0.3 }}>
+                Enter your email and we'll send{"\n"}a secure reset link
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={{ width: 40, height: 1, backgroundColor: "#0a6bff", alignSelf: "center", marginBottom: 22 }} />
+
+            {/* Email field */}
+            <Text style={authStyles.flabel}>Email Address</Text>
+            <View style={[authStyles.fbox, { marginBottom: 22 }]}>
+              <TextInput
+                value={forgotEmail}
+                onChangeText={setForgotEmail}
+                placeholder="Enter your email"
+                placeholderTextColor="rgba(255,255,255,0.28)"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!forgotBusy}
+                autoFocus
+                style={authStyles.finput}
+              />
+              <Text style={{ fontSize: 18, color: "rgba(0,180,255,0.5)" }}>✉</Text>
+            </View>
+
+            {/* Send button */}
+            <Pressable onPress={onSubmit} disabled={forgotBusy}>
+              <View style={[authStyles.btnP, { opacity: forgotBusy ? 0.65 : 1 }]}>
+                <LinearGradient colors={['#0a6bff', '#00b4ff']} start={{x:0,y:0}} end={{x:1,y:1}} style={authStyles.btnPInner}>
+                  <Text style={authStyles.btnPText}>{forgotBusy ? "SENDING…" : "SEND RESET LINK"}</Text>
+                </LinearGradient>
+                <LinearGradient colors={['rgba(255,255,255,0.14)', 'transparent']} style={StyleSheet.absoluteFill} />
+              </View>
+            </Pressable>
+
+            {/* Cancel */}
+            <Pressable onPress={onClose} style={authStyles.btnS} disabled={forgotBusy}>
+              <Text style={authStyles.btnSText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+// ─── Reset Password Screen (deep-link entry) ──────────────────────────────────
+function ResetPasswordScreen({ token, newPassword, setNewPassword, confirmPassword, setConfirmPassword, busy, onClose, onSubmit }: {
+  token: string; newPassword: string; setNewPassword: (v: string) => void;
+  confirmPassword: string; setConfirmPassword: (v: string) => void;
+  busy: boolean; onClose: () => void; onSubmit: () => void;
+}) {
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const slideAnim = useRef(new Animated.Value(60)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const strength = newPassword.length === 0 ? 0 : newPassword.length < 8 ? 1 : newPassword.length < 12 ? 2 : 3;
+  const strengthColor = ["transparent", C.rose, C.gold, C.emerald][strength];
+  const strengthLabel = ["", "Too short", "Good", "Strong"][strength];
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#04080e", zIndex: 99999, elevation: 99999 }]}>
+      <LinearGradient
+        colors={['rgba(0,30,80,0.6)', 'rgba(4,8,16,0.95)', '#04080e']}
+        start={{x:0.3,y:0}} end={{x:0.7,y:1}}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40, paddingHorizontal: 25 }} keyboardShouldPersistTaps="handled">
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+
+            {/* Back button */}
+            <Pressable onPress={onClose} hitSlop={16} style={{ flexDirection: "row", alignItems: "center", marginBottom: 32 }}>
+              <Text style={{ color: "rgba(0,180,255,0.65)", fontSize: 18, marginRight: 6 }}>‹</Text>
+              <Text style={{ fontFamily: "DMSans_300Light", fontSize: 14, color: "rgba(0,180,255,0.65)", letterSpacing: 0.5 }}>Back to sign in</Text>
+            </Pressable>
+
+            {/* Logo */}
+            <View style={{ alignItems: "center", marginBottom: 24 }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(0,107,255,0.1)", borderWidth: 0.5, borderColor: "rgba(0,180,255,0.25)", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ fontSize: 36 }}>🔐</Text>
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={[authStyles.scTitle, { marginBottom: 4 }]}>Choose a New</Text>
+            <GradientText
+              text="Password"
+              style={{ fontFamily: "CormorantGaramond_300Light_Italic", fontSize: 32, textAlign: "center", marginBottom: 8, letterSpacing: 0.5 }}
+              colors={["#55d6ff", "#0a6bff"]}
+            />
+            <Text style={{ fontFamily: "DMSans_300Light", fontSize: 13, color: "rgba(255,255,255,0.35)", textAlign: "center", letterSpacing: 0.3, marginBottom: 30, lineHeight: 18 }}>
+              Make it strong. At least 8 characters.
+            </Text>
+
+            {/* New password */}
+            <Text style={authStyles.flabel}>New Password</Text>
+            <View style={authStyles.fbox}>
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Enter new password"
+                placeholderTextColor="rgba(255,255,255,0.28)"
+                secureTextEntry={!showNew}
+                style={authStyles.finput}
+                editable={!busy}
+              />
+              <Pressable onPress={() => setShowNew(v => !v)} hitSlop={8}>
+                <Text style={{ fontSize: 16, color: "rgba(0,180,255,0.5)" }}>{showNew ? "◉" : "◎"}</Text>
+              </Pressable>
+            </View>
+
+            {/* Strength bar */}
+            {newPassword.length > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, marginBottom: 4, gap: 4 }}>
+                {[1, 2, 3].map(i => (
+                  <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: i <= strength ? strengthColor : "rgba(255,255,255,0.08)" }} />
+                ))}
+                <Text style={{ fontFamily: "DMSans_300Light", fontSize: 11, color: strengthColor, marginLeft: 6, width: 55 }}>{strengthLabel}</Text>
+              </View>
+            )}
+
+            {/* Confirm password */}
+            <Text style={authStyles.flabel}>Confirm Password</Text>
+            <View style={[authStyles.fbox, { marginBottom: 8 }]}>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Repeat new password"
+                placeholderTextColor="rgba(255,255,255,0.28)"
+                secureTextEntry={!showConfirm}
+                style={authStyles.finput}
+                editable={!busy}
+              />
+              <Pressable onPress={() => setShowConfirm(v => !v)} hitSlop={8}>
+                <Text style={{ fontSize: 16, color: "rgba(0,180,255,0.5)" }}>{showConfirm ? "◉" : "◎"}</Text>
+              </Pressable>
+            </View>
+
+            {/* Match indicator */}
+            {confirmPassword.length > 0 && (
+              <Text style={{ fontFamily: "DMSans_300Light", fontSize: 12, color: newPassword === confirmPassword ? C.emerald : C.rose, marginBottom: 4, letterSpacing: 0.3 }}>
+                {newPassword === confirmPassword ? "✓ Passwords match" : "✗ Passwords don't match"}
+              </Text>
+            )}
+
+            {/* Submit */}
+            <View style={{ marginTop: 28 }}>
+              <Pressable onPress={onSubmit} disabled={busy || newPassword.length < 8 || newPassword !== confirmPassword}>
+                <View style={[authStyles.btnP, { opacity: (busy || newPassword.length < 8 || newPassword !== confirmPassword) ? 0.5 : 1 }]}>
+                  <LinearGradient colors={['#0a6bff', '#00b4ff']} start={{x:0,y:0}} end={{x:1,y:1}} style={authStyles.btnPInner}>
+                    <Text style={authStyles.btnPText}>{busy ? "UPDATING…" : "SET NEW PASSWORD"}</Text>
+                  </LinearGradient>
+                  <LinearGradient colors={['rgba(255,255,255,0.14)', 'transparent']} style={StyleSheet.absoluteFill} />
+                </View>
+              </Pressable>
+            </View>
+
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
