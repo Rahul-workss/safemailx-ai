@@ -1,10 +1,25 @@
+from html import escape as html_escape
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 
-from server.auth import create_access_token, create_refresh_token, create_signed_token, require_auth, validate_login, verify_access_token
+from server.auth import (
+    consume_ws_ticket,
+    consume_oauth_state,
+    create_oauth_exchange_code,
+    create_access_token,
+    create_refresh_token,
+    create_signed_token,
+    create_ws_ticket,
+    consume_oauth_exchange_code,
+    require_auth,
+    revoke_token,
+    validate_login,
+    verify_access_token,
+)
 from server.gmail_watcher import enqueue_unread_forwarded_messages
 from server.gmail_oauth import build_authorization_url, build_gmail_service_from_blob, encode_credentials, exchange_code_for_token
 try:
@@ -13,7 +28,7 @@ except ImportError:
     SAFEMAILX_LABELS = {"scan": "SafeMail X Scan", "queued": "SafeMail X Queued", "safe": "SafeMail X Safe", "suspicious": "SafeMail X Suspicious", "phishing": "SafeMail X Phishing", "failed": "SafeMail X Failed"}
     ensure_safemailx_labels = None
 from server.health import build_health, check_llm_health
-from server.mailer import send_password_reset_email
+from server.mailer import send_password_reset_email, smtp_configured
 from server.persistence_checks import check_database_persistence
 from google.auth.exceptions import RefreshError
 from server.queue import QueueUnavailable, ScanQueue
@@ -31,6 +46,7 @@ from server.schemas import (
     ManualScanRequest,
     ManualSmsScanRequest,
     NotificationPreferences,
+    OAuthExchangeRequest,
     PushTokenRequest,
     PushTokenResponse,
     ReadinessResponse,
@@ -54,9 +70,25 @@ try:
 except ImportError:
     from server.settings import MAX_UPLOAD_BYTES
     GMAIL_OAUTH_REDIRECT_URI = ""
-from server.settings import DATABASE_URL, FEATURE_REFRESH_TOKEN_ENABLED
-from server.uploads import SUPPORTED_UPLOAD_EXTENSIONS, extract_upload_text
+from server.settings import (
+    CORS_ALLOWED_ORIGINS,
+    DATABASE_URL,
+    FEATURE_REFRESH_TOKEN_ENABLED,
+    SAFEMAILX_PRODUCTION,
+    WS_MAX_SECONDS,
+    validate_security_settings,
+)
+from server.security import (
+    MaxBodySizeMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+    clear_login_failures,
+    login_lock_status,
+    record_login_failure,
+)
+from server.uploads import SUPPORTED_UPLOAD_EXTENSIONS, extract_upload_text, validate_upload_bytes
 from server.uploads import IMAGE_EXTENSIONS
+from engines.url_analyzer import is_safe_external_url
 try:
     from utils.config import SIGNIN_CREDENTIALS_PATH
 except ImportError:
@@ -81,15 +113,53 @@ except ImportError:
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="SafeMail X AI API", version="0.1.0")
+app = FastAPI(
+    title="SafeMail X AI API",
+    version="0.1.0",
+    docs_url=None if SAFEMAILX_PRODUCTION else "/docs",
+    redoc_url=None if SAFEMAILX_PRODUCTION else "/redoc",
+    openapi_url=None if SAFEMAILX_PRODUCTION else "/openapi.json",
+)
+
+app.add_middleware(MaxBodySizeMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.56.1:3000"],
+    allow_origins=CORS_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Bypass-Tunnel-Reminder"],
+    max_age=3600,
 )
+
+import logging
+import traceback
+
+logger = logging.getLogger("safemailx")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        {"detail": "Invalid request. Check your inputs and try again."},
+        status_code=422,
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "Unhandled exception on %s %s\n%s",
+        request.method,
+        request.url.path,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        {"detail": "An unexpected error occurred. Please try again."},
+        status_code=500,
+    )
 import threading
 import time
 from server.worker import run_worker
@@ -113,6 +183,7 @@ def _resilient_thread(name: str, target_fn):
 
 @app.on_event("startup")
 def startup_event():
+    validate_security_settings()
     print("[APP] Starting background worker threads...")
     persistence_warning = check_database_persistence(DATABASE_URL)
     if persistence_warning:
@@ -141,17 +212,46 @@ def _user_id(auth_payload) -> str:
     return auth_payload.get("uid") or "local"
 
 
+async def _read_upload_with_limit(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
+    retry_after = login_lock_status(payload.email)
+    if retry_after:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     user = validate_login(repository, payload.email, payload.password)
     if not user:
+        lockout = record_login_failure(payload.email)
+        if lockout:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed login attempts. Please try again later.",
+                headers={"Retry-After": str(lockout)},
+            )
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    clear_login_failures(payload.email)
     return TokenResponse(
         access_token=create_access_token(user["email"], user["id"]),
         refresh_token=create_refresh_token(user["email"], user["id"]),
     )
 
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from server.auth import hash_password
@@ -164,15 +264,15 @@ def send_otp(payload: SendOtpRequest):
     if existing_user:
         raise HTTPException(status_code=400, detail="User already exists")
     
-    otp = "".join(random.choices("0123456789", k=6))
+    otp = "".join(secrets.choice("0123456789") for _ in range(6))
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
     
     repository.store_otp(payload.email, otp, expires_at)
     
     try:
         send_otp_email(payload.email, otp)
-    except Exception as exc:
-        print(f"[MAIL ERROR] Failed sending OTP email to {payload.email}: {exc}")
+    except Exception:
+        logger.warning("Failed sending registration email", exc_info=True)
     return {"status": "OTP sent"}
 
 @app.post("/auth/register", response_model=TokenResponse)
@@ -213,6 +313,8 @@ def refresh_token(payload: RefreshRequest):
     if not FEATURE_REFRESH_TOKEN_ENABLED:
         raise HTTPException(status_code=404, detail="Refresh token flow disabled")
 
+    # Keep the established client-facing error for a valid access token while
+    # requiring an explicit refresh-token type for this endpoint.
     decoded = verify_access_token(payload.refresh_token)
     if decoded.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Not a refresh token")
@@ -227,8 +329,38 @@ def refresh_token(payload: RefreshRequest):
     )
 
 
+@app.post("/auth/oauth/exchange", response_model=TokenResponse)
+def exchange_oauth_code(payload: OAuthExchangeRequest):
+    exchanged = consume_oauth_exchange_code(payload.code)
+    if not exchanged:
+        raise HTTPException(status_code=401, detail="Invalid or expired OAuth code")
+    return TokenResponse(
+        access_token=create_access_token(exchanged["email"], exchanged["uid"], exchanged.get("name")),
+        refresh_token=create_refresh_token(exchanged["email"], exchanged["uid"]),
+        email=exchanged["email"],
+    )
+
+
+@app.post("/auth/logout")
+def logout(_auth=Depends(require_auth)):
+    if _auth and _auth.get("jti"):
+        revoke_token(_auth)
+    return {"status": "logged out"}
+
+
 @app.post("/auth/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest):
+    # In production the startup check (validate_security_settings) already
+    # ensures SMTP is configured, so this guard only fires in dev/staging.
+    if not smtp_configured():
+        if SAFEMAILX_PRODUCTION:
+            # Should never reach here — startup would have raised already.
+            raise HTTPException(status_code=503, detail="Email delivery is not configured")
+        # Dev/staging: give developers a clear signal instead of silent success.
+        return JSONResponse(
+            status_code=202,
+            content={"status": "SMTP not configured — reset email was not sent (dev/staging only)"},
+        )
     user = repository.get_user_by_email(payload.email)
     if user:
         from datetime import datetime, timedelta, timezone
@@ -238,9 +370,9 @@ def forgot_password(payload: ForgotPasswordRequest):
         repository.create_password_reset_token(token, user["id"], expires)
         try:
             send_password_reset_email(payload.email, token)
-        except Exception as exc:
-            print(f"[MAIL ERROR] Failed sending reset email to {payload.email}: {exc}")
-    # Always return 200 to prevent email enumeration
+        except Exception:
+            logger.warning("Failed sending password reset email", exc_info=True)
+    # Always return generic 200 to prevent email enumeration
     return {"status": "If an account with that email exists, a password reset link has been sent."}
 
 
@@ -393,11 +525,15 @@ async def upload_scan(
     if scan_mode not in {"strict", "balanced", "fast"}:
         raise HTTPException(status_code=422, detail="Invalid scan_mode")
 
-    file_bytes = await file.read()
+    file_bytes = await _read_upload_with_limit(file)
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
     if len(file_bytes) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+    try:
+        validate_upload_bytes(filename, file_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     result = inline_scan_service.scan_file(
         filename,
@@ -654,19 +790,64 @@ def register_push_token(payload: PushTokenRequest, _auth=Depends(require_auth)):
     return PushTokenResponse(status="registered", token_count=len(repository.list_push_tokens(user_id=user_id)))
 
 
+@app.post("/api/scans/{scan_id}/events-ticket")
+def scan_events_ticket(scan_id: str, _auth=Depends(require_auth)):
+    if repository.get_scan(scan_id, user_id=_user_id(_auth)) is None:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return {"ticket": create_ws_ticket(_user_id(_auth), scan_id), "expires_in_seconds": 60}
+
+
 @app.websocket("/api/scans/{scan_id}/events")
 async def scan_events(websocket: WebSocket, scan_id: str):
     await websocket.accept()
-    for stage in SCAN_STAGES:
-        await websocket.send_json({
-            "scan_id": scan_id,
-            "event": "stage_completed",
-            "stage": stage,
-            "message": f"{stage.replace('_', ' ').title()} completed",
-            "payload": {},
-        })
-    await websocket.send_json({"scan_id": scan_id, "event": "scan_completed"})
+    ticket = websocket.query_params.get("ticket")
+    if not ticket:
+        await websocket.close(code=1008)
+        return
+    try:
+        user_id = consume_ws_ticket(ticket, scan_id)
+        if not user_id:
+            await websocket.close(code=1008)
+            return
+        scan = repository.get_scan(scan_id, user_id=user_id)
+        if scan is None:
+            await websocket.close(code=1008)
+            return
+
+        import asyncio
+
+        async def stream_events():
+            for stage in SCAN_STAGES:
+                await websocket.send_json({
+                    "scan_id": scan_id,
+                    "event": "stage_completed",
+                    "stage": stage,
+                    "message": f"{stage.replace('_', ' ').title()} completed",
+                    "payload": {},
+                })
+            await websocket.send_json({"scan_id": scan_id, "event": "scan_completed"})
+
+        await asyncio.wait_for(stream_events(), timeout=WS_MAX_SECONDS)
+    except Exception:
+        await websocket.close(code=1008)
+        return
     await websocket.close()
+
+
+def _safe_oauth_return_url(return_url: str | None) -> str:
+    candidate = (return_url or "safemailxai://oauth-callback").strip()
+    parsed = urlparse(candidate)
+    if (
+        parsed.scheme != "safemailxai"
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+        or parsed.query
+        or parsed.netloc not in {"", "oauth-callback"}
+        or parsed.path not in {"", "/", "/oauth-callback"}
+    ):
+        raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
+    return candidate
 
 
 def _oauth_redirect_uri_for_request(request: Request) -> str:
@@ -679,6 +860,7 @@ def _oauth_redirect_uri_for_request(request: Request) -> str:
 
 @app.get("/api/gmail/oauth/start", response_model=GmailOAuthStartResponse)
 def gmail_oauth_start(request: Request, return_url: str | None = Query(None), _auth=Depends(require_auth)):
+    return_url = _safe_oauth_return_url(return_url)
     redirect_uri = _oauth_redirect_uri_for_request(request)
     state = create_signed_token({
         "sub": _auth.get("sub", "local"),
@@ -695,6 +877,7 @@ def gmail_oauth_start(request: Request, return_url: str | None = Query(None), _a
 
 @app.get("/api/auth/google/start")
 def auth_google_start(request: Request, return_url: str | None = Query(None)):
+    return_url = _safe_oauth_return_url(return_url)
     base_uri = _oauth_redirect_uri_for_request(request).replace("/api/gmail/oauth/callback", "")
     redirect_uri = f"{base_uri}/api/auth/google/callback"
     state = create_signed_token({
@@ -717,11 +900,15 @@ def auth_google_start(request: Request, return_url: str | None = Query(None)):
 @app.get("/api/auth/google/callback")
 def auth_google_callback(code: str = Query(...), state: str = Query(...)):
     payload = verify_access_token(state)
+    if not consume_oauth_state(payload):
+        raise HTTPException(status_code=401, detail="Invalid or expired OAuth state")
     user_id = payload.get("uid")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid OAuth state")
 
     purpose = payload.get("purpose", "auth")
+    if purpose not in {"auth", "gmail", "backup"}:
+        raise HTTPException(status_code=401, detail="Invalid OAuth state")
     redirect_uri = payload.get("oauth_redirect_uri") or GMAIL_OAUTH_REDIRECT_URI
 
     backup_scopes = [
@@ -745,7 +932,8 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
         else:
             creds = exchange_code_for_token(code, state, redirect_uri=redirect_uri)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"OAuth token exchange failed: {exc}") from exc
+        logger.warning("OAuth token exchange failed for purpose=%s", purpose)
+        raise HTTPException(status_code=400, detail="OAuth token exchange failed") from exc
 
     if purpose == "gmail":
         # Gmail-only tokens don't have userinfo scopes, just store the token directly
@@ -764,8 +952,7 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
             import uuid
             print(
                 f"[AUTH] Creating new user record for {email} via Google OAuth "
-                f"(no existing record found - this is expected for new users, "
-                f"but check for a database reset if this email should already exist)"
+                "(new account; no credential or token data logged)"
             )
             user_id = repository.create_user(
                 email=email,
@@ -785,32 +972,28 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
             backup_svc = GoogleBackupService(repository)
             threading.Thread(target=backup_svc.sync_scans_to_drive, args=(user_id,), daemon=True).start()
 
-    access_token = create_access_token(email, user_id, name)
-    refresh_token_value = create_refresh_token(email, user_id)
-    deep_link_base = payload.get("return_url") or "safemailxai://oauth-callback"
+    exchange_code = create_oauth_exchange_code(email, user_id, name)
+    deep_link_base = _safe_oauth_return_url(payload.get("return_url"))
     join_char = "&" if "?" in deep_link_base else "?"
     
-    base_params = f"token={access_token}&email={email}&name={name}"
-    if refresh_token_value:
-        base_params += f"&refresh_token={refresh_token_value}"
-    
     if purpose == "auth":
-        deep_link_url = f"{deep_link_base}{join_char}{base_params}"
+        deep_link_url = f"{deep_link_base}{join_char}{urlencode({'code': exchange_code})}"
         title_text = "SafeMail X AI Authenticated"
         header_text = "Signed In Successfully!"
         body_text = f"Welcome, {name}! You have successfully signed in as {email}."
     elif purpose == "backup":
-        deep_link_url = f"{deep_link_base}{join_char}{base_params}&status=connected&service=backup"
+        deep_link_url = f"{deep_link_base}{join_char}{urlencode({'code': exchange_code, 'status': 'connected', 'service': 'backup'})}"
         title_text = "SafeMail X AI Cloud Backup"
         header_text = "Backup Activated!"
         body_text = f"Welcome, {name}! Your SafeMail X AI reports and analysis history are now securely synced to {email}."
     else: # gmail
-        deep_link_url = f"{deep_link_base}{join_char}{base_params}&status=connected&service=gmail"
+        deep_link_url = f"{deep_link_base}{join_char}{urlencode({'code': exchange_code, 'status': 'connected', 'service': 'gmail'})}"
         title_text = "SafeMail X AI Gmail Sync"
         header_text = "Gmail Connected!"
         body_text = f"Welcome, {name}! SafeMail X AI is now successfully configured to scan and secure your Gmail inbox at {email}."
 
     from fastapi.responses import HTMLResponse
+    safe_deep_link_url = html_escape(deep_link_url, quote=True)
     return HTMLResponse(content=f"""
     <!DOCTYPE html>
     <html>
@@ -873,9 +1056,9 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
         <div class="card">
             <div class="icon">&#10004;</div>
             <h1>{header_text}</h1>
-            <p>{body_text}</p>
+            <p>{html_escape(body_text)}</p>
             <p style="color: #6fd9b8; font-size: 12px; margin-top: -15px; margin-bottom: 25px;">Redirecting back to app...</p>
-            <a class="btn" href="{deep_link_url}" id="redirect-link">Return to App</a>
+            <a class="btn" href="{safe_deep_link_url}" id="redirect-link">Return to App</a>
         </div>
         <script>
             window.onload = function() {{
@@ -940,6 +1123,8 @@ def scan_sms(payload: ManualSmsScanRequest, _auth=Depends(require_auth)):
 def scan_url(payload: UrlScanRequest, _auth=Depends(require_auth)):
     user_id = _user_id(_auth)
     url_str = str(payload.url)
+    if not is_safe_external_url(url_str):
+        raise HTTPException(status_code=400, detail="Only safe public HTTP(S) URLs can be scanned")
     subject = f"URL Scan: {url_str[:80]}"
     sender = "url_checker"
     queued_id = repository.create_queued_scan(
@@ -994,6 +1179,8 @@ def instant_scan_sms(payload: InstantSmsScanRequest, _auth=Depends(require_auth)
 
 @app.post("/api/instant/url", response_model=InstantScanResult)
 def instant_scan_url(payload: InstantUrlScanRequest, _auth=Depends(require_auth)):
+    if not is_safe_external_url(str(payload.url)):
+        raise HTTPException(status_code=400, detail="Only safe public HTTP(S) URLs can be scanned")
     return inline_scan_service.scan_url(payload, _user_id(_auth))
 
 @app.post("/api/instant/file", response_model=InstantScanResult)
@@ -1002,11 +1189,17 @@ async def instant_scan_file(
     scan_mode: str = Form("balanced"),
     _auth=Depends(require_auth)
 ):
-    file_bytes = await file.read()
+    if scan_mode not in {"strict", "balanced", "fast"}:
+        raise HTTPException(status_code=422, detail="Invalid scan_mode")
+    file_bytes = await _read_upload_with_limit(file)
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
     if len(file_bytes) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+    try:
+        validate_upload_bytes(file.filename or "upload.bin", file_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return inline_scan_service.scan_file(
         file.filename or "upload.bin",
         file.content_type or "application/octet-stream",
@@ -1049,6 +1242,7 @@ def backup_oauth_status(_auth=Depends(require_auth)):
 
 @app.get("/api/backup/oauth/start", response_model=GmailOAuthStartResponse)
 def backup_oauth_start(request: Request, return_url: str | None = Query(None), _auth=Depends(require_auth)):
+    return_url = _safe_oauth_return_url(return_url)
     base_uri = _oauth_redirect_uri_for_request(request).replace("/api/gmail/oauth/callback", "")
     redirect_uri = f"{base_uri}/api/auth/google/callback"
     state = create_signed_token({
