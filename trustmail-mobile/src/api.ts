@@ -1,6 +1,7 @@
 import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } from "./session";
 
-let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
+let apiBaseUrl = configuredApiBaseUrl;
 
 let accessToken = "";
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -9,6 +10,7 @@ let refreshPromise: Promise<boolean> | null = null;
 export type AuthTokenSet = {
   accessToken: string;
   refreshToken?: string | null;
+  email?: string | null;
 };
 
 // ─── Typed error classes ──────────────────────────────────────────────────────
@@ -65,13 +67,21 @@ async function attemptSilentRefresh(): Promise<boolean> {
 async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS, allowRefresh = true) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  const isAuthEndpoint = path.startsWith("/auth/");
+  const isPublicAuthEndpoint = new Set([
+    "/auth/login",
+    "/auth/register",
+    "/auth/send-otp",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/auth/refresh",
+    "/auth/oauth/exchange",
+  ]).has(path);
 
   const headers = {
     "Bypass-Tunnel-Reminder": "true",
     ...(options.headers || {})
   } as Record<string, string>;
-  if (!isAuthEndpoint && accessToken) {
+  if (!isPublicAuthEndpoint && accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
@@ -94,7 +104,7 @@ async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = DEF
 
   // 401 — token is invalid or expired. Trigger exactly-once logout flow.
   // EXCEPT for auth endpoints where 401 means "wrong credentials", not "expired session".
-  if (response.status === 401 && !isAuthEndpoint) {
+  if (response.status === 401 && !isPublicAuthEndpoint) {
     if (allowRefresh) {
       const refreshed = await attemptSilentRefresh();
       if (refreshed) {
@@ -112,12 +122,34 @@ export function getApiBaseUrl() {
   return apiBaseUrl;
 }
 
-export function setApiBaseUrl(url: string) {
-  apiBaseUrl = url.trim().replace(/\/+$/, "");
+export function setApiBaseUrl(url: string): boolean {
+  // Release builds use the EAS-provided API only. Developer builds can still
+  // point at a local LAN server for testing, but never silently downgrade a
+  // release build to an attacker-controlled endpoint.
+  if (!__DEV__) return false;
+  try {
+    const parsed = new URL(url.trim());
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      return false;
+    }
+    apiBaseUrl = parsed.toString().replace(/\/+$/, "");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function setAccessToken(token: string) {
   accessToken = token;
+}
+
+export async function logoutSession(): Promise<void> {
+  if (!accessToken) return;
+  try {
+    await apiFetch("/auth/logout", { method: "POST", headers: authHeaders() }, 10000, false);
+  } catch {
+    // Local cleanup still runs if the network is unavailable.
+  }
 }
 
 function authHeaders(extra: Record<string, string> = {}) {
@@ -322,6 +354,21 @@ export async function confirmPasswordReset(token: string, newPassword: string): 
     body: JSON.stringify({ token, new_password: newPassword })
   });
   if (!response.ok) throw new Error("Password reset confirmation failed");
+}
+
+export async function exchangeOAuthCode(code: string): Promise<AuthTokenSet> {
+  const response = await apiFetch("/auth/oauth/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw new Error("OAuth sign-in link expired");
+  const payload = await response.json();
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token || null,
+    email: payload.email || null,
+  };
 }
 
 export async function fetchScans(): Promise<ScanSummary[]> {

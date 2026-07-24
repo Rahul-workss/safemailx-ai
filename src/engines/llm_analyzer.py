@@ -301,6 +301,13 @@ def _build_user_message(prefix: str, suffix: str, email_text: str,
     )
 
 
+def _clean_prompt_field(value: str | None, max_len: int) -> str:
+    value = str(value or "")[:max_len]
+    if _INJECTION_GUARD_AVAILABLE:
+        return sanitize_for_prompt(value, max_len=max_len)
+    return value
+
+
 def _is_context_error(resp: requests.Response) -> bool:
     body = resp.text.lower()
     return resp.status_code == 400 and any(
@@ -337,6 +344,13 @@ def run_llm_analysis(
         email_text = channel
         channel = "email"
 
+    sender = _clean_prompt_field(sender, 320)
+    subject = _clean_prompt_field(subject, 500)
+    security_summary = _clean_prompt_field(security_summary, 6000)
+    email_text = _clean_prompt_field(email_text, LLM_EMAIL_CHAR_LIMIT)
+    combined_context = "\n".join((sender, subject, security_summary, email_text))
+    injection_finding = scan_for_prompt_injection(combined_context)
+
     system_prompt = get_system_prompt(channel)
 
     # Build the user message with the available forensic context.
@@ -363,10 +377,6 @@ def run_llm_analysis(
     # sanitize_for_prompt runs UNCONDITIONALLY — zero scoring impact, pure defense.
     # scan_for_prompt_injection result is attached to the returned dict so
     # hybrid_engine can apply the score floor if injection is detected.
-    injection_finding = scan_for_prompt_injection(email_text)
-    if _INJECTION_GUARD_AVAILABLE:
-        email_text = sanitize_for_prompt(email_text)
-
     user_msg = _build_user_message(user_prefix, user_suffix, email_text)
 
     payload = {
@@ -462,7 +472,7 @@ def run_llm_analysis(
         reasoning = msg.get("reasoning_content", "") or ""
         
         # Some responses place the JSON inside the reasoning block, so combine both.
-        raw = (reasoning + "\n" + content).strip()
+        raw = (reasoning + "\n" + content).strip()[:100000]
         print(f"[LLM] Analysis complete. "
               f"({len(raw)} chars received)")
 
@@ -504,6 +514,8 @@ def run_llm_analysis(
                 # Use the last match, which is usually the final JSON object.
                 json_candidate = matches[-1].group(0)
                 parsed = json.loads(json_candidate)
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM output was not a JSON object")
                 
     except (json.JSONDecodeError, ValueError) as e:
         print(f"[LLM] JSON parse failed: {e}")
@@ -535,13 +547,16 @@ def run_llm_analysis(
     tactics = parsed.get("social_engineering_tactics", [])
     if not isinstance(tactics, list):
         tactics = []
-    tactics = [t for t in tactics
-               if isinstance(t, str) and t.lower() != "none_detected"]
+    tactics = [t[:80] for t in tactics
+               if isinstance(t, str) and t.lower() != "none_detected"][:12]
                
+    allowed_intents = {"credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"}
     intent = str(parsed.get("detected_intent", "unknown")).lower()
+    if intent not in allowed_intents:
+        intent = "unknown"
 
     reasoning = str(parsed.get("reasoning",
-                               "No detailed reasoning provided."))
+                               "No detailed reasoning provided."))[:2000]
 
     # -- Calculate LLM confidence score ----------------------------------------
     confidence = 0.5  # Base confidence

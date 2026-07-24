@@ -1,0 +1,45 @@
+app = "safemailx-ai"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  SAFEMAILX_API_HOST = "0.0.0.0"
+  SAFEMAILX_API_PORT = "8080"
+  TESSERACT_CMD = "/usr/bin/tesseract"
+  JWT_EXPIRES_MINUTES = "1440"
+  FEATURE_REFRESH_TOKEN_ENABLED = "true"
+  REFRESH_TOKEN_EXPIRES_DAYS = "30"
+  SAFEMAILX_PRODUCTION = "true"
+  SAFEMAILX_REQUIRE_AUTH = "true"
+  FEATURE_QR_DETECTION_ENABLED = "true"
+  FEATURE_PROMPT_INJECTION_GUARD_ENABLED = "true"
+  FEATURE_OFFLINE_SAFEBROWSING_ENABLED = "true"
+  FEATURE_CAMPAIGN_CORRELATION_ENABLED = "true"
+  FEATURE_ADAPTIVE_TRUST_ENABLED = "true"
+  FEATURE_SECOND_LOOK_RESCAN_ENABLED = "true"
+  FEATURE_VISHING_DETECTION_ENABLED = "false"
+  WHISPER_MODEL_SIZE = "tiny"
+  MAX_UPLOAD_BYTES = "10485760"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/api/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

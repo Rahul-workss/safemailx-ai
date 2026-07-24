@@ -14,11 +14,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.safemailx-ai.tech"
+        "EXPO_PUBLIC_API_BASE_URL": "https://safemailx-ai.onrender.com"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://safemailx-ai.onrender.com"
+      }
     }
   },
   "submit": {

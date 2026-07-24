@@ -532,13 +532,26 @@ class ScanRepository:
         created_at = datetime.now(timezone.utc).isoformat()
         placeholder = "%s" if self.is_postgres else "?"
         with self._db() as conn:
-            conn.execute(
-                f"""
-                INSERT INTO password_reset_tokens (token, user_id, expires_at, created_at)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
-                """,
-                (token, user_id, expires_at, created_at),
-            )
+            if self.is_postgres:
+                conn.execute(
+                    """
+                    INSERT INTO password_reset_tokens (token, user_id, expires_at, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (token) DO UPDATE SET
+                        user_id = EXCLUDED.user_id,
+                        expires_at = EXCLUDED.expires_at,
+                        created_at = EXCLUDED.created_at
+                    """,
+                    (token, user_id, expires_at, created_at),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO password_reset_tokens (token, user_id, expires_at, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (token, user_id, expires_at, created_at),
+                )
 
     def get_password_reset_token(self, token: str) -> dict[str, Any] | None:
         placeholder = "%s" if self.is_postgres else "?"

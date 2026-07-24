@@ -52,7 +52,7 @@ import {
   uploadScreenshot, scanUrl, fetchNotificationPreferences,
   saveNotificationPreferences, NotificationPreferences,
   InstantScanResult, scanInstantFile, submitScanFeedback,
-  UnauthorizedError, NetworkError
+  UnauthorizedError, NetworkError, exchangeOAuthCode, logoutSession
 } from "./src/api";
 import {
   saveSession, loadSession, clearSession,
@@ -477,36 +477,30 @@ function App() {
   const processIncomingUrl = React.useCallback(async (url: string) => {
     if (!url) return;
     try {
-      console.log("Incoming deep link:", url);
-      const tokenMatch = url.match(/[?&]token=([^&]+)/);
-      const emailMatch = url.match(/[?&]email=([^&]+)/);
-      const nameMatch = url.match(/[?&]name=([^&]+)/);
-      const refreshTokenMatch = url.match(/[?&]refresh_token=([^&]+)/);
+      const parsed = Linking.parse(url);
+      const isOAuthCallback = parsed.scheme === "safemailxai" &&
+        (parsed.hostname === "oauth-callback" || parsed.path === "oauth-callback" || parsed.path === "/oauth-callback");
+      if (!isOAuthCallback) return;
+      const params = parsed.queryParams || {};
+      const code = typeof params.code === "string" ? params.code : "";
 
-      if (tokenMatch && tokenMatch[1]) {
-        const token = decodeURIComponent(tokenMatch[1]);
-        const emailVal = emailMatch ? decodeURIComponent(emailMatch[1]) : "";
-        const nameVal = nameMatch ? decodeURIComponent(nameMatch[1]) : "User";
-
-        // Set token temporarily and validate against the backend
-        setAccessToken(token);
-        setEmail(emailVal);
+      if (code) {
         try {
-          await fetchScans(); // validate token is real
-          await saveSession(
-            token,
-            emailVal,
-            refreshTokenMatch && refreshTokenMatch[1] ? decodeURIComponent(refreshTokenMatch[1]) : null
-          ); // persist only after validation
+          const tokens = await exchangeOAuthCode(code);
+          const emailVal = tokens.email || "";
+
+          setAccessToken(tokens.accessToken);
+          setEmail(emailVal);
+          await saveSession(tokens.accessToken, emailVal, tokens.refreshToken || null);
           setAuthState("Signed in");
           setActiveTab("dashboard");
 
-          if (url.includes("service=gmail")) {
+          if (params.service === "gmail") {
             showToast(`Gmail connected for ${emailVal}!`, "success");
-          } else if (url.includes("service=backup")) {
+          } else if (params.service === "backup") {
             showToast(`Backup activated for ${emailVal}!`, "success");
           } else {
-            showToast(`Welcome back, ${nameVal}!`, "success");
+            showToast(`Welcome back, ${emailVal}!`, "success");
           }
           refresh();
           refreshGmailStatus();
@@ -514,17 +508,11 @@ function App() {
           // Token was invalid or expired — clear it
           setAccessToken("");
           setEmail("");
-          showToast("Invalid or expired authentication link");
+          showToast("This sign-in link has expired. Please try again.");
         }
-      } else {
-        if (url.includes("gmail") || url.includes("backup") || url.includes("service=") || url.includes("status=")) {
-          showToast("Sync connection completed successfully!", "success");
-        }
-        refresh();
-        refreshGmailStatus();
       }
     } catch (e) {
-      console.log("Deep link parse error:", e);
+      console.warn("Deep link could not be processed");
     }
   }, []);
 
@@ -546,7 +534,7 @@ function App() {
   // ── Android Share Intent handler ("Share to SafeMail X") ───────────────
   // When user long-presses an SMS and taps "Share → SafeMail X", Android
   // opens the app with a safemailxai://share?text=<url-encoded-sms> URL.
-  // We pre-fill the SMS scanner and switch to the SMS tab automatically.
+  // We pre-fill the SMS scanner and open the unified scan screen automatically.
   // This is entirely additive — the existing deep-link handler is untouched.
   useEffect(() => {
     function handleShareIntent(event: { url: string }) {
@@ -557,7 +545,7 @@ function App() {
         if (textMatch && textMatch[1]) {
           const sharedText = decodeURIComponent(textMatch[1].replace(/\+/g, " "));
           setSmsText(sharedText);
-          setActiveTab("sms");
+          setActiveTab("new");
           showToast("SMS loaded — tap Scan SMS to analyse", "success");
         }
       } catch {
@@ -700,8 +688,9 @@ function App() {
     finally { setBusy(false); }
   }
 
-  function handleLogout() {
-    clearSession(); // fire-and-forget — clears encrypted storage (Keychain/Keystore)
+  async function handleLogout() {
+    await logoutSession();
+    await clearSession();
     AsyncStorage.removeItem('gmailLabelsReady').catch(() => {}); // clear gmail label cache
     setAccessToken("");
     setAuthState("Local mode");
@@ -857,7 +846,11 @@ function App() {
 
   async function saveApiUrl(url: string) {
     if (!url.trim()) return;
-    setApiBaseUrl(url.trim()); setApiUrl(getApiBaseUrl()); await refresh();
+    if (!setApiBaseUrl(url.trim())) {
+      showToast("API changes are available only in developer builds.");
+      return;
+    }
+    setApiUrl(getApiBaseUrl()); await refresh();
     showToast("API server updated", "success");
   }
 
@@ -1965,7 +1958,7 @@ function UnifiedScanScreen({
   onSubmitManual: () => void;
   refreshApp: () => Promise<void>;
   scrollViewRef: React.RefObject<ScrollView | null>;
-  onShowToast: (msg: string, type?: "error" | "success" | "") => void;
+  onShowToast: (msg: string, type?: "error" | "success") => void;
 }) {
   const [mode, setMode] = useState<"email" | "sms" | "text" | "url">("email");
   const [showInfo, setShowInfo] = useState(false);

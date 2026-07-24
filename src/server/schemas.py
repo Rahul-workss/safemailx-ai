@@ -9,50 +9,55 @@ ScanFeedbackChoice = Literal["correct", "false_positive", "false_negative"]
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., min_length=3, max_length=320)
+    password: str = Field(..., min_length=1, max_length=256)
 
 
 class SendOtpRequest(BaseModel):
-    email: str
+    email: str = Field(..., min_length=3, max_length=320)
 
 
 class RegisterRequest(BaseModel):
-    email: str
-    name: str = "User"
-    password: str = Field(..., min_length=8)
+    email: str = Field(..., min_length=3, max_length=320)
+    name: str = Field("User", max_length=120)
+    password: str = Field(..., min_length=8, max_length=256)
     otp: str = Field(..., min_length=6, max_length=6)
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    email: str = Field(..., min_length=3, max_length=320)
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=8)
+    token: str = Field(..., min_length=8, max_length=256)
+    new_password: str = Field(..., min_length=8, max_length=256)
 
 
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str | None = None
     token_type: str = "bearer"
+    email: str | None = None
 
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=20)
 
 
+class OAuthExchangeRequest(BaseModel):
+    code: str = Field(..., min_length=20, max_length=200)
+
+
 class ManualScanRequest(BaseModel):
-    subject: str = "Manual SafeMail X Scan"
-    sender: str = "manual_input"
-    body: str = Field(..., min_length=1)
+    subject: str = Field("Manual SafeMail X Scan", max_length=200)
+    sender: str = Field("manual_input", max_length=320)
+    body: str = Field(..., min_length=1, max_length=200_000)
     scan_mode: ScanMode = "balanced"
 
 
 class ManualSmsScanRequest(BaseModel):
-    text: str = Field(..., min_length=1)
-    sender_number: str | None = None
+    text: str = Field(..., min_length=1, max_length=20_000)
+    sender_number: str | None = Field(default=None, max_length=64)
     scan_mode: ScanMode = "balanced"
 
 
@@ -127,13 +132,13 @@ class SettingsResponse(BaseModel):
 
 class SettingsUpdateRequest(BaseModel):
     auto_trust_contacts: bool | None = None
-    whitelist: list[str] | None = None
-    blacklist: list[str] | None = None
+    whitelist: list[str] | None = Field(default=None, max_length=500)
+    blacklist: list[str] | None = Field(default=None, max_length=500)
 
 
 class PushTokenRequest(BaseModel):
-    token: str = Field(..., min_length=10)
-    platform: str = "unknown"
+    token: str = Field(..., min_length=10, max_length=512)
+    platform: str = Field("unknown", max_length=32)
 
 class PushTokenResponse(BaseModel):
     status: str
@@ -171,7 +176,7 @@ class GmailLabelsResponse(BaseModel):
 
 
 class UrlScanRequest(BaseModel):
-    url: str = Field(..., min_length=8)
+    url: str = Field(..., min_length=8, max_length=2048)
     scan_mode: ScanMode = "balanced"
 
 
@@ -181,12 +186,12 @@ class NotificationPreferences(BaseModel):
 
 
 class InstantSmsScanRequest(BaseModel):
-    text: str = Field(..., min_length=1)
-    sender_number: str | None = None
+    text: str = Field(..., min_length=1, max_length=20_000)
+    sender_number: str | None = Field(default=None, max_length=64)
     scan_mode: ScanMode = "balanced"
 
 class InstantUrlScanRequest(BaseModel):
-    url: str = Field(..., min_length=8)
+    url: str = Field(..., min_length=8, max_length=2048)
     scan_mode: ScanMode = "balanced"
 
 class InstantFileScanRequest(BaseModel):

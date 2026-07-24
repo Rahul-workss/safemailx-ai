@@ -52,7 +52,7 @@ class InlineScanService:
         return result
 
     def scan_url(self, request: InstantUrlScanRequest, user_id: str) -> InstantScanResult:
-        logger.info(f"Scanning URL via SMART VETO for user {user_id}: {request.url}")
+        logger.info("Scanning URL via SMART VETO for user %s", user_id)
         result = self.orchestrator.process_url_scan(str(request.url), scan_mode=request.scan_mode)
         self._save_to_repo(result, subject="Instant URL Scan", sender="url_scanner", user_id=user_id)
         return result

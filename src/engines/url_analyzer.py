@@ -1,5 +1,7 @@
 import math
+import ipaddress
 import requests
+import socket
 import sqlite3
 import datetime
 import urllib.parse
@@ -181,6 +183,28 @@ def _levenshtein(s1: str, s2: str) -> int:
 
 TARGET_BRANDS = ["paypal.com", "microsoft.com", "apple.com", "amazon.com", "google.com", "netflix.com"]
 
+
+def is_safe_external_url(url: str) -> bool:
+    """Allow only HTTP(S) destinations that do not resolve to local networks."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return False
+        host = parsed.hostname.rstrip(".")
+        try:
+            addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)}
+        except socket.gaierror:
+            # A domain that cannot currently resolve cannot be fetched by the
+            # HTTP client either. Keep lexical analysis available for it.
+            return True
+        for address in addresses:
+            ip = ipaddress.ip_address(address)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+                return False
+        return True
+    except (ValueError, TypeError):
+        return False
+
 def get_typosquatting_metrics(url: str) -> List[str]:
     """Check for IDN Homographs and Levenshtein distance against high-value targets."""
     hits = []
@@ -259,10 +283,14 @@ def analyze_urls(urls, sender_domain: str | None = None):
 
 def _resolve_final_url(url: str) -> tuple[str | None, str | None]:
     try:
+        if not is_safe_external_url(url):
+            return None, None
         response = requests.get(url, timeout=2.0, allow_redirects=True, stream=True)
         final_url = response.url
         response.close()
         if not final_url: return None, None
+        if not is_safe_external_url(final_url):
+            return None, None
         parsed = urlparse(final_url)
         return final_url, (parsed.hostname or "").lower()
     except Exception:

@@ -1,3 +1,4 @@
+import logging
 import smtplib
 from email.message import EmailMessage
 
@@ -10,6 +11,8 @@ from server.settings import (
     SMTP_USERNAME,
     SMTP_USE_TLS,
 )
+
+logger = logging.getLogger("safemailx.mailer")
 
 
 def smtp_configured() -> bool:
@@ -24,7 +27,7 @@ def send_password_reset_email(to_email: str, token: str) -> bool:
     reset_link = build_password_reset_link(token)
 
     if not smtp_configured():
-        print(f"[MAIL MOCK] Password reset link for {to_email}: {reset_link}")
+        logger.warning("SMTP is not configured; password reset delivery was skipped")
         return False
 
     message = EmailMessage()
@@ -70,7 +73,7 @@ def send_password_reset_email(to_email: str, token: str) -> bool:
 
 def send_otp_email(to_email: str, otp: str) -> bool:
     if not smtp_configured():
-        print(f"[MAIL MOCK] OTP for {to_email}: {otp}")
+        logger.warning("SMTP is not configured; registration code delivery was skipped")
         return False
 
     message = EmailMessage()
