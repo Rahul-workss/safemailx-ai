@@ -361,7 +361,8 @@ def forgot_password(payload: ForgotPasswordRequest):
             status_code=202,
             content={"status": "SMTP not configured — reset email was not sent (dev/staging only)"},
         )
-    user = repository.get_user_by_email(payload.email)
+    clean_email = payload.email.strip().lower()
+    user = repository.get_user_by_email(clean_email)
     if user:
         from datetime import datetime, timedelta, timezone
         import uuid
@@ -369,7 +370,9 @@ def forgot_password(payload: ForgotPasswordRequest):
         expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         repository.create_password_reset_token(token, user["id"], expires)
         try:
-            send_password_reset_email(payload.email, token)
+            sent = send_password_reset_email(clean_email, token)
+            if not sent:
+                logger.warning("send_password_reset_email returned False for %s", clean_email)
         except Exception:
             logger.warning("Failed sending password reset email", exc_info=True)
     # Always return generic 200 to prevent email enumeration
