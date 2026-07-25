@@ -840,17 +840,37 @@ async def scan_events(websocket: WebSocket, scan_id: str):
 def _safe_oauth_return_url(return_url: str | None) -> str:
     candidate = (return_url or "safemailxai://oauth-callback").strip()
     parsed = urlparse(candidate)
-    if (
-        parsed.scheme != "safemailxai"
-        or parsed.username
-        or parsed.password
-        or parsed.fragment
-        or parsed.query
-        or parsed.netloc not in {"", "oauth-callback"}
-        or parsed.path not in {"", "/", "/oauth-callback"}
-    ):
-        raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
-    return candidate
+
+    # Mobile deep-link scheme — always allowed
+    if parsed.scheme == "safemailxai":
+        if (
+            parsed.username
+            or parsed.password
+            or parsed.fragment
+            or parsed.query
+            or parsed.netloc not in {"", "oauth-callback"}
+            or parsed.path not in {"", "/", "/oauth-callback"}
+        ):
+            raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
+        return candidate
+
+    # Web HTTP/HTTPS return URLs — allow localhost and the production domain
+    ALLOWED_WEB_HOSTS = {
+        "localhost",
+        "127.0.0.1",
+        "safemailx-ai.onrender.com",
+    }
+    if parsed.scheme in {"http", "https"} and parsed.hostname in ALLOWED_WEB_HOSTS:
+        # Block credentials, fragments, or suspicious query params in redirect URL
+        if parsed.username or parsed.password:
+            raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
+        # Only allow known callback paths
+        allowed_paths = {"/auth/callback", "/auth/login", "/dashboard"}
+        if not any(parsed.path.startswith(p) for p in allowed_paths):
+            raise HTTPException(status_code=400, detail="Unsupported OAuth return URL path")
+        return candidate
+
+    raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
 
 
 def _oauth_redirect_uri_for_request(request: Request) -> str:
