@@ -861,11 +861,11 @@ def _safe_oauth_return_url(return_url: str | None) -> str:
         "safemailx-ai.onrender.com",
     }
     if parsed.scheme in {"http", "https"} and parsed.hostname in ALLOWED_WEB_HOSTS:
-        # Block credentials, fragments, or suspicious query params in redirect URL
-        if parsed.username or parsed.password:
+        # Block credentials or fragments in redirect URL
+        if parsed.username or parsed.password or parsed.fragment:
             raise HTTPException(status_code=400, detail="Unsupported OAuth return URL")
-        # Only allow known callback paths
-        allowed_paths = {"/auth/callback", "/auth/login", "/dashboard"}
+        # Only allow known web paths (query strings like ?tab=email are fine)
+        allowed_paths = {"/auth/callback", "/auth/login", "/dashboard", "/scan", "/settings"}
         if not any(parsed.path.startswith(p) for p in allowed_paths):
             raise HTTPException(status_code=400, detail="Unsupported OAuth return URL path")
         return candidate
