@@ -112,7 +112,8 @@ IP_PATTERN = re.compile(r"https?://\d+\.\d+\.\d+\.\d+")
 WEIGHTS = {
     "high_urgency": 0.25,        # Reduced slightly — tactics scorer now adds more precisely
     "medium_urgency": 0.15,
-    "short_url": 0.35,
+    "short_url": 0.35,           # Short URL with anchor text / CTA (real threat vector)
+    "short_url_footer": 0.10,    # Short URL with no anchor text (social media footer icon)
     "ip_url": 0.40,
     "urgency_plus_link": 0.18,
     "sms_scam_phrase": 0.45,
@@ -186,15 +187,33 @@ def analyze_rules(
     url_records = url_records or extract_urls(text)
     urls = [record["normalized_url"] for record in url_records]
 
+    seen_short_domains: set[str] = set()  # Fix 3a: count each short domain only once
     for url in urls:
-
         host = urlparse(url).hostname or ""
 
-        # shortened URL detection
+        # -- Shortened URL detection (Fix 3a+3b) --------------------------------
         for short in SHORT_URL_DOMAINS:
-            if host == short or host.endswith("." + short):
-                score += WEIGHTS["short_url"]
-                reasons.append(f"shortened_url:{short}")
+            if (host == short or host.endswith("." + short)) and short not in seen_short_domains:
+                seen_short_domains.add(short)  # deduplicate
+
+                # Fix 3b: context-aware weight
+                # Find the url_record for this URL to check anchor text / CTA flag
+                _rec = next(
+                    (r for r in (url_records or [])
+                     if (urlparse(r.get("normalized_url", "")).hostname or "") == host),
+                    None
+                )
+                _has_anchor = bool(_rec and _rec.get("anchor_text"))
+                _is_cta     = bool(_rec and _rec.get("is_cta"))
+
+                if _has_anchor or _is_cta:
+                    # Short URL with anchor text or CTA flag = real threat vector
+                    score += WEIGHTS["short_url"]           # 0.35
+                    reasons.append(f"shortened_url_cta:{short}")
+                else:
+                    # Short URL with no anchor text = likely social media footer icon
+                    score += WEIGHTS.get("short_url_footer", 0.10)   # 0.10
+                    reasons.append(f"shortened_url:{short}")
                 features["structural_risk"] = True
 
         # IP based URL
@@ -233,10 +252,13 @@ def analyze_rules(
             reasons.append("screenshot_cta_without_visible_destination")
 
     # -------------------------
-    # Urgency + link combo
+    # Urgency + link combo (Fix 3c: requires ACTUAL urgency phrase, not just any rule)
     # -------------------------
-
-    if urls and reasons:
+    has_urgency_signal = any(
+        r.startswith("high_urgency:") or r.startswith("medium_urgency:")
+        for r in reasons
+    )
+    if urls and has_urgency_signal:
         score += WEIGHTS["urgency_plus_link"]
         reasons.append("urgency_and_link_combined")
 

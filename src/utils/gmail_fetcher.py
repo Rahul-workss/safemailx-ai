@@ -32,7 +32,17 @@ def _load_token():
             raw = cipher.decrypt(raw)
         except InvalidToken as exc:
             raise RuntimeError("Gmail token exists but could not be decrypted") from exc
-    return pickle.loads(raw)
+    try:
+        return pickle.loads(raw)
+    except Exception as exc:
+        # Token file exists but can't be deserialized (e.g., serialized by a
+        # different Python/google-auth version). Delete it so get_gmail_service()
+        # re-triggers a fresh OAuth sign-in rather than crashing in a loop.
+        GMAIL_TOKEN_PATH.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Gmail token was corrupt or incompatible and has been deleted. "
+            f"Please re-authenticate. Underlying error: {exc}"
+        ) from exc
 
 
 def _save_token(creds) -> None:

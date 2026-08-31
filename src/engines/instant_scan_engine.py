@@ -5,6 +5,7 @@ import ipaddress
 import json
 import logging
 import re
+import traceback
 import socket
 import uuid
 from email.utils import parseaddr
@@ -31,6 +32,7 @@ from server.schemas import InstantScanResult, QuickScanArtifacts, QuickScanSigna
 from server.uploads import IMAGE_EXTENSIONS, extract_upload_text
 from utils.config import (
     IPQUALITYSCORE_API_KEY,
+    LLM_EMAIL_CHAR_LIMIT,
     SAFE_BROWSING_API_KEY,
     VIRUSTOTAL_API_KEY,
     is_configured_secret,
@@ -280,45 +282,57 @@ def _safe_browsing_lookup(url: str) -> tuple[bool, str | None]:
 def _virustotal_url_lookup(url: str) -> tuple[int, int]:
     if not is_configured_secret(VIRUSTOTAL_API_KEY):
         return 0, 0
-    url_id = base64.urlsafe_b64encode(url.encode("utf-8")).decode("ascii").strip("=")
-    response = requests.get(
-        f"https://www.virustotal.com/api/v3/urls/{url_id}",
-        headers={"x-apikey": VIRUSTOTAL_API_KEY},
-        timeout=2.5,
-    )
-    response.raise_for_status()
-    stats = response.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
-    malicious = int(stats.get("malicious", 0))
-    suspicious = int(stats.get("suspicious", 0))
-    return malicious, suspicious
+    try:
+        url_id = base64.urlsafe_b64encode(url.encode("utf-8")).decode("ascii").strip("=")
+        response = requests.get(
+            f"https://www.virustotal.com/api/v3/urls/{url_id}",
+            headers={"x-apikey": VIRUSTOTAL_API_KEY},
+            timeout=2.5,
+        )
+        response.raise_for_status()
+        stats = response.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
+        malicious = int(stats.get("malicious", 0))
+        suspicious = int(stats.get("suspicious", 0))
+        return malicious, suspicious
+    except Exception as exc:
+        logger.warning("VirusTotal URL lookup failed for %s: %s", url[:80], exc)
+        return 0, 0
 
 
 @lru_cache(maxsize=512)
 def _ipqs_url_lookup(url: str) -> dict[str, Any]:
     if not is_configured_secret(IPQUALITYSCORE_API_KEY):
         return {}
-    response = requests.get(
-        f"https://www.ipqualityscore.com/api/json/url/{IPQUALITYSCORE_API_KEY}/{requests.utils.quote(url, safe='')}",
-        timeout=2.5,
-    )
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = requests.get(
+            f"https://www.ipqualityscore.com/api/json/url/{IPQUALITYSCORE_API_KEY}/{requests.utils.quote(url, safe='')}",
+            timeout=2.5,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as exc:
+        logger.warning("IPQS URL lookup failed for %s: %s", url[:80], exc)
+        return {}
 
 
 @lru_cache(maxsize=512)
 def _virustotal_hash_lookup(sha256_hash: str) -> int:
     if not is_configured_secret(VIRUSTOTAL_API_KEY):
         return 0
-    response = requests.get(
-        f"https://www.virustotal.com/api/v3/files/{sha256_hash}",
-        headers={"x-apikey": VIRUSTOTAL_API_KEY},
-        timeout=2.5,
-    )
-    if response.status_code == 404:
+    try:
+        response = requests.get(
+            f"https://www.virustotal.com/api/v3/files/{sha256_hash}",
+            headers={"x-apikey": VIRUSTOTAL_API_KEY},
+            timeout=2.5,
+        )
+        if response.status_code == 404:
+            return 0
+        response.raise_for_status()
+        stats = response.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
+        return int(stats.get("malicious", 0))
+    except Exception as exc:
+        logger.warning("VirusTotal hash lookup failed for %s: %s", sha256_hash[:16], exc)
         return 0
-    response.raise_for_status()
-    stats = response.json().get("data", {}).get("attributes", {}).get("last_analysis_stats", {})
-    return int(stats.get("malicious", 0))
 
 
 def _is_private_target(host: str) -> bool:
@@ -426,13 +440,16 @@ def _llm_assessment(channel: str, text: str, features: dict[str, Any], subject: 
     try:
         return run_llm_analysis(
             channel=channel,
-            email_text=text[:12000],
+            email_text=text[:LLM_EMAIL_CHAR_LIMIT],
             subject=subject[:240],
             sender=sender[:240],
             security_summary=json.dumps(features, ensure_ascii=True)[:1800],
         )
     except Exception as exc:
-        logger.debug("Quick scan LLM unavailable: %s", exc)
+        logger.warning(
+            "[LLM] _llm_assessment failed for channel=%s — %s\n%s",
+            channel, exc, traceback.format_exc()
+        )
         return None
 
 
@@ -1141,4 +1158,108 @@ class SmartVetoOrchestrator:
             structural_score=round(file_struct_score, 2),
             reputation_score=round(file_rep_score, 2),
             llm_score_value=round(file_llm_prob, 4) if file_llm_prob is not None else None,
+        )
+
+    def process_email_scan(
+        self,
+        body: str,
+        subject: str = "",
+        sender: str = "",
+        scan_mode: str = "balanced",
+    ) -> InstantScanResult:
+        """Full email scan using hybrid_detect (rule + TF-IDF + Qwen 3 LLM).
+        Used by /api/instant/email and InlineScanService.scan_email.
+        """
+        cleaned = clean_extracted_text(body)
+        url_details = list(extract_urls(cleaned))
+        url_flags: list[str] = []
+        external_checks_used: list[str] = []
+        external_checks_failed: list[str] = []
+        degraded_reasons: list[str] = []
+
+        # Inspect embedded URLs (cap at 3 to avoid slow scans)
+        for record in url_details[:3]:
+            try:
+                url_score, _, _, used, failed, deg, _, _us, _ur, _ul = self._inspect_url(
+                    record["normalized_url"],
+                    source_sender=sender,
+                )
+                external_checks_used.extend(used)
+                external_checks_failed.extend(failed)
+                degraded_reasons.extend(deg)
+                if url_score >= 80:
+                    url_flags.append("high_risk_url")
+                elif url_score >= 45:
+                    url_flags.append("suspicious_url")
+            except Exception as exc:
+                logger.warning("[EMAIL] URL inspection failed: %s", exc)
+
+        # hybrid_detect runs rule-engine + TF-IDF + run_llm_analysis(channel='email')
+        hybrid = hybrid_detect(
+            subject or "Email Scan",
+            cleaned,
+            sender or "unknown_sender",
+            attachment_score=None,
+            url_flags=url_flags,
+            security_headers={},
+            auth_context="manual_input",
+            url_details=url_details,
+            source_type="email",
+            link_evidence_mode="visible_url" if url_details else "none_visible",
+        )
+
+        score = max(0, min(int(round(float(hybrid.get("final_score", 0.0)) * 100)), 100))
+        llm_reasoning = (hybrid.get("llm_reasons") or [""])[0] or None
+        llm_prob = float(hybrid["llm_score"]) if hybrid.get("llm_score") is not None else None
+        verdict_raw = hybrid.get("final_label", "legitimate")
+
+        # Normalise verdict to schema literal
+        if verdict_raw in {"phishing", "suspicious", "legitimate"}:
+            verdict = verdict_raw
+        else:
+            verdict = _risk_to_verdict(score)
+
+        if score >= 80:
+            summary = "This email shows strong phishing or social-engineering indicators."
+        elif score >= 45:
+            summary = "This email contains suspicious patterns and should be treated with caution."
+        else:
+            summary = "No strong phishing evidence was detected in this email."
+
+        degraded = bool(external_checks_failed)
+        signals: list[dict[str, Any]] = []
+        for reason in hybrid.get("rule_reasons", [])[:8]:
+            signals.append(_make_signal("semantic_rule", reason.replace("_", " "), 10, 0.65))
+        if llm_prob is not None and llm_prob >= 0.72:
+            signals.append(_make_signal("llm_email_threat", "Qwen 3 reasoning found deceptive patterns in the email.", 18, 0.80))
+
+        artifacts = {
+            "urls": [d.get("normalized_url", "") for d in url_details],
+            "domains": list(dict.fromkeys(d.get("domain", "") for d in url_details if d.get("domain"))),
+            "sender_id": sender,
+            "detected_type": "text/email",
+            "extraction_method": "email_body_scan",
+            "parser_quality": "high" if cleaned else "low",
+        }
+        rep_score = 0.0
+        struct_score = float(min(100, max(0, score - ((llm_prob or 0) * 18))))
+
+        return _build_result(
+            channel="email",
+            score=score,
+            signals=signals,
+            artifacts=artifacts,
+            summary=summary,
+            recommended_action=_recommended_action(verdict, "email", None),
+            category="email_scan",
+            llm_reasoning=llm_reasoning,
+            degraded=degraded,
+            degraded_reasons=degraded_reasons,
+            evidence_quality="high" if cleaned else "low",
+            external_checks_used=external_checks_used,
+            external_checks_failed=external_checks_failed,
+            privacy_notice="Email content is processed locally. No data is sent to external servers.",
+            structural_score=round(struct_score, 2),
+            reputation_score=round(rep_score, 2),
+            llm_score_value=round(llm_prob, 4) if llm_prob is not None else None,
         )

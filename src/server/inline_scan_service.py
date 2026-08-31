@@ -1,6 +1,6 @@
 import logging
 from server.schemas import (
-    InstantScanResult, InstantSmsScanRequest, InstantUrlScanRequest
+    InstantEmailScanRequest, InstantScanResult, InstantSmsScanRequest, InstantUrlScanRequest
 )
 from engines.smart_veto import SmartVetoOrchestrator
 
@@ -74,6 +74,25 @@ class InlineScanService:
             result,
             subject=subject or f"File Scan: {filename}",
             sender=sender or "file_scanner",
+            user_id=user_id,
+        )
+        return result
+
+    def scan_email(self, request: InstantEmailScanRequest, user_id: str) -> InstantScanResult:
+        """Direct email body scan via SmartVetoOrchestrator (Qwen 3 + rules).
+        This is the instant path — Gmail label scans go through the worker queue instead.
+        """
+        logger.info("Scanning Email via SMART VETO for user %s", user_id)
+        result = self.orchestrator.process_email_scan(
+            body=request.body,
+            subject=request.subject,
+            sender=request.sender,
+            scan_mode=request.scan_mode,
+        )
+        self._save_to_repo(
+            result,
+            subject=request.subject or "Instant Email Scan",
+            sender=request.sender or "unknown_sender",
             user_id=user_id,
         )
         return result

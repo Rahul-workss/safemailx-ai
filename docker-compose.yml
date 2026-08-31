@@ -68,6 +68,8 @@ services:
       POSTGRES_DB: trustmail
       POSTGRES_USER: trustmail
       POSTGRES_PASSWORD: trustmail
+    ports:
+      - "5432:5432"        # exposed so local dev processes can connect
     volumes:
       - postgres-data:/var/lib/postgresql/data
 

@@ -36,23 +36,66 @@ VIP_DOMAINS = {
     "swiggy.in", "zomato.com", "flipkart.com", "myntra.com",
     "bigbasket.com", "nykaa.com", "meesho.com",
     "makemytrip.com", "goibibo.com", "irctc.co.in", "booking.com",
-    # Payments / Fintech
+    # Payments / Fintech (India + Global)
     "paytm.com", "phonepe.com", "razorpay.com", "cashfree.com",
     "payu.in", "juspay.com", "gpay.app", "stripe.com",
+    "mobikwik.com", "freecharge.com", "billdesk.com",
+    # Indian NBFC Lenders / Fintech (Fix 5b — previously missing entire category)
+    "moneyview.in", "mvloans.in",
+    "kreditbee.com", "earlysalary.com", "fibe.in",
+    "cashe.co.in", "mpokket.com",
+    "lendingkart.com", "indifi.com",
+    "navi.com", "kissht.com",
+    "bajajfinserv.in", "bajajfinance.in", "bajajfinserv.com",
+    "hdfccredila.com", "lichousing.com",
     # Indian Banks
     "hdfcbank.com", "icicibank.com", "sbi.co.in", "axisbank.com",
     "kotak.com", "yesbank.in", "indusind.com", "pnb.co.in",
-    "unionbankofindia.co.in", "canarabank.com",
+    "unionbankofindia.co.in", "canarabank.com", "rblbank.com",
+    "federalbank.co.in", "idbibank.com", "idfcfirstbank.com",
     # Global Banks
     "chase.com", "wellsfargo.com", "bankofamerica.com", "citibank.com",
     "barclays.co.uk", "hsbc.com", "standardchartered.com",
+    # Indian Telecom (Fix 5b — previously missing)
+    "jio.com", "airtel.in", "airtel.com", "vodafone.in", "bsnl.co.in",
+    "idea.in", "reliancejio.com",
+    # Indian Insurance (Fix 5b — previously missing)
+    "policybazaar.com", "coverfox.com",
+    "hdfcergo.com", "icicilombard.com", "bajajallianz.com",
+    "starhealth.in", "niacl.co.in", "licindia.in",
     # Government
     "uidai.gov.in", "incometax.gov.in", "irs.gov", "gov.uk",
-    "mca.gov.in", "nsdl.co.in", "sebi.gov.in",
+    "mca.gov.in", "nsdl.co.in", "sebi.gov.in", "rbi.org.in",
+    "epfindia.gov.in", "gstn.org.in",
     # OTT / Media
     "hotstar.com", "disneyplus.com", "primevideo.com",
     "jiocinema.com", "sonyliv.com",
 }
+
+
+def _is_vip_domain(sender_domain: str) -> bool:
+    """
+    Fix 5a: Check if sender_domain is a VIP domain or a subdomain of one.
+
+    Exact match: 'moneyview.in' in VIP_DOMAINS → True
+    Subdomain match: 'payments.mvloans.in' → check 'mvloans.in' → True
+    Subdomain match: 'reminders.payments.mvloans.in' → check 'payments.mvloans.in',
+                     then 'mvloans.in' → True
+
+    This prevents the case where payments.mvloans.in was not getting trust
+    reduction because only the root domain mvloans.in was in VIP_DOMAINS.
+    """
+    if not sender_domain:
+        return False
+    if sender_domain in VIP_DOMAINS:
+        return True
+    # Walk up the domain hierarchy checking each parent
+    parts = sender_domain.split(".")
+    for i in range(1, len(parts) - 1):   # -1 to avoid bare TLDs like "in", "com"
+        parent = ".".join(parts[i:])
+        if parent in VIP_DOMAINS:
+            return True
+    return False
 
 
 def classify_risk_band(score):
@@ -185,6 +228,12 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
 
     if llm_available and llm_score is not None:
         llm_confidence = llm_result.get("confidence", 0.5)
+        llm_intent     = llm_result.get("intent", "unknown")
+        llm_tactics    = llm_result.get("tactics", [])
+
+        # -- Define safe/threat intent sets (used in multiple places below) --
+        _SAFE_INTENTS   = {"benign_notification", "conversational", "marketing"}
+        _THREAT_INTENTS = {"credential_theft", "financial_fraud", "malware_delivery", "coercion"}
 
         # 1. Base correlation across the active detectors
         # If multiple engines trigger at moderate levels, escalate the result.
@@ -193,10 +242,11 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
             analysis_steps.append("Correlation Engine: Multiple weak signals escalated threat.")
         else:
             base_score = (0.2 * rule_score) + (0.3 * ai_score) + (0.5 * llm_score)
-        
+
         final_score = base_score
 
         # 2. Smart veto logic
+        # -- Dangerous direction vetoes --
         if llm_score > 0.75:
             if llm_confidence > 0.8:
                 final_score = max(final_score, llm_score)
@@ -205,14 +255,40 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
             elif llm_confidence > 0.6:
                 final_score = max(final_score, llm_score * 0.85)
                 analysis_steps.append(f"Smart Veto: SOFT VETO triggered (confidence {llm_confidence}).")
-        elif (llm_score < 0.25 and llm_confidence >= 0.8) or (llm_score == 0.0 and llm_intent == "conversational"):
-            if llm_score == 0.0 and rule_score == 0.0:
+        elif llm_score > 0.60 and llm_intent in _THREAT_INTENTS and not llm_tactics == []:
+            # Moderate-confidence threat with intent agreement (Qwen3 path for real phishing)
+            final_score = max(final_score, llm_score * 0.80)
+            analysis_steps.append(f"Smart Veto: THREAT INTENT VETO triggered (intent={llm_intent}, conf={llm_confidence}).")
+
+        # -- Safe direction vetoes (three tiers, model-agnostic) --
+        # Tier A: high confidence + low threat (original, still applies)
+        _safe_tier_a = (llm_score < 0.25 and llm_confidence >= 0.8)
+        # Tier B: intent + threat + tactics all agree it is benign (Qwen3 path)
+        _safe_tier_b = (
+            llm_score < 0.25
+            and llm_confidence >= 0.65
+            and llm_intent in _SAFE_INTENTS
+            and len(llm_tactics) == 0          # no social engineering tactics detected
+        )
+        # Tier C: absolute safe (unchanged)
+        _safe_tier_c = (llm_score == 0.0 and llm_intent == "conversational")
+
+        if _safe_tier_c:
+            if rule_score == 0.0:
                 final_score = 0.0
                 analysis_steps.append("Smart Veto: ABSOLUTE SAFE override triggered (score forced to 0).")
             else:
                 final_score = min(final_score, llm_score + 0.1)
-                analysis_steps.append(f"Smart Veto: SAFE override triggered by high LLM confidence ({llm_confidence}).")
-             
+                analysis_steps.append(f"Smart Veto: SAFE override (Tier C conversational, conf={llm_confidence}).")
+        elif _safe_tier_a:
+            final_score = min(final_score, llm_score + 0.1)
+            analysis_steps.append(f"Smart Veto: SAFE override (Tier A high-conf={llm_confidence}).")
+        elif _safe_tier_b:
+            final_score = min(final_score, llm_score + 0.15)
+            analysis_steps.append(
+                f"Smart Veto: SAFE override (Tier B intent={llm_intent}, "
+                f"tactics=none, conf={llm_confidence})."
+            )
     else:
         # ==========================================================
         # FALLBACK SCORING — Intent-Gated Calibrated Blending
@@ -326,19 +402,43 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
 
     # -- Confidence override for extreme rule/model scores ----------------------
     active_scores = [s for s in [rule_score, ai_score, llm_score] if s is not None]
-    
-    # Do NOT apply the extreme safety override if the LLM explicitly vetoed as SAFE
+
+    # Do NOT apply the extreme safety override if the LLM explicitly vetoed as SAFE.
+    # Mirror the same three-tier safe conditions used in the veto block above.
+    _llm_conf_here  = llm_result.get("confidence", 0.5) if llm_result else 0.5
+    _llm_int_here   = llm_result.get("intent", "unknown") if llm_result else "unknown"
+    _llm_tac_here   = llm_result.get("tactics", []) if llm_result else []
+    _SAFE_INTENTS_G = {"benign_notification", "conversational", "marketing"}
+
     is_safe_veto = llm_available and (llm_score is not None) and (
-        (llm_score < 0.25 and llm_confidence >= 0.8) or (llm_score == 0.0 and llm_intent == "conversational")
+        # Tier A: original high-confidence safe
+        (llm_score < 0.25 and _llm_conf_here >= 0.8)
+        # Tier B: intent + tactics agree it is benign (Qwen3 path)
+        or (llm_score < 0.25 and _llm_conf_here >= 0.65
+            and _llm_int_here in _SAFE_INTENTS_G and len(_llm_tac_here) == 0)
+        # Tier C: absolute safe
+        or (llm_score == 0.0 and _llm_int_here == "conversational")
     )
-    
+
+    # Fix 4: Safety limit requires at least 2-of-3 engines to confirm high threat.
+    # Previously: rule_score > 0.9 alone was sufficient — this falsely triggered
+    # when legitimate companies put multiple bit.ly social-media footer links in emails
+    # (4 × bit.ly = 1.40 → capped at 1.0) even though LLM and AI said safe.
     if not is_safe_veto:
-        if any(s > 0.95 for s in active_scores) or rule_score > 0.9:
+        _engines_high = sum([
+            rule_score > 0.9,
+            ai_score   > 0.6,
+            (llm_score or 0) > 0.5,
+        ])
+        if _engines_high >= 2 or any(s > 0.95 for s in active_scores):
             final_score = max(final_score, 0.9)
-            analysis_steps.append("Safety Limit: Confidence override triggered")
+            analysis_steps.append(
+                f"Safety Limit: Multi-engine consensus override triggered "
+                f"({_engines_high}/3 engines above threshold)."
+            )
 
     # -- Conditional trust based on authentication signals ----------------------
-    sender_domain = sender.split("@")[-1].lower() if "@" in sender else ""
+    sender_domain = sender.split("@")[-1].replace(">", "").strip().lower() if "@" in sender else ""
     spf_pass  = sec_hdrs.get("spf", "").lower() == "pass"
     dkim_pass = sec_hdrs.get("dkim", "").lower() == "pass"
 
@@ -353,7 +453,7 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
     if not trust_original_auth:
         analysis_steps.append(
             f"Authentication trust disabled ({auth_context}); headers belong to forwarder or are unavailable")
-    elif sender_domain in VIP_DOMAINS and spf_pass and dkim_pass and not has_cta_mismatch:
+    elif _is_vip_domain(sender_domain) and spf_pass and dkim_pass and not has_cta_mismatch:
         # Do not suppress a result that the LLM already pushed high.
         if final_score >= 0.7:
             analysis_steps.append(f"ALERT: VIP Domain '{sender_domain}' authenticated, but ignored due to high threat Veto (Compromised sender/Invoice scam).")
@@ -364,7 +464,7 @@ def hybrid_detect(subject, email_text, sender="unknown_origin",
             analysis_steps.append(f"VIP Domain '{sender_domain}' authenticated -- trust boost applied (score reduced from {old_score:.3f} to {final_score:.3f})")
             rule_reasons.append(f"vip_authenticated:{sender_domain}")
             trust_arbitration = {"tier": "vip_authenticated", "applied": True, "reason": sender_domain}
-    elif sender_domain in VIP_DOMAINS and (not spf_pass or not dkim_pass):
+    elif _is_vip_domain(sender_domain) and (not spf_pass or not dkim_pass):
         # Claims to be a safelisted domain but authentication failed.
         boost = 0.15
         final_score = round(min(final_score + boost, 1.0), 3)

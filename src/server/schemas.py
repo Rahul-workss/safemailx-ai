@@ -194,6 +194,13 @@ class InstantUrlScanRequest(BaseModel):
     url: str = Field(..., min_length=8, max_length=2048)
     scan_mode: ScanMode = "balanced"
 
+class InstantEmailScanRequest(BaseModel):
+    """Request body for /api/instant/email — direct email body scan via SmartVetoOrchestrator."""
+    body: str = Field(..., min_length=1, max_length=200_000)
+    subject: str = Field("", max_length=500)
+    sender: str = Field("", max_length=320)
+    scan_mode: ScanMode = "balanced"
+
 class InstantFileScanRequest(BaseModel):
     filename: str
     content_type: str = "application/octet-stream"
@@ -235,7 +242,7 @@ class QuickScanArtifacts(BaseModel):
 
 class InstantScanResult(BaseModel):
     scan_id: str
-    channel: Literal["sms", "url", "file"]
+    channel: Literal["sms", "url", "file", "email"]
     verdict: Verdict
     risk_score: float
     confidence: float

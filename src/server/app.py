@@ -42,6 +42,7 @@ from server.schemas import (
     GmailOAuthStatusResponse,
     GmailLabelsResponse,
     HealthResponse,
+    InstantEmailScanRequest,
     LoginRequest,
     ManualScanRequest,
     ManualSmsScanRequest,
@@ -168,16 +169,19 @@ from server.gmail_watcher import run_gmail_watcher
 
 def _resilient_thread(name: str, target_fn):
     """Wraps a worker function in an infinite restart loop so
-    the thread NEVER permanently dies â€” it auto-restarts after
-    any crash with a 5-second backoff."""
+    the thread NEVER permanently dies — it auto-restarts after
+    any crash with a 5-second backoff. The sleep only happens
+    on crashes, not on a clean return."""
     def wrapper():
         while True:
             try:
                 print(f"[APP] {name} thread starting...")
                 target_fn()
+                # target_fn() returned without crashing — restart immediately
+                print(f"[APP] {name} thread exited cleanly. Restarting...")
             except Exception as exc:
                 print(f"[APP] {name} thread crashed: {exc}. Restarting in 5s...")
-            time.sleep(5)
+                time.sleep(5)
     return wrapper
 
 
@@ -1230,6 +1234,15 @@ async def instant_scan_file(
         _user_id(_auth),
         scan_mode=scan_mode,
     )
+
+
+@app.post("/api/instant/email", response_model=InstantScanResult)
+def instant_scan_email(payload: InstantEmailScanRequest, _auth=Depends(require_auth)):
+    """Instantly scan an email body using Qwen 3 + rule engine.
+    Use this for manual email submission from the Scan Center.
+    Gmail-connected scans go through the worker queue (/api/gmail/run-once).
+    """
+    return inline_scan_service.scan_email(payload, _user_id(_auth))
 
 
 import urllib.request

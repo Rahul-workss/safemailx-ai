@@ -58,6 +58,10 @@ _FAKE_ROLE_TAG_PATTERNS = [
     r"\[/?(?:system|assistant|instructions?|prompt|override)\]",
     r"###\s*(?:system|assistant|user|instruction)\s*:",
     r"\|\|\|\s*(?:system|assistant|override)",
+    # Group 5 addition: Qwen 3 thinking-mode escape attack.
+    # An attacker can embed </think> in email body to break out of the model's
+    # reasoning block and inject a fake verdict into the post-think answer.
+    r"</?think(?:ing)?>",
 ]
 
 # Group 5: Encoding hints — weak signal individually, meaningful in combination
@@ -80,6 +84,8 @@ _SANITIZE_PATTERNS = [
     re.compile(r"</?(?:system|assistant|user|prompt|instruction)>", re.IGNORECASE),
     re.compile(r"\[/?(?:system|assistant|instructions?|prompt|override)\]", re.IGNORECASE),
     re.compile(r"###\s*(?:system|assistant|user|instruction)\s*:", re.IGNORECASE),
+    # Qwen 3 thinking-mode tag sanitizer (additive — no existing pattern changed).
+    re.compile(r"</?think(?:ing)?>", re.IGNORECASE),
 ]
 
 

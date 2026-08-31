@@ -53,7 +53,22 @@ def _extract_email_address(value: str | None) -> str:
 def run_worker() -> None:
     repository = ScanRepository()
     service = ScanService(repository)
+
+    # ── Startup banner — shows environment so stale workers are immediately visible ──
+    import sys as _sys
+    import os as _os
+    try:
+        from engines.llm_analyzer import _get_live_config as _glc
+        _cfg = _glc()
+        _model_line = f"model={_cfg['model']!r}  max_tokens={_cfg['max_tokens']}  thinking={_cfg['thinking']}"
+    except Exception as _e:
+        _model_line = f"(could not read: {_e})"
+    print("=" * 60)
     print("[WORKER] SafeMail X scan worker started.")
+    print(f"[WORKER] Python : {_sys.executable}")
+    print(f"[WORKER] CWD    : {_os.getcwd()}")
+    print(f"[WORKER] LLM    : {_model_line}")
+    print("=" * 60)
 
     # Feature 3: Start offline safe-browsing sync thread (daemon, starts once)
     if FEATURE_OFFLINE_SAFEBROWSING_ENABLED and _OFFLINE_SYNC_AVAILABLE:

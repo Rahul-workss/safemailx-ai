@@ -1,6 +1,6 @@
 # =============================================
 # TrustMail LLM Analysis Module
-# Uses Qwen 2.5 through LM Studio
+# Qwen 3 8B (thinking mode) via LM Studio
 # =============================================
 
 import json
@@ -11,6 +11,7 @@ import requests
 
 from utils.config import (
     LLM_BASE_URL,
+    LLM_ENABLE_THINKING,
     LLM_EMAIL_CHAR_LIMIT,
     LLM_HEALTH_URL,
     LLM_MAX_CONTEXT_TOKENS,
@@ -20,6 +21,44 @@ from utils.config import (
     LLM_TIMEOUT,
     LM_STUDIO_AUTO_CONTEXT,
 )
+import logging as _logging
+_llc_logger = _logging.getLogger(__name__)
+
+
+def _get_live_config() -> dict:
+    """Read LLM config fresh from .env on every call — no restart needed for model changes.
+    Self-contained: uses Path(__file__) so it works regardless of CWD or import context.
+    Logs any failure so bugs are visible in uvicorn/worker logs.
+    """
+    try:
+        from pathlib import Path as _Path
+        # src/engines/llm_analyzer.py → parents[0]=engines, parents[1]=src, parents[2]=project root
+        _env_path = _Path(__file__).resolve().parents[2] / ".env"
+        _env: dict = {}
+        if _env_path.exists():
+            with open(_env_path, "r", encoding="utf-8", errors="replace") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith("#") and "=" in _line:
+                        _k, _, _v = _line.partition("=")
+                        _env[_k.strip()] = _v.strip()
+        _model = _env.get("LLM_MODEL", "").strip() or LLM_MODEL
+        _thinking_raw = _env.get("LLM_ENABLE_THINKING", "").strip().lower()
+        _thinking = _thinking_raw in {"1", "true", "yes", "on"} if _thinking_raw else LLM_ENABLE_THINKING
+        try:
+            _max_tokens = int(_env.get("LLM_MAX_OUTPUT_TOKENS", str(LLM_MAX_OUTPUT_TOKENS)))
+        except (ValueError, TypeError):
+            _max_tokens = LLM_MAX_OUTPUT_TOKENS
+        return {"model": _model, "thinking": _thinking, "max_tokens": _max_tokens}
+    except Exception as _exc:
+        _llc_logger.warning(
+            "_get_live_config() failed, using startup defaults. "
+            "model=%s thinking=%s max_tokens=%s  error=%s",
+            LLM_MODEL, LLM_ENABLE_THINKING, LLM_MAX_OUTPUT_TOKENS, _exc
+        )
+        return {"model": LLM_MODEL, "thinking": LLM_ENABLE_THINKING, "max_tokens": LLM_MAX_OUTPUT_TOKENS}
+
+
 
 # -- Feature 2: Prompt Injection Guard -----------------------------------------
 try:
@@ -81,33 +120,36 @@ Use this calibration guide — your scores MUST align with these:
 
 Return a JSON object with EXACTLY these keys:
 {
-  "urgency_score": <integer 0-10, 0=no urgency, 10=extreme artificial panic>,
-  "legitimacy_score": <integer 0-10, 0=clearly genuine, 10=clearly impersonating>,
-  "grammar_score": <integer 0-10, 0=professional, 10=very poor/suspicious>,
-  "coherence_score": <integer 0-10, 0=fully logical, 10=nonsensical template>,
-  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]>,
+  "urgency_score": <integer 0-10. 0=completely calm/no urgency. 10=extreme artificial panic. A real bank alert scores 1-2. A "ACCOUNT DELETED IN 1 HOUR" phishing scores 9-10.>,
+  "legitimacy_score": <integer 0-10. 0=clearly a genuine email from a real org. 10=clearly impersonating a real org. A real Moneyview loan email scores 1-2. A fake Amazon account alert scores 8-9.>,
+  "grammar_score": <integer 0-10. 0=perfect professional grammar. 10=very poor, suspicious, machine-translated. A well-written corporate email scores 0-1.>,
+  "coherence_score": <integer 0-10. 0=fully logical and coherent. 10=nonsensical, generic template with no specifics. A personalized notification with loan ID scores 0-2.>,
+  "social_engineering_tactics": <list from: ["pretexting","authority_impersonation","fear_appeal","reward_lure","artificial_scarcity","credential_harvesting","false_deadline","trust_exploitation","none_detected"]. Only include tactics that are ACTUALLY PRESENT. An informational update with no manipulation gets []>,
   "detected_intent": <string from: ["credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"]>,
   "threat_probability": <float 0.0-1.0>,
+  "confidence": <float 0.0-1.0, how certain you are about your threat_probability. 0.9+ = very sure, 0.5 = genuinely ambiguous>,
   "reasoning": <string: 2-3 sentence professional assessment. Include the apparent intent, the strongest benign or suspicious evidence, and what factor most influenced the score. Do not expose hidden chain-of-thought.>
 }
 
-EXAMPLE OUTPUT:
+EXAMPLE OUTPUT (legitimate loan notification):
 {
-  "urgency_score": 2,
-  "legitimacy_score": 0,
+  "urgency_score": 1,
+  "legitimacy_score": 1,
   "grammar_score": 0,
-  "coherence_score": 0,
+  "coherence_score": 1,
   "social_engineering_tactics": [],
   "detected_intent": "benign_notification",
   "threat_probability": 0.05,
+  "confidence": 0.92,
   "reasoning": "This is a standard automated notification from a verified service with no suspicious links."
 }
 
 RULES:
-- Return ONLY valid JSON. No markdown fences, no extra text, no thinking tags.
-- If the email is clearly a real service notification, give it LOW scores.
+- Return ONLY the JSON object in your final response. No markdown fences, no extra text.
+- If the email is clearly a real service notification, give it LOW scores (0-2 range).
 - NEVER flag a legitimate marketing email as high-threat just because it uses urgency words.
 - Focus on INTENT and DECEPTION, not just keywords.
+- social_engineering_tactics must only list tactics ACTUALLY present — do NOT add "reward_lure" for a routine service update.
 - If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
 
     "sms": """You are a Cybersecurity SMS Analyst specializing in SMISHING (SMS Phishing) detection.
@@ -134,7 +176,7 @@ Return a JSON object with EXACTLY these keys:
 }
 
 RULES:
-- Return ONLY valid JSON. No markdown fences, no extra text.
+- Return ONLY the JSON object in your final response. No markdown fences, no extra text.
 - Rely heavily on the provided metadata/features to inform your probability score.
 - If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
 
@@ -160,7 +202,7 @@ Return a JSON object with EXACTLY these keys:
 }
 
 RULES:
-- Return ONLY valid JSON. No markdown fences, no extra text.
+- Return ONLY the JSON object in your final response. No markdown fences, no extra text.
 - If the message is extremely short and conversational (e.g., 'hey there', 'how are you') with NO links and NO suspicious requests, score it EXACTLY threat_probability: 0.0 and set detected_intent: 'conversational'.""",
 
     "url": """You are a Cybersecurity Web Analyst specializing in malicious URL detection and credential harvesting lures.
@@ -186,7 +228,7 @@ Return a JSON object with EXACTLY these keys:
 }
 
 RULES:
-- Return ONLY valid JSON. No markdown fences, no extra text.""",
+- Return ONLY the JSON object in your final response. No markdown fences, no extra text.""",
 
     "file": """You are a Cybersecurity Malware Analyst specializing in document lures.
 
@@ -210,7 +252,7 @@ Return a JSON object with EXACTLY these keys:
 }
 
 RULES:
-- Return ONLY valid JSON. No markdown fences, no extra text."""
+- Return ONLY the JSON object in your final response. No markdown fences, no extra text."""
 }
 
 def get_system_prompt(channel: str) -> str:
@@ -325,7 +367,7 @@ def run_llm_analysis(
     text: str | None = None,
 ) -> dict | None:
     """
-    Send email content to Qwen 2.5 7B and return structured features.
+    Send content to the configured LLM (Qwen 3 8B via LM Studio) and return structured features.
 
     Returns a dict with keys:
         llm_score, urgency_score, legitimacy_score, grammar_score,
@@ -353,6 +395,15 @@ def run_llm_analysis(
 
     system_prompt = get_system_prompt(channel)
 
+    # ── Live config read (always fresh from .env — no restart needed) ──────
+    _live_cfg = _get_live_config()
+    print(
+        f"[LLM] Scan config: model={_live_cfg['model']!r}  "
+        f"max_tokens={_live_cfg['max_tokens']}  "
+        f"thinking={_live_cfg['thinking']}  "
+        f"channel={channel!r}"
+    )
+
     # Build the user message with the available forensic context.
     user_prefix = (
         f"Analyze this {channel} using the forensic protocol.\n\n"
@@ -366,13 +417,10 @@ def run_llm_analysis(
 
     user_suffix = (
         "\n--- END ---\n\n"
-        "Apply the protocol internally to evaluate the content. "
-        "DO NOT output your internal reasoning steps. You must output ONLY the final JSON object."
+        "Apply the protocol to evaluate the content. "
+        "Output ONLY the final JSON object in your response — no preambles, no markdown, no extra text."
     )
-    
-    # We must patch _fit_email_to_context and _build_user_message calls locally
-    # since they previously relied on the global SYSTEM_PROMPT. 
-    # For now, we will compute char_limit locally or rely on their default logic.
+
     # -- Feature 2: Prompt Injection Guard ------------------------------------
     # sanitize_for_prompt runs UNCONDITIONALLY — zero scoring impact, pure defense.
     # scan_for_prompt_injection result is attached to the returned dict so
@@ -380,16 +428,22 @@ def run_llm_analysis(
     user_msg = _build_user_message(user_prefix, user_suffix, email_text)
 
     payload = {
-        "model": LLM_MODEL,
+        "model": _live_cfg["model"],
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_msg},
         ],
         "temperature": 0.1,
         "top_p": 0.8,
-        "max_tokens": LLM_MAX_OUTPUT_TOKENS,
+        "max_tokens": _live_cfg["max_tokens"],
         "stream": False,
     }
+    # Enable Qwen 3 chain-of-thought reasoning via LM Studio chat_template_kwargs.
+    # LLM_ENABLE_THINKING=false in .env disables this for Qwen 2.5 rollback.
+    # Both values are read live from .env so changes take effect without restart.
+    if _live_cfg["thinking"]:
+        payload["chat_template_kwargs"] = {"enable_thinking": True}
+
 
     import threading
     import sys
@@ -405,29 +459,29 @@ def run_llm_analysis(
             direction = 1
             while not done:
                 elapsed = time.time() - start
-                
+
                 # Draw a simple progress indicator while the request is running.
                 bar = ['-'] * bar_len
                 bar[pos] = '#'
                 if pos > 0: bar[pos-1] = '='
                 if pos < bar_len - 1: bar[pos+1] = '='
-                
+
                 bar_str = "".join(bar)
                 sys.stdout.write(
                     f"\r[LLM] [{bar_str}] Running analysis... "
                     f"({int(elapsed)}s elapsed)  "
                 )
                 sys.stdout.flush()
-                
+
                 pos += direction
                 if pos == bar_len - 1:
                     direction = -1
                 elif pos == 0:
                     direction = 1
-                    
+
                 time.sleep(0.1)
 
-        t = threading.Thread(target=progress_bar)
+        t = threading.Thread(target=progress_bar, daemon=True)
         t.start()
 
         try:
@@ -468,13 +522,13 @@ def run_llm_analysis(
             sys.stdout.flush()
 
         msg = resp.json()["choices"][0]["message"]
-        content = msg.get("content", "") or ""
-        reasoning = msg.get("reasoning_content", "") or ""
-        
-        # Some responses place the JSON inside the reasoning block, so combine both.
-        raw = (reasoning + "\n" + content).strip()[:100000]
+        content     = (msg.get("content", "") or "").strip()
+        think_block = (msg.get("reasoning_content", "") or "").strip()
+
+        think_words = len(think_block.split()) if think_block else 0
         print(f"[LLM] Analysis complete. "
-              f"({len(raw)} chars received)")
+              f"({len(content)} chars in answer"
+              f"{f', {think_words} think-words' if think_block else ''})")
 
     except requests.exceptions.ConnectionError:
         print("[LLM] LM Studio not running "
@@ -494,32 +548,57 @@ def run_llm_analysis(
               "-- fallback to TF-IDF.")
         return None
 
-    # -- Parse JSON ------------------------------------------------------------
+    # -- Parse JSON — 2-stage parser for Qwen 3 thinking mode -----------------
+    # Stage 1: Try the content field directly.
+    #   Qwen 3 (thinking mode): LM Studio puts the JSON answer in `content`
+    #   and the think block in `reasoning_content`. Parsing `content` alone
+    #   is clean — no think-block text to confuse the parser.
+    # Stage 2: Fallback — search combined text.
+    #   Qwen 2.5 path (reasoning_content is always empty, JSON is in content).
+    #   Also catches edge cases where content has a preamble before the JSON.
+    raw = content  # used in error messages; may be overwritten in Stage 2
     try:
-        # Try direct JSON parsing first.
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            # Fallback 1: remove markdown code blocks if present.
-            clean_raw = re.sub(r"```(?:json)?\s*([\s\S]*?)\s*```", r"\1", raw).strip()
+        _parsed_s1 = None
+        if content:
             try:
-                parsed = json.loads(clean_raw)
+                _parsed_s1 = json.loads(content)
             except json.JSONDecodeError:
-                # Fallback 2: extract the last JSON-like block.
-                matches = list(re.finditer(r"\{[\s\S]*\}", raw))
-                if not matches:
-                    # Fallback 3: no JSON-like block was returned.
-                    raise ValueError("No JSON object found in LLM output")
-                
-                # Use the last match, which is usually the final JSON object.
-                json_candidate = matches[-1].group(0)
-                parsed = json.loads(json_candidate)
+                # Stage 1b: strip markdown fences from content and retry.
+                _clean_content = re.sub(
+                    r"```(?:json)?\s*([\s\S]*?)\s*```", r"\1", content
+                ).strip()
+                try:
+                    _parsed_s1 = json.loads(_clean_content)
+                    raw = _clean_content
+                except json.JSONDecodeError:
+                    pass  # fall through to Stage 2
+
+        if _parsed_s1 is not None:
+            parsed = _parsed_s1
+        else:
+            # Stage 2: combine think block + content and search for last JSON object.
+            raw = (think_block + "\n" + content).strip()[:100000]
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                clean_raw = re.sub(
+                    r"```(?:json)?\s*([\s\S]*?)\s*```", r"\1", raw
+                ).strip()
+                try:
+                    parsed = json.loads(clean_raw)
+                except json.JSONDecodeError:
+                    matches = list(re.finditer(r"\{[\s\S]*\}", raw))
+                    if not matches:
+                        raise ValueError("No JSON object found in LLM output")
+                    # Use the last match (final JSON object after any think-block examples)
+                    json_candidate = matches[-1].group(0)
+                    parsed = json.loads(json_candidate)
+
         if not isinstance(parsed, dict):
             raise ValueError("LLM output was not a JSON object")
-                
+
     except (json.JSONDecodeError, ValueError) as e:
         print(f"[LLM] JSON parse failed: {e}")
-        # Print a short preview to help with local debugging.
         debug_snippet = raw[:500].replace("\n", " ")
         print(f"[LLM] RAW OUTPUT PREVIEW: {debug_snippet}...")
         print("[LLM] Falling back to TF-IDF.")
@@ -549,7 +628,7 @@ def run_llm_analysis(
         tactics = []
     tactics = [t[:80] for t in tactics
                if isinstance(t, str) and t.lower() != "none_detected"][:12]
-               
+
     allowed_intents = {"credential_theft", "financial_fraud", "malware_delivery", "coercion", "benign_notification", "marketing", "conversational", "unknown"}
     intent = str(parsed.get("detected_intent", "unknown")).lower()
     if intent not in allowed_intents:
@@ -559,22 +638,44 @@ def run_llm_analysis(
                                "No detailed reasoning provided."))[:2000]
 
     # -- Calculate LLM confidence score ----------------------------------------
-    confidence = 0.5  # Base confidence
-    
-    if len(tactics) > 0:
-        confidence += 0.2
-    if urgency >= 8:
-        confidence += 0.1
-    if legit >= 8:
-        confidence += 0.1
-    if cohere >= 7:
-        confidence += 0.1
-    if intent in ["credential_theft", "financial_fraud", "malware_delivery", "coercion"]:
-        confidence += 0.2
-    elif intent in ["benign_notification", "marketing", "conversational"]:
-        confidence += 0.2  # Strong confidence in a benign result
-        
-    confidence = min(1.0, confidence)
+    # Model-agnostic: measures HOW CLEARLY the primary outputs point in one
+    # direction — not how many suspicious signals exist.
+    # This works correctly for both Qwen2.5 and Qwen3 (and future models).
+    #
+    # Old formula rewarded Qwen2.5's miscalibrated subscores (high legit/cohere
+    # on legitimate emails → artificially high confidence). Qwen3 gives correct
+    # subscores (low legit for genuine email) → old formula gave 0.7, breaking
+    # the safe override threshold of 0.8.
+
+    _BENIGN_INTENTS = {"benign_notification", "conversational", "marketing"}
+    _THREAT_INTENTS = {"credential_theft", "financial_fraud", "malware_delivery", "coercion"}
+
+    # Base: how far is threat from the uncertain midpoint (0.5)?
+    # 0.0 → ambiguous; 0.5 → completely certain in one direction
+    _distance = abs(threat - 0.5)                        # 0.0–0.5
+    confidence = 0.40 + (_distance * 1.20)               # maps: 0→0.40, 0.35→0.82, 0.5→1.0
+
+    # Corroboration: threat direction matches intent (both agree → more confident)
+    if threat < 0.25 and intent in _BENIGN_INTENTS:
+        confidence += 0.15    # LLM clearly says safe AND intent confirms it
+    elif threat > 0.70 and intent in _THREAT_INTENTS:
+        confidence += 0.15    # LLM clearly says danger AND intent confirms it
+
+    # Corroboration: tactics list is consistent with threat direction
+    if tactics and threat > 0.35:
+        confidence += 0.10    # tactics found and score is elevated — consistent
+    elif not tactics and threat < 0.35:
+        confidence += 0.05    # no tactics and score is low — consistent
+
+    # If the LLM itself reported a confidence value (new prompt field), blend it in.
+    # The LLM's self-assessment is useful signal but we don't fully trust it to
+    # avoid prompt injection attacks that claim high confidence for malicious emails.
+    _llm_self_confidence = _clamp_float(parsed.get("confidence"), 0.0, 1.0, None)
+    if _llm_self_confidence is not None:
+        # Weight: 60% computed (robust), 40% LLM self-reported (informed but manipulable)
+        confidence = round(0.60 * confidence + 0.40 * _llm_self_confidence, 2)
+
+    confidence = min(1.0, round(confidence, 2))
 
     result = {
         "llm_score":        threat,
@@ -594,6 +695,6 @@ def run_llm_analysis(
     print(f"[LLM] Threat: {threat:.2f} | Confidence: {confidence:.2f} | "
           f"Intent: {intent} | Tactics: {tactics}")
     if injection_finding.get("injection_detected"):
-        print(f"[LLM] ⚠️  Prompt injection attempt detected in content "
+        print(f"[LLM] \u26a0\ufe0f  Prompt injection attempt detected in content "
               f"(confidence={injection_finding['confidence']})")
     return result
