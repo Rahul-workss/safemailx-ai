@@ -139,3 +139,9 @@ FEATURE_VISHING_DETECTION_ENABLED = os.getenv("FEATURE_VISHING_DETECTION_ENABLED
 # Other valid values: 'base', 'small', 'medium', 'large' (for self-hosted).
 WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "tiny").strip().lower()
 
+
+FEATURE_CALL_ANALYSIS_ENABLED = os.getenv("FEATURE_CALL_ANALYSIS_ENABLED", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+INDICWHISPER_MODEL_SIZE = os.getenv("INDICWHISPER_MODEL_SIZE", "base").strip().lower()
+CALL_ANALYSIS_RATE_LIMIT_PER_HOUR = int(os.getenv("CALL_ANALYSIS_RATE_LIMIT_PER_HOUR", "10"))

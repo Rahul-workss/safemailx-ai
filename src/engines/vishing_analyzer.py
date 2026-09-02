@@ -196,3 +196,53 @@ def analyze_audio_for_vishing(
         f"[Audio transcript — vishing detection]\n\n{transcript}"
     )
     return {**transcription, "text_for_analysis": text_for_analysis}
+
+def transcribe_voice_description(
+    audio_bytes: bytes,
+    filename: str = "description.wav",
+    model_size: Optional[str] = None,
+) -> dict:
+    """
+    Transcribe a short user voice description (20s max) for the Hold+Describe feature.
+    Tries faster-whisper first, then falls back to openai-whisper.
+    """
+    if model_size is None:
+        try:
+            from utils.config import INDICWHISPER_MODEL_SIZE
+            model_size = INDICWHISPER_MODEL_SIZE
+        except ImportError:
+            model_size = "base"
+
+    # Try faster-whisper first
+    try:
+        import faster_whisper
+        import tempfile, os
+        ext = os.path.splitext(filename)[-1].lower() or ".wav"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+        try:
+            model = faster_whisper.WhisperModel(model_size, device="cpu", compute_type="int8")
+            segments, info = model.transcribe(tmp_path, beam_size=5)
+            transcript = " ".join(seg.text for seg in segments).strip()
+            logger.info("[VISHING] faster-whisper transcribed %d chars. lang=%s",
+                        len(transcript), info.language)
+            return {
+                "success": True,
+                "transcript": transcript,
+                "language": info.language,
+                "model": f"faster-whisper-{model_size}",
+                "reason": ""
+            }
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    except ImportError:
+        logger.info("[VISHING] faster-whisper not available, trying openai-whisper")
+    except Exception as e:
+        logger.warning("[VISHING] faster-whisper failed: %s", e)
+
+    # Fallback to openai-whisper
+    return transcribe_audio(audio_bytes, filename=filename, model_size="tiny")

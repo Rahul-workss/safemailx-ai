@@ -1,0 +1,136 @@
+[
+  {
+    "slug": "digital_arrest",
+    "display_name": "Digital Arrest Scam",
+    "description": "Caller impersonates CBI, ED, or Police and claims victim is implicated in money laundering or drug trafficking. Threatens arrest via video call ('digital arrest') unless victim transfers money to a 'safe account'.",
+    "key_phrases": [
+      "digital arrest", "safe custody account", "safe account transfer",
+      "CBI officer", "ED officer", "Enforcement Directorate", "money laundering",
+      "narcotics found", "drug trafficking", "stay on video call",
+      "you are under investigation", "arrest warrant issued",
+      "giraftari warrant", "case darj ho gaya", "narcotics mila",
+      "digital giraftari", "Supreme Court order"
+    ],
+    "typical_stages": ["AUTHORITY", "FEAR", "ISOLATION", "ACTION"],
+    "action_requested": "money_transfer",
+    "reported_cases": "14000+ (MHA 2024 data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "kyc_fraud",
+    "display_name": "KYC Update Scam",
+    "description": "Caller claims to be from a bank or payment app. Warns that account will be blocked today if KYC is not updated. Asks for OTP, PAN, or downloading a screen-sharing app.",
+    "key_phrases": [
+      "KYC update", "account blocked", "account suspend",
+      "PAN link", "Aadhaar link", "24 hours",
+      "OTP share", "OTP batao", "app download karo",
+      "bank manager", "customer care", "verification process",
+      "khata band ho jayega", "turant update", "link pe click"
+    ],
+    "typical_stages": ["HOOK", "URGENCY", "FEAR", "ACTION"],
+    "action_requested": "otp_or_app_install",
+    "reported_cases": "45000+ (RBI 2024 data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "fedex_customs",
+    "display_name": "FedEx / Customs Parcel Scam",
+    "description": "Caller claims a parcel in your name was intercepted by customs and contains illegal items (drugs/passports). Demands payment to clear your name or connects you to 'cyber police'.",
+    "key_phrases": [
+      "FedEx parcel", "customs department", "illegal parcel",
+      "drugs found", "narcotics", "passports", "money laundering",
+      "connect to cyber police", "FIR file", "parcel seized",
+      "customs duty", "clearance fee", "payment to clear name",
+      "aapke naam ka parcel", "illegal saman", "police ko transfer"
+    ],
+    "typical_stages": ["AUTHORITY", "FEAR", "ISOLATION", "ACTION"],
+    "action_requested": "money_transfer",
+    "reported_cases": "8000+ (MHA 2024 data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "electricity_disconnection",
+    "display_name": "Electricity Disconnection Scam",
+    "description": "Caller claims your previous month's electricity bill was not updated. Threatens power disconnection tonight. Asks to pay a small amount via a link or download an app.",
+    "key_phrases": [
+      "electricity bill", "power disconnect", "bijli kat jayegi",
+      "previous month bill", "update not done", "tonight 9 PM",
+      "aaj raat 9 baje", "10 rupees payment", "link sent",
+      "QuickSupport app", "AnyDesk", "electricity board",
+      "bill pending", "online update"
+    ],
+    "typical_stages": ["HOOK", "URGENCY", "FEAR", "ACTION"],
+    "action_requested": "app_install_or_payment",
+    "reported_cases": "12000+ (Power Ministry data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "sim_block",
+    "display_name": "TRAI / SIM Block Scam",
+    "description": "Automated voice or caller claiming to be from TRAI. States your number is being used for illegal activities and will be blocked in 2 hours. Asks to press 9 or share OTP.",
+    "key_phrases": [
+      "TRAI department", "SIM block", "number block",
+      "illegal activity", "police complaint", "2 hours",
+      "press 9", "customer care executive", "Aadhaar misuse",
+      "aapka number band", "FIR register", "verification OTP"
+    ],
+    "typical_stages": ["AUTHORITY", "URGENCY", "FEAR", "ACTION"],
+    "action_requested": "otp_or_personal_info",
+    "reported_cases": "20000+ (DoT data)",
+    "advisory": "https://sancharsaathi.gov.in/",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "income_tax_refund",
+    "display_name": "Income Tax Refund Scam",
+    "description": "Caller claims you have a pending income tax refund. Sends a link or asks for bank details/OTP to process the refund immediately.",
+    "key_phrases": [
+      "income tax refund", "TDS refund", "tax department",
+      "refund pending", "amount approved", "bank details",
+      "OTP for refund", "click link", "tax officer",
+      "refund ka paisa", "account mein transfer", "immediate process"
+    ],
+    "typical_stages": ["HOOK", "URGENCY", "ACTION"],
+    "action_requested": "otp_or_bank_details",
+    "reported_cases": "5000+ (CBDT data)",
+    "advisory": "https://incometax.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "lottery_prize",
+    "display_name": "Lottery / KBC Prize Scam",
+    "description": "Caller claims you won a lottery (KBC, Amazon, Jio). Demands a 'processing fee' or 'GST' payment before releasing the prize money.",
+    "key_phrases": [
+      "lottery won", "KBC prize", "lucky draw",
+      "25 lakh", "processing fee", "GST payment",
+      "prize money", "WhatsApp call", "Amitabh Bachchan",
+      "lottery jeeta hai", "tax pay karo", "advance payment",
+      "Amazon lucky winner"
+    ],
+    "typical_stages": ["HOOK", "URGENCY", "ACTION"],
+    "action_requested": "advance_fee_payment",
+    "reported_cases": "30000+ (Police data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  },
+  {
+    "slug": "tech_support",
+    "display_name": "Tech Support Scam",
+    "description": "Caller claims to be from Microsoft or Apple. Says your computer/phone has a virus or your bank account is compromised. Asks to install remote access software.",
+    "key_phrases": [
+      "Microsoft support", "Apple support", "computer virus",
+      "hacked", "compromised", "AnyDesk", "TeamViewer",
+      "remote access", "system scan", "error detected",
+      "bank account hack", "virus nikalna", "app download"
+    ],
+    "typical_stages": ["AUTHORITY", "FEAR", "ACTION"],
+    "action_requested": "app_install",
+    "reported_cases": "10000+ (CERT-In data)",
+    "advisory": "https://cybercrime.gov.in",
+    "official_callback": "1930"
+  }
+]

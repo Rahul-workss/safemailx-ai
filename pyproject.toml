@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+# Fix for conflicting import paths:
+# test_corpus_regression.py uses: from engines.instant_scan_engine import ...  (no src. prefix)
+# test_llm_analyzer.py uses:      from src.engines.llm_analyzer import ...     (src. prefix)
+# Adding both "src" and "." lets pytest find modules under both conventions.
+pythonpath = ["src", "."]
+testpaths = ["tests"]

@@ -265,3 +265,19 @@ class InstantScanResult(BaseModel):
     llm_score: float | None = None
     # Feature 1: QR quishing — None when no QR scan was performed or flag is off
     qr_analysis: dict | None = None
+class CallAnalysisResponse(BaseModel):
+    final_score: float
+    risk_band: str
+    score_display: int
+    org_claimed: str = ""
+    purpose_detected: str = ""
+    why_flagged: list[str] = []
+    recommended_action: str = ""
+    official_callback_number: str = ""
+    report_url: str = "cybercrime.gov.in | Helpline: 1930"
+    signals_fired: list[str] = []
+    hard_floors_triggered: list[str] = []
+    full_explanation: str = ""
+    composite_score: float = 0.0
+    floor_score: float = 0.0
+    layer_results: dict = {}

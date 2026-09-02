@@ -1,0 +1,897 @@
+{
+  "label": "--corpus",
+  "per_case": [
+    {
+      "case_id": "email/legit_bank_security_alert",
+      "channel": "email",
+      "expected": "legitimate",
+      "actual": "suspicious",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.45,
+      "llm_score": 0.2,
+      "llm_available": true,
+      "response_time_ms": 397922,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "email/legit_order_shipped",
+      "channel": "email",
+      "expected": "legitimate",
+      "actual": "suspicious",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.45,
+      "llm_score": 0.1,
+      "llm_available": true,
+      "response_time_ms": 184365,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "email/phish_amazon_account_locked",
+      "channel": "email",
+      "expected": "phishing",
+      "actual": "phishing",
+      "correct": true,
+      "bucket": "TP",
+      "final_score": 1.0,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 176428,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "email/phish_cloud_invoice_credential",
+      "channel": "email",
+      "expected": "phishing",
+      "actual": "phishing",
+      "correct": true,
+      "bucket": "TP",
+      "final_score": 0.95,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 217598,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "email/phish_password_reset_harvest",
+      "channel": "email",
+      "expected": "phishing",
+      "actual": "phishing",
+      "correct": true,
+      "bucket": "TP",
+      "final_score": 0.85,
+      "llm_score": 0.85,
+      "llm_available": true,
+      "response_time_ms": 174583,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/legit_amazon_order",
+      "channel": "sms",
+      "expected": "legitimate",
+      "actual": "suspicious",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.68,
+      "llm_score": 0.75,
+      "llm_available": true,
+      "response_time_ms": 131685,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/legit_bank_otp",
+      "channel": "sms",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.0,
+      "llm_score": 0.85,
+      "llm_available": true,
+      "response_time_ms": 57280,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/legit_courier_tracking",
+      "channel": "sms",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.4,
+      "llm_score": 0.1,
+      "llm_available": true,
+      "response_time_ms": 146982,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/legit_google_otp",
+      "channel": "sms",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.0,
+      "llm_score": 0.8,
+      "llm_available": true,
+      "response_time_ms": 41303,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/phish_fake_bank",
+      "channel": "sms",
+      "expected": "phishing",
+      "actual": "legitimate",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.4,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 101644,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/phish_irs_refund",
+      "channel": "sms",
+      "expected": "phishing",
+      "actual": "legitimate",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.36,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 168416,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/phish_prize_winner",
+      "channel": "sms",
+      "expected": "phishing",
+      "actual": "legitimate",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.36,
+      "llm_score": 0.92,
+      "llm_available": true,
+      "response_time_ms": 100352,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "sms/phish_toll_bait",
+      "channel": "sms",
+      "expected": "phishing",
+      "actual": "suspicious",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.58,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 148604,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "url/legit_brand_login",
+      "channel": "url",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.07,
+      "llm_score": 0.25,
+      "llm_available": true,
+      "response_time_ms": 75623,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "url/legit_github",
+      "channel": "url",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.07,
+      "llm_score": 0.2,
+      "llm_available": true,
+      "response_time_ms": 103253,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "url/legit_google_accounts",
+      "channel": "url",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.11,
+      "llm_score": 0.05,
+      "llm_available": true,
+      "response_time_ms": 61312,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "url/phish_paypal_spoof",
+      "channel": "url",
+      "expected": "phishing",
+      "actual": "suspicious",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.69,
+      "llm_score": 0.85,
+      "llm_available": true,
+      "response_time_ms": 51017,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "url/phish_typosquat",
+      "channel": "url",
+      "expected": "phishing",
+      "actual": "legitimate",
+      "correct": false,
+      "bucket": "FN",
+      "final_score": 0.34,
+      "llm_score": 0.92,
+      "llm_available": true,
+      "response_time_ms": 67109,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "file/legit_plain",
+      "channel": "file",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.0,
+      "llm_score": null,
+      "llm_available": false,
+      "response_time_ms": 37794,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [
+        "fallback_safety_net"
+      ],
+      "fallback_activated": true
+    },
+    {
+      "case_id": "file/legit_text_report",
+      "channel": "file",
+      "expected": "legitimate",
+      "actual": "legitimate",
+      "correct": true,
+      "bucket": "TN",
+      "final_score": 0.35,
+      "llm_score": 0.1,
+      "llm_available": true,
+      "response_time_ms": 91052,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    },
+    {
+      "case_id": "file/phish_invoice_lure",
+      "channel": "file",
+      "expected": "phishing",
+      "actual": "phishing",
+      "correct": true,
+      "bucket": "TP",
+      "final_score": 0.95,
+      "llm_score": 0.95,
+      "llm_available": true,
+      "response_time_ms": 171606,
+      "token_usage": {
+        "prompt": null,
+        "completion": null,
+        "total": null
+      },
+      "json_parse_success": true,
+      "parse_failure_reason": null,
+      "thinking_block_present": false,
+      "thinking_tokens": 0,
+      "systems_fired": [],
+      "fallback_activated": false
+    }
+  ],
+  "aggregate": {
+    "total": 21,
+    "TP": 4,
+    "FP": 0,
+    "TN": 11,
+    "FN": 6,
+    "precision": 1.0,
+    "recall": 0.4,
+    "f1": 0.5714,
+    "accuracy": 0.7143,
+    "avg_response_time_ms": 128853.7,
+    "json_parse_success_rate": 1.0,
+    "parse_failure_breakdown": {},
+    "thinking_block_present_rate": 0.0,
+    "avg_thinking_tokens": 0,
+    "thinking_suppressed_cases": [
+      "email/legit_bank_security_alert",
+      "email/legit_order_shipped",
+      "email/phish_amazon_account_locked",
+      "email/phish_cloud_invoice_credential",
+      "email/phish_password_reset_harvest",
+      "sms/legit_amazon_order",
+      "sms/legit_bank_otp",
+      "sms/legit_courier_tracking",
+      "sms/legit_google_otp",
+      "sms/phish_fake_bank",
+      "sms/phish_irs_refund",
+      "sms/phish_prize_winner",
+      "sms/phish_toll_bait",
+      "url/legit_brand_login",
+      "url/legit_github",
+      "url/legit_google_accounts",
+      "url/phish_paypal_spoof",
+      "url/phish_typosquat",
+      "file/legit_text_report",
+      "file/phish_invoice_lure"
+    ],
+    "fallback_safety_net_rate": 0.0476,
+    "system_fire_rates": {
+      "correlation_engine": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "smart_veto_hard": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "smart_veto_soft": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "smart_veto_safe": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "specificity_scorer": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "intent_ceiling": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "intent_floor": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "attack_vector_gate": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "vip_domain_trust": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "vip_spoof_penalty": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "prompt_injection_guard": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "confidence_override": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "fallback_safety_net": {
+        "count": 1,
+        "rate": 0.048
+      }
+    }
+  },
+  "per_channel": {
+    "email": {
+      "total": 5,
+      "TP": 3,
+      "FP": 0,
+      "TN": 2,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0,
+      "avg_response_time_ms": 230179.2,
+      "json_parse_success_rate": 1.0,
+      "parse_failure_breakdown": {},
+      "thinking_block_present_rate": 0.0,
+      "avg_thinking_tokens": 0,
+      "thinking_suppressed_cases": [
+        "email/legit_bank_security_alert",
+        "email/legit_order_shipped",
+        "email/phish_amazon_account_locked",
+        "email/phish_cloud_invoice_credential",
+        "email/phish_password_reset_harvest"
+      ],
+      "fallback_safety_net_rate": 0.0,
+      "system_fire_rates": {
+        "correlation_engine": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_hard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_soft": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_safe": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "specificity_scorer": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_ceiling": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_floor": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "attack_vector_gate": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_domain_trust": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_spoof_penalty": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "prompt_injection_guard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "confidence_override": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fallback_safety_net": {
+          "count": 0,
+          "rate": 0.0
+        }
+      }
+    },
+    "sms": {
+      "total": 8,
+      "TP": 0,
+      "FP": 0,
+      "TN": 4,
+      "FN": 4,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 0.5,
+      "avg_response_time_ms": 112033.2,
+      "json_parse_success_rate": 1.0,
+      "parse_failure_breakdown": {},
+      "thinking_block_present_rate": 0.0,
+      "avg_thinking_tokens": 0,
+      "thinking_suppressed_cases": [
+        "sms/legit_amazon_order",
+        "sms/legit_bank_otp",
+        "sms/legit_courier_tracking",
+        "sms/legit_google_otp",
+        "sms/phish_fake_bank",
+        "sms/phish_irs_refund",
+        "sms/phish_prize_winner",
+        "sms/phish_toll_bait"
+      ],
+      "fallback_safety_net_rate": 0.0,
+      "system_fire_rates": {
+        "correlation_engine": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_hard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_soft": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_safe": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "specificity_scorer": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_ceiling": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_floor": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "attack_vector_gate": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_domain_trust": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_spoof_penalty": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "prompt_injection_guard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "confidence_override": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fallback_safety_net": {
+          "count": 0,
+          "rate": 0.0
+        }
+      }
+    },
+    "url": {
+      "total": 5,
+      "TP": 0,
+      "FP": 0,
+      "TN": 3,
+      "FN": 2,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 0.6,
+      "avg_response_time_ms": 71662.8,
+      "json_parse_success_rate": 1.0,
+      "parse_failure_breakdown": {},
+      "thinking_block_present_rate": 0.0,
+      "avg_thinking_tokens": 0,
+      "thinking_suppressed_cases": [
+        "url/legit_brand_login",
+        "url/legit_github",
+        "url/legit_google_accounts",
+        "url/phish_paypal_spoof",
+        "url/phish_typosquat"
+      ],
+      "fallback_safety_net_rate": 0.0,
+      "system_fire_rates": {
+        "correlation_engine": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_hard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_soft": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_safe": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "specificity_scorer": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_ceiling": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_floor": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "attack_vector_gate": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_domain_trust": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_spoof_penalty": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "prompt_injection_guard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "confidence_override": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fallback_safety_net": {
+          "count": 0,
+          "rate": 0.0
+        }
+      }
+    },
+    "file": {
+      "total": 3,
+      "TP": 1,
+      "FP": 0,
+      "TN": 2,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "accuracy": 1.0,
+      "avg_response_time_ms": 100150.7,
+      "json_parse_success_rate": 1.0,
+      "parse_failure_breakdown": {},
+      "thinking_block_present_rate": 0.0,
+      "avg_thinking_tokens": 0,
+      "thinking_suppressed_cases": [
+        "file/legit_text_report",
+        "file/phish_invoice_lure"
+      ],
+      "fallback_safety_net_rate": 0.3333,
+      "system_fire_rates": {
+        "correlation_engine": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_hard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_soft": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "smart_veto_safe": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "specificity_scorer": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_ceiling": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "intent_floor": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "attack_vector_gate": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_domain_trust": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "vip_spoof_penalty": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "prompt_injection_guard": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "confidence_override": {
+          "count": 0,
+          "rate": 0.0
+        },
+        "fallback_safety_net": {
+          "count": 1,
+          "rate": 0.333
+        }
+      }
+    }
+  }
+}

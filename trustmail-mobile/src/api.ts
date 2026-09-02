@@ -648,3 +648,61 @@ export async function disconnectGoogleBackup(): Promise<void> {
   });
   if (!response.ok) throw new Error("Google Backup disconnect failed");
 }
+
+export type CallAnalysisResult = {
+  final_score: number;
+  risk_band: 'SAFE' | 'SUSPICIOUS' | 'CRITICAL';
+  score_display: number;
+  org_claimed: string;
+  purpose_detected: string;
+  why_flagged: string[];
+  recommended_action: string;
+  official_callback_number: string;
+  report_url: string;
+  signals_fired: string[];
+  hard_floors_triggered: string[];
+  full_explanation: string;
+  composite_score: number;
+  floor_score: number;
+  layer_results: Record<string, any>;
+};
+
+export async function analyzeCall(params: {
+  inputMode: 'voice' | 'structured';
+  audioUri?: string;
+  orgClaimed?: string;
+  actionsRequested?: string[];
+  warningPhrases?: string[];
+}): Promise<CallAnalysisResult> {
+  const form = new FormData();
+  form.append('input_mode', params.inputMode);
+
+  if (params.inputMode === 'voice' && params.audioUri) {
+    form.append('audio', {
+      uri: params.audioUri,
+      name: 'description.wav',
+      type: 'audio/wav',
+    } as any);
+  } else {
+    form.append('org_claimed', params.orgClaimed || '');
+    form.append('actions_requested', JSON.stringify(params.actionsRequested || []));
+    form.append('warning_phrases', JSON.stringify(params.warningPhrases || []));
+  }
+
+  const response = await apiFetch('/api/voice/analyze-call', {
+    method: 'POST',
+    body: form,
+    headers: authHeaders(),
+  }, 30000); // 30s timeout for audio transcription
+
+  if (!response.ok) {
+    let msg = 'Call analysis failed';
+    try {
+      const err = await response.json();
+      if (err.detail) msg = err.detail;
+    } catch (e) {}
+    throw new Error(msg);
+  }
+
+  return response.json();
+}

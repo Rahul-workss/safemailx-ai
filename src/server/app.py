@@ -58,6 +58,7 @@ from server.schemas import (
     ScanFeedbackResponse,
     ScanDetail,
     ScanSummary,
+    CallAnalysisResponse,
     SettingsResponse, SettingsUpdateRequest,
     TokenResponse,
     UrlScanRequest,
@@ -1243,6 +1244,74 @@ def instant_scan_email(payload: InstantEmailScanRequest, _auth=Depends(require_a
     Gmail-connected scans go through the worker queue (/api/gmail/run-once).
     """
     return inline_scan_service.scan_email(payload, _user_id(_auth))
+
+
+@app.post("/api/voice/analyze-call", response_model=CallAnalysisResponse)
+async def analyze_call_description(
+    input_mode: str = Form(...),
+    audio: Optional[UploadFile] = File(None),
+    org_claimed: str = Form(""),
+    actions_requested: str = Form("[]"),
+    warning_phrases: str = Form("[]"),
+    _auth=Depends(require_auth)
+):
+    """
+    Hold + Describe: Analyze a suspicious phone call.
+    Supports two input modes:
+    - voice: User records a 20-second voice description
+    - structured: User taps checkboxes describing what happened
+    """
+    from utils.config import FEATURE_CALL_ANALYSIS_ENABLED
+    if not FEATURE_CALL_ANALYSIS_ENABLED:
+        raise HTTPException(status_code=503, detail="Call analysis feature is disabled.")
+
+    import json as _json
+    try:
+        actions = _json.loads(actions_requested) if actions_requested else []
+        phrases = _json.loads(warning_phrases) if warning_phrases else []
+    except Exception:
+        actions = []
+        phrases = []
+
+    transcript = ""
+
+    # Path A: Voice recording
+    if input_mode == "voice" and audio is not None:
+        audio_bytes = await audio.read()
+        if len(audio_bytes) > 5 * 1024 * 1024:  # 5MB limit
+            raise HTTPException(status_code=413, detail="Audio file too large. Max 5MB.")
+        if len(audio_bytes) < 500:  # Too small = empty recording
+            raise HTTPException(status_code=422, detail="Audio recording is too short or empty. Please use structured input instead.")
+        try:
+            from engines.vishing_analyzer import transcribe_voice_description
+            result = transcribe_voice_description(audio_bytes, filename=audio.filename or "description.wav")
+            if result.get("success"):
+                transcript = result.get("transcript", "")
+            else:
+                # Transcription failed — fall back to structured if we have it
+                if not org_claimed and not actions:
+                    raise HTTPException(status_code=422, detail="Voice transcription failed. Please use the tap form instead.")
+        except ImportError:
+            if not org_claimed and not actions:
+                raise HTTPException(status_code=503, detail="Transcription service unavailable. Please use structured input.")
+
+    # Path B: Structured input — transcript will be built by engine
+    elif input_mode == "structured":
+        if not org_claimed and not actions and not phrases:
+            raise HTTPException(status_code=422, detail="Please select at least one option.")
+    else:
+        raise HTTPException(status_code=422, detail="Invalid input_mode. Use 'voice' or 'structured'.")
+
+    from engines.scam_intelligence_engine import analyze as scam_analyze
+    result = scam_analyze({
+        "transcript": transcript,
+        "org_claimed": org_claimed,
+        "actions_requested": actions,
+        "warning_phrases": phrases,
+        "input_mode": input_mode,
+    })
+
+    return CallAnalysisResponse(**result)
 
 
 import urllib.request

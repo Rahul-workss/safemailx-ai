@@ -1,0 +1,346 @@
+{
+  "state_bank_of_india": {
+    "name": "State Bank of India",
+    "aliases": ["SBI", "SBI Bank", "State Bank", "State Bank of India"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for one time password",
+      "ask for full card number",
+      "ask for CVV or CVC",
+      "ask for internet banking password",
+      "ask for net banking password",
+      "ask for UPI PIN or MPIN",
+      "ask for ATM PIN or debit card PIN",
+      "ask you to install any app",
+      "ask for Aadhaar number",
+      "ask to transfer money to a safe account",
+      "ask to share your screen",
+      "conduct KYC over phone call"
+    ],
+    "legitimate_call_reasons": [
+      "inform about EMI due date",
+      "confirm recent large transaction",
+      "notify about account statement",
+      "inform about credit card payment due",
+      "appointment confirmation for branch visit"
+    ],
+    "kyc_policy": "SBI conducts KYC only at the branch or via the YONO app. SBI never asks for OTP or any personal credentials over a phone call to complete KYC.",
+    "official_numbers": ["1800-11-2211", "1800-425-3800", "1800-11-0009"],
+    "verified_source": "https://sbi.co.in/web/personal-banking/fraud-alerts"
+  },
+
+  "hdfc_bank": {
+    "name": "HDFC Bank",
+    "aliases": ["HDFC", "HDFC Bank", "Housing Development Finance Corporation"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for net banking password",
+      "ask for debit card PIN",
+      "ask for full card number",
+      "ask for CVV",
+      "ask for UPI PIN",
+      "ask to install a remote access app",
+      "ask to share your screen",
+      "ask for Aadhaar or PAN details over phone"
+    ],
+    "legitimate_call_reasons": [
+      "notify about credit card due",
+      "inform about loan EMI",
+      "confirm transaction for fraud prevention",
+      "inform about fixed deposit maturity"
+    ],
+    "kyc_policy": "HDFC Bank updates KYC only at the branch or via the HDFC Bank app. They never ask for OTP or passwords over the phone.",
+    "official_numbers": ["1800-202-6161", "1800-258-3838"],
+    "verified_source": "https://www.hdfcbank.com/content/bbp/repositories/723fb80a-2dde-42a3-9793-7ae1be57c87f/fraud-awareness"
+  },
+
+  "icici_bank": {
+    "name": "ICICI Bank",
+    "aliases": ["ICICI", "ICICI Bank"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for internet banking password",
+      "ask for debit or credit card PIN",
+      "ask for CVV",
+      "ask for full card number",
+      "ask for UPI PIN",
+      "ask you to share screen or grant remote access"
+    ],
+    "legitimate_call_reasons": [
+      "credit card payment reminder",
+      "loan EMI reminder",
+      "large transaction verification",
+      "service feedback call"
+    ],
+    "kyc_policy": "ICICI Bank performs KYC at the branch or via iMobile Pay. They never ask for credentials or OTP over phone.",
+    "official_numbers": ["1800-102-4242", "1800-1080"],
+    "verified_source": "https://www.icicibank.com/personal-banking/fraud-awareness"
+  },
+
+  "axis_bank": {
+    "name": "Axis Bank",
+    "aliases": ["Axis", "Axis Bank"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for ATM PIN",
+      "ask for internet banking password",
+      "ask for full card number or CVV",
+      "ask for UPI PIN",
+      "ask to install any app for verification"
+    ],
+    "legitimate_call_reasons": [
+      "credit card EMI reminder",
+      "loan payment reminder",
+      "new product offering (opt-in)"
+    ],
+    "kyc_policy": "Axis Bank does KYC at branches or via Axis Mobile App. Never over the phone.",
+    "official_numbers": ["1860-419-5555", "1860-500-5555"],
+    "verified_source": "https://www.axisbank.com/about-us/safe-banking"
+  },
+
+  "kotak_mahindra_bank": {
+    "name": "Kotak Mahindra Bank",
+    "aliases": ["Kotak", "Kotak Bank", "Kotak Mahindra"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for net banking password",
+      "ask for debit card PIN",
+      "ask for CVV",
+      "ask for UPI PIN or MPIN",
+      "ask for Aadhaar or PAN number"
+    ],
+    "legitimate_call_reasons": [
+      "credit card payment due",
+      "savings account balance notification",
+      "loan EMI reminder"
+    ],
+    "kyc_policy": "Kotak Mahindra Bank never requests OTP, passwords, or card details over the phone.",
+    "official_numbers": ["1860-266-2666"],
+    "verified_source": "https://www.kotak.com/en/consumer-banking/ways-to-bank/stay-safe.html"
+  },
+
+  "punjab_national_bank": {
+    "name": "Punjab National Bank",
+    "aliases": ["PNB", "Punjab National Bank"],
+    "org_type": "bank",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for internet banking password",
+      "ask for ATM PIN",
+      "ask for full card number or CVV",
+      "ask for UPI PIN"
+    ],
+    "legitimate_call_reasons": [
+      "account statement notification",
+      "loan EMI reminder",
+      "fixed deposit maturity notification"
+    ],
+    "kyc_policy": "PNB never collects KYC information or banking credentials over the phone.",
+    "official_numbers": ["1800-180-2222", "1800-103-2222"],
+    "verified_source": "https://www.pnbindia.in/safebanking.html"
+  },
+
+  "uidai_aadhaar": {
+    "name": "UIDAI (Aadhaar)",
+    "aliases": ["UIDAI", "Aadhaar", "Aadhar", "Unique Identification Authority of India"],
+    "org_type": "uidai",
+    "special_rule": "UIDAI NEVER calls citizens for any reason. Any call claiming to be from UIDAI or Aadhaar is fraudulent.",
+    "never_via_call": [
+      "call citizens at all",
+      "ask for Aadhaar number over phone",
+      "ask for biometric data",
+      "ask for OTP",
+      "ask for personal details to update Aadhaar",
+      "conduct Aadhaar updates over phone"
+    ],
+    "legitimate_call_reasons": [],
+    "kyc_policy": "UIDAI does not contact citizens via phone calls for any purpose. Aadhaar updates are done only at Aadhaar Seva Kendra or online at myaadhaar.uidai.gov.in.",
+    "official_numbers": ["1947"],
+    "verified_source": "https://uidai.gov.in/en/fraud-alert.html"
+  },
+
+  "income_tax_department": {
+    "name": "Income Tax Department",
+    "aliases": ["Income Tax", "IT Department", "Income Tax Officer", "TDS", "Tax Department"],
+    "org_type": "income_tax",
+    "special_rule": "The Income Tax Department NEVER collects payments over the phone or asks for bank details via a call.",
+    "never_via_call": [
+      "collect tax payment over phone",
+      "ask for bank account number over phone",
+      "ask for OTP to process a refund",
+      "ask for UPI payment for tax dues",
+      "ask for card details",
+      "conduct raids via phone call"
+    ],
+    "legitimate_call_reasons": [
+      "send SMS/email about pending notices (not phone calls)"
+    ],
+    "kyc_policy": "The Income Tax Department communicates via the official income tax portal (incometax.gov.in). They never make unsolicited calls to collect payments.",
+    "official_numbers": ["1800-103-0025", "1800-419-0025"],
+    "verified_source": "https://incometax.gov.in/iec/foportal/help/be-aware-of-frauds"
+  },
+
+  "trai": {
+    "name": "TRAI",
+    "aliases": ["TRAI", "Telecom Regulatory Authority of India", "TRAI officer"],
+    "org_type": "regulatory",
+    "special_rule": "TRAI NEVER calls consumers to block SIM cards or take action against them. TRAI only communicates via official channels with telecom operators.",
+    "never_via_call": [
+      "call consumers directly",
+      "block SIM cards via phone call instructions",
+      "ask consumers to press 9 to prevent disconnection",
+      "ask for payment to keep number active",
+      "threaten SIM disconnection to individual consumers"
+    ],
+    "legitimate_call_reasons": [],
+    "kyc_policy": "TRAI does not make direct calls to consumers. If your number is at risk, your telecom provider (Jio/Airtel etc.) will notify you, not TRAI.",
+    "official_numbers": ["1800-110-420"],
+    "verified_source": "https://www.trai.gov.in/consumer-corner/fraud-alert"
+  },
+
+  "rbi": {
+    "name": "Reserve Bank of India",
+    "aliases": ["RBI", "Reserve Bank", "Reserve Bank of India"],
+    "org_type": "regulatory",
+    "special_rule": "The RBI NEVER deals directly with the public regarding personal bank accounts. Any call from 'RBI' asking for personal or banking details is fraudulent.",
+    "never_via_call": [
+      "contact individual citizens about their personal accounts",
+      "ask for OTP or banking credentials",
+      "offer prize money or lottery",
+      "help transfer money from foreign countries",
+      "ask for any fee or tax payment",
+      "conduct any KYC for personal accounts"
+    ],
+    "legitimate_call_reasons": [],
+    "kyc_policy": "The RBI regulates banks and does not directly communicate with individual bank customers. For banking grievances, contact your bank or the RBI Banking Ombudsman portal.",
+    "official_numbers": ["14440"],
+    "verified_source": "https://www.rbi.org.in/commonman/english/scripts/FAQs.aspx?Id=96"
+  },
+
+  "law_enforcement_cbi_ed_police": {
+    "name": "Law Enforcement (CBI / Police / ED)",
+    "aliases": ["CBI", "ED", "Enforcement Directorate", "Police", "Cyber Crime Cell", "Narcotics", "NCIB", "CBI officer", "cyber police", "Supreme Court"],
+    "org_type": "law_enforcement",
+    "special_rule": "Law enforcement agencies in India NEVER conduct arrests via phone or video call. 'Digital arrest' is NOT a real legal concept. Any such call is a scam.",
+    "never_via_call": [
+      "conduct arrests via phone call",
+      "issue digital arrest warrants",
+      "require payment to avoid arrest",
+      "ask for money transfer to a safe account",
+      "require victim to stay on video call as digital arrest",
+      "ask for OTP or bank details to clear your name",
+      "investigate via phone call alone",
+      "issue court orders over the phone"
+    ],
+    "legitimate_call_reasons": [],
+    "kyc_policy": "Legitimate law enforcement serves legal notices in person or via official written communication. They never threaten arrest via phone or demand money.",
+    "official_numbers": ["1930 (Cyber Crime Helpline)", "100 (Police Emergency)"],
+    "verified_source": "https://cybercrime.gov.in"
+  },
+
+  "paytm": {
+    "name": "Paytm",
+    "aliases": ["Paytm", "Paytm Bank", "Paytm Payments Bank", "One97 Communications"],
+    "org_type": "payment",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for Paytm PIN or MPIN",
+      "ask for password",
+      "ask for card details or CVV",
+      "ask to install any app for verification",
+      "ask you to scan a QR code to receive money"
+    ],
+    "legitimate_call_reasons": [
+      "customer support callback (only if you raised a ticket)",
+      "merchant onboarding"
+    ],
+    "kyc_policy": "Paytm KYC is done via the app or at official Paytm KYC points. Paytm never asks for OTP or credentials over the phone.",
+    "official_numbers": ["0120-4456-456"],
+    "verified_source": "https://paytm.com/blog/paytm-security/fraud-awareness"
+  },
+
+  "phonepe": {
+    "name": "PhonePe",
+    "aliases": ["PhonePe", "Phone Pe"],
+    "org_type": "payment",
+    "never_via_call": [
+      "ask for OTP",
+      "ask for UPI PIN",
+      "ask for MPIN",
+      "ask for card details",
+      "ask to share screen",
+      "ask to scan a QR code to receive a refund"
+    ],
+    "legitimate_call_reasons": [
+      "callback if you raised a support ticket"
+    ],
+    "kyc_policy": "PhonePe never asks for your UPI PIN, OTP, or any password over the phone.",
+    "official_numbers": ["080-68727374", "022-68727374"],
+    "verified_source": "https://www.phonepe.com/en/customer-support/safety-and-security"
+  },
+
+  "amazon_india": {
+    "name": "Amazon India",
+    "aliases": ["Amazon", "Amazon.in", "Amazon India", "Amazon delivery"],
+    "org_type": "ecommerce",
+    "never_via_call": [
+      "ask for OTP to deliver a package",
+      "ask for payment to release a parcel",
+      "ask for card details over phone",
+      "claim a parcel contains illegal items",
+      "ask for Aadhaar details to process a return",
+      "demand customs duty payment via UPI"
+    ],
+    "legitimate_call_reasons": [
+      "delivery confirmation",
+      "customer support callback (if you raised a ticket)"
+    ],
+    "kyc_policy": "Amazon India never asks for OTP or payment to deliver a package. Delivery OTPs if used are only for contactless delivery verification at the door, not for payment.",
+    "official_numbers": ["1800-3000-9009"],
+    "verified_source": "https://www.amazon.in/b?node=12891399031"
+  },
+
+  "jio": {
+    "name": "Jio",
+    "aliases": ["Jio", "Reliance Jio", "RJIL", "Jio network"],
+    "org_type": "telecom",
+    "never_via_call": [
+      "ask for OTP to prevent SIM block",
+      "ask for payment to reactivate number",
+      "ask for card details over phone",
+      "threaten immediate SIM disconnection unless you pay",
+      "ask you to press 9 to avoid disconnection"
+    ],
+    "legitimate_call_reasons": [
+      "plan renewal reminder",
+      "customer satisfaction survey"
+    ],
+    "kyc_policy": "Jio communicates SIM-related issues via SMS or the MyJio app. They never threaten disconnection or ask for payment via an unsolicited phone call.",
+    "official_numbers": ["199", "1800-889-9999"],
+    "verified_source": "https://www.jio.com/en-in/safe-usage"
+  },
+
+  "airtel": {
+    "name": "Airtel",
+    "aliases": ["Airtel", "Bharti Airtel"],
+    "org_type": "telecom",
+    "never_via_call": [
+      "ask for OTP to prevent SIM block",
+      "ask for payment via UPI to keep number active",
+      "ask for card details",
+      "threaten disconnection unless you pay immediately over phone"
+    ],
+    "legitimate_call_reasons": [
+      "plan renewal reminder",
+      "service upgrade offer"
+    ],
+    "kyc_policy": "Airtel communicates via SMS and the Airtel Thanks app. Unsolicited calls asking for payment or OTP are not from Airtel.",
+    "official_numbers": ["121", "1800-103-0121"],
+    "verified_source": "https://www.airtel.in/fraud-prevention"
+  }
+}
