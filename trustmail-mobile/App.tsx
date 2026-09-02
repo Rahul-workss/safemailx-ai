@@ -59,6 +59,7 @@ import {
   registerSessionExpiredHandler,
 } from "./src/session";
 import { C, colors, verdictColor } from "./src/theme";
+import CallAnalyzerScreen from "./src/screens/CallAnalyzerScreen";
 const { width: SW } = Dimensions.get("window");
 
 type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help";
@@ -320,6 +321,7 @@ function App() {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotBusy, setForgotBusy] = useState(false);
+  const [showCallAnalyzer, setShowCallAnalyzer] = useState(false);
   // Reset password (from email deep-link)
   const [resetToken, setResetToken] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
@@ -957,6 +959,7 @@ function App() {
                   onDisconnectGoogle={handleDisconnectGoogle}
                   onSyncGoogle={syncGoogleBackup}
                   onOpenReport={openReport}
+                  onOpenCallAnalyzer={() => setShowCallAnalyzer(true)}
                 />
               </View>
               <View style={{ display: activeTab === "scans" ? "flex" : "none" }}>
@@ -1075,6 +1078,11 @@ function App() {
             }
           }}
         />
+      )}
+
+      {/* ── Call Analyzer Modal ── */}
+      {showCallAnalyzer && (
+        <CallAnalyzerScreen onClose={() => setShowCallAnalyzer(false)} />
       )}
 
       {/* ── Video Splash Screen ── */}
@@ -1755,6 +1763,7 @@ function DashboardScreen({
   onDisconnectGoogle,
   onSyncGoogle,
   onOpenReport,
+  onOpenCallAnalyzer,
 }: {
   health: Health | null;
   stats: { safe: number; suspicious: number; phishing: number };
@@ -1766,9 +1775,26 @@ function DashboardScreen({
   onDisconnectGoogle: () => void;
   onSyncGoogle: () => void;
   onOpenReport: (id: string, kind: "pdf" | "json") => void;
+  onOpenCallAnalyzer: () => void;
 }) {
   return (
     <View style={{ gap: 0, paddingBottom: 20 }}>
+      {/* Vishing Call Analyzer Banner Button */}
+      <Pressable onPress={onOpenCallAnalyzer}>
+        <TmCard style={{ padding: 16, marginBottom: 16, backgroundColor: "rgba(52, 199, 89, 0.1)", borderColor: "rgba(52, 199, 89, 0.4)" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(52, 199, 89, 0.2)", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="call" size={20} color="#34c759" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Live Call Analyzer</Text>
+              <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>Hold & Describe to detect scams</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+          </View>
+        </TmCard>
+      </Pressable>
+
       <SafeMailEngineCore stats={stats} />
       <SecurityBulletin />
       <ThreatMatrix scans={scans} />
