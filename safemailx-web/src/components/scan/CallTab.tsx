@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { analyzeCall } from "@/lib/api";
 
 export default function CallTab() {
   const [busy, setBusy] = useState(false);
@@ -29,21 +29,7 @@ export default function CallTab() {
     setError("");
     setResult(null);
     try {
-      const form = new FormData();
-      form.append('input_mode', 'structured');
-      form.append('org_claimed', orgClaimed);
-      form.append('actions_requested', JSON.stringify(actions));
-      form.append('warning_phrases', JSON.stringify(warnings));
-
-      const res = await apiFetch('/api/voice/analyze-call', {
-        method: 'POST',
-        body: form
-      });
-      
-      if (!res.ok) {
-        throw new Error('Call analysis failed');
-      }
-      const data = await res.json();
+      const data = await analyzeCall(orgClaimed, actions, warnings);
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Call analysis failed");
@@ -153,7 +139,7 @@ export default function CallTab() {
         {result ? (
           <div className="glass-box" style={{ padding: 24, animation: "fadeInUp 0.4s ease-out both" }}>
              <h4 style={{ color: result.risk_band === 'CRITICAL' ? 'var(--rose)' : (result.risk_band === 'SAFE' ? 'var(--green)' : 'var(--gold)'), fontSize: 20, marginTop: 0, marginBottom: 16 }}>
-               {result.risk_band} — {result.score_display}/100
+               {result.risk_band} â€” {result.score_display}/100
              </h4>
              <p style={{ color: 'white', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{result.full_explanation}</p>
              
