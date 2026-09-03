@@ -529,23 +529,22 @@ export async function disconnectGoogleBackup(): Promise<any> {
   throw new Error("Google Backup is not implemented on the backend yet.");
 }
 
- e x p o r t   a s y n c   f u n c t i o n   a n a l y z e C a l l ( o r g C l a i m e d :   s t r i n g ,   a c t i o n s R e q u e s t e d :   s t r i n g [ ] ,   w a r n i n g P h r a s e s :   s t r i n g [ ] )   { 
-     c o n s t   f o r m   =   n e w   F o r m D a t a ( ) ; 
-     f o r m . a p p e n d ( ' i n p u t _ m o d e ' ,   ' s t r u c t u r e d ' ) ; 
-     f o r m . a p p e n d ( ' o r g _ c l a i m e d ' ,   o r g C l a i m e d ) ; 
-     f o r m . a p p e n d ( ' a c t i o n s _ r e q u e s t e d ' ,   J S O N . s t r i n g i f y ( a c t i o n s R e q u e s t e d ) ) ; 
-     f o r m . a p p e n d ( ' w a r n i n g _ p h r a s e s ' ,   J S O N . s t r i n g i f y ( w a r n i n g P h r a s e s ) ) ; 
- 
-     c o n s t   r e s p o n s e   =   a w a i t   a p i F e t c h ( ' / a p i / v o i c e / a n a l y z e - c a l l ' ,   { 
-         m e t h o d :   ' P O S T ' , 
-         b o d y :   f o r m , 
-         h e a d e r s :   a u t h H e a d e r s ( ) , 
-     } ,   3 0 0 0 0 ) ; 
-     
-     i f   ( ! r e s p o n s e . o k )   { 
-         t h r o w   n e w   E r r o r ( ' C a l l   a n a l y s i s   f a i l e d ' ) ; 
-     } 
-     r e t u r n   r e s p o n s e . j s o n ( ) ; 
- } 
-  
- 
+
+export async function analyzeCall(orgClaimed: string, actionsRequested: string[], warningPhrases: string[]) {
+  const form = new FormData();
+  form.append('input_mode', 'structured');
+  form.append('org_claimed', orgClaimed);
+  form.append('actions_requested', JSON.stringify(actionsRequested));
+  form.append('warning_phrases', JSON.stringify(warningPhrases));
+
+  const response = await apiFetch('/api/voice/analyze-call', {
+    method: 'POST',
+    body: form,
+    headers: authHeaders(),
+  }, 30000);
+
+  if (!response.ok) {
+    throw new Error('Call analysis failed');
+  }
+  return response.json();
+}
