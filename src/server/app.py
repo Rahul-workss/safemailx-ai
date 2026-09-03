@@ -1,5 +1,6 @@
 from html import escape as html_escape
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
