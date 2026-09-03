@@ -2,7 +2,7 @@
   "expo": {
     "name": "SafeMail X AI",
     "slug": "safemailx-ai",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/custom-shield.png",
     "userInterfaceStyle": "dark",
