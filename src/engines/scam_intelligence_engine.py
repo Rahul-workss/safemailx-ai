@@ -1,9 +1,10 @@
 """
 SafeMailX — Scam Intelligence Engine
-Coordinates the 7-layer call scam detection pipeline.
+Coordinates the 7-layer rule pipeline + Qwen3 arbiter + Live Policy Agent.
 Used by the Hold + Describe feature.
 """
 import logging
+import concurrent.futures
 from typing import Optional
 
 from engines.layers import (
@@ -15,6 +16,22 @@ from engines.layers import (
     knowledge_profiler,
     conversation_dynamics,
 )
+
+# Stage 3: Qwen3 thinking-mode arbiter (grey-zone only)
+try:
+    from engines.layers.qwen_call_layer import analyze_with_qwen
+    _QWEN_AVAILABLE = True
+except ImportError:
+    _QWEN_AVAILABLE = False
+    def analyze_with_qwen(*a, **kw): return None  # type: ignore
+
+# Stage 4: Live policy fact-checker (web search + scrape + Qwen3)
+try:
+    from engines.layers import live_policy_agent
+    _LIVE_POLICY_AVAILABLE = True
+except ImportError:
+    _LIVE_POLICY_AVAILABLE = False
+    live_policy_agent = None  # type: ignore
 
 logger = logging.getLogger("SCAM_INTELLIGENCE")
 
@@ -127,13 +144,72 @@ def analyze(input_data: dict) -> dict:
     final_score = max(composite_score, floor_score)
     final_score = round(min(1.0, final_score), 3)
 
-    # Risk band
+    # Risk band from rules
     if final_score > 0.70:
-        risk_band = "CRITICAL"
+        rule_band = "CRITICAL"
     elif final_score >= 0.30:
-        risk_band = "SUSPICIOUS"
+        rule_band = "SUSPICIOUS"
     else:
-        risk_band = "SAFE"
+        rule_band = "SAFE"
+
+    # ── Stage 3 + 4 run in parallel (only if score is in grey zone) ──────────
+    GREY_ZONE = 0.20 <= final_score <= 0.85
+    qwen_result = None
+    live_policy_result = None
+
+    def _run_qwen():
+        if not GREY_ZONE:
+            return None
+        return analyze_with_qwen(
+            transcript=transcript,
+            org_claimed=org_claimed,
+            actions_requested=actions_requested,
+            warning_phrases=warning_phrases,
+            rule_results=layer_results,
+            composite_score=composite_score,
+            floor_score=floor_score,
+            hard_floors_triggered=hard_floors_triggered,
+            timeout=55,
+        )
+
+    def _run_live_policy():
+        if not _LIVE_POLICY_AVAILABLE or not org_claimed:
+            return None
+        return live_policy_agent.check(
+            org_claimed=org_claimed,
+            actions_requested=actions_requested,
+            timeout=50,
+        )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        f_qwen   = ex.submit(_run_qwen)
+        f_policy = ex.submit(_run_live_policy)
+        try:
+            qwen_result        = f_qwen.result(timeout=60)
+        except Exception as e:
+            logger.warning("[SCAM_INTEL] Qwen3 stage error: %s", e)
+        try:
+            live_policy_result = f_policy.result(timeout=60)
+        except Exception as e:
+            logger.warning("[SCAM_INTEL] Live policy stage error: %s", e)
+
+    # ── Merge Qwen3 verdict ───────────────────────────────────────────────────
+    if qwen_result:
+        final_score  = qwen_result["threat_probability"]
+        risk_band    = qwen_result["final_verdict"]
+        qwen_plain   = qwen_result["plain_english"]
+        tactics      = qwen_result["tactics_detected"]
+        qwen_conf    = qwen_result["confidence"]
+        qwen_avail   = True
+        logger.info("[SCAM_INTEL] Qwen3 override: %s (prob=%.3f)", risk_band, final_score)
+    else:
+        risk_band    = rule_band
+        qwen_plain   = ""
+        tactics      = []
+        qwen_conf    = None
+        qwen_avail   = False
+
+    score_display = round(final_score * 100)
 
     # Signals fired
     signals_fired = [
@@ -149,10 +225,12 @@ def analyze(input_data: dict) -> dict:
     )
     why_flagged = [res["plain_english"] for _, res in sorted_layers[:3]]
 
-    # Full explanation
+    # Full explanation — prefer Qwen3's human explanation if available
     org_display = org_claimed or "Unknown Organization"
     explanation_parts = [f"Caller claimed to be from: {org_display}."]
-    if why_flagged:
+    if qwen_plain:
+        explanation_parts.append(qwen_plain)
+    elif why_flagged:
         explanation_parts.append("Why SafeMail X flagged this call:")
         for bullet in why_flagged:
             explanation_parts.append(f"• {bullet}")
@@ -161,30 +239,42 @@ def analyze(input_data: dict) -> dict:
     recommended_action = _get_recommended_action(risk_band, official_callback)
 
     result = {
-        "final_score": final_score,
-        "risk_band": risk_band,
-        "score_display": round(final_score * 100),
-        "org_claimed": org_claimed,
-        "purpose_detected": ", ".join(actions_requested) if actions_requested else "Unknown",
+        "final_score":             final_score,
+        "risk_band":               risk_band,
+        "score_display":           score_display,
+        "org_claimed":             org_claimed,
+        "purpose_detected":        ", ".join(actions_requested) if actions_requested else "Unknown",
         "layer_results": {
             name: {
-                "score": round(res["score"], 3),
-                "finding": res["finding"],
+                "score":       round(res["score"], 3),
+                "finding":     res["finding"],
                 "plain_english": res["plain_english"]
             }
             for name, res in layer_results.items()
         },
-        "signals_fired": signals_fired,
-        "hard_floors_triggered": hard_floors_triggered,
-        "composite_score": round(composite_score, 3),
-        "floor_score": round(floor_score, 3),
-        "full_explanation": full_explanation,
-        "why_flagged": why_flagged,
-        "recommended_action": recommended_action,
+        "signals_fired":           signals_fired,
+        "hard_floors_triggered":   hard_floors_triggered,
+        "composite_score":         round(composite_score, 3),
+        "floor_score":             round(floor_score, 3),
+        "full_explanation":        full_explanation,
+        "why_flagged":             why_flagged,
+        "recommended_action":      recommended_action,
         "official_callback_number": official_callback,
-        "report_url": "cybercrime.gov.in | Helpline: 1930",
+        "report_url":              "cybercrime.gov.in | Helpline: 1930",
+        # Qwen3 fields
+        "qwen_available":          qwen_avail,
+        "qwen_confidence":         qwen_conf,
+        "tactics_detected":        tactics,
+        "plain_english":           qwen_plain,
+        # Live policy fact-check
+        "live_policy_check":       live_policy_result,
     }
 
-    logger.info("[SCAM_INTEL] Result: score=%.3f band=%s floors=%s",
-                final_score, risk_band, hard_floors_triggered)
+    logger.info(
+        "[SCAM_INTEL] Final: score=%.3f band=%s qwen=%s policy_checked=%s floors=%s",
+        final_score, risk_band, qwen_avail,
+        bool(live_policy_result and live_policy_result.get("checked")),
+        hard_floors_triggered
+    )
     return result
+

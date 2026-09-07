@@ -649,6 +649,17 @@ export async function disconnectGoogleBackup(): Promise<void> {
   if (!response.ok) throw new Error("Google Backup disconnect failed");
 }
 
+export type LivePolicyCheck = {
+  checked: boolean;
+  policy_allows: boolean | null;
+  verdict_text: string;
+  policy_quote: string | null;
+  source_url: string | null;
+  source_label: string | null;
+  confidence: number;
+  error: string | null;
+};
+
 export type CallAnalysisResult = {
   final_score: number;
   risk_band: 'SAFE' | 'SUSPICIOUS' | 'CRITICAL';
@@ -665,6 +676,13 @@ export type CallAnalysisResult = {
   composite_score: number;
   floor_score: number;
   layer_results: Record<string, any>;
+  // Qwen3 thinking-mode fields
+  qwen_available: boolean;
+  qwen_confidence: number | null;
+  plain_english: string;
+  tactics_detected: string[];
+  // Live policy fact-check
+  live_policy_check: LivePolicyCheck | null;
 };
 
 export async function analyzeCall(params: {
@@ -693,7 +711,7 @@ export async function analyzeCall(params: {
     method: 'POST',
     body: form,
     headers: authHeaders(),
-  }, 30000); // 30s timeout for audio transcription
+  }, 120000); // 120s — Qwen3 thinking mode + live policy search
 
   if (!response.ok) {
     let msg = 'Call analysis failed';
@@ -706,3 +724,4 @@ export async function analyzeCall(params: {
 
   return response.json();
 }
+

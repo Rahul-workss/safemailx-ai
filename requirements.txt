@@ -40,3 +40,5 @@ pyzbar==0.1.9
 # openai-whisper==20240930
 # torch>=2.0.0          # pulled in automatically by whisper
 # ffmpeg-python==0.2.0  # also needs system ffmpeg (see Dockerfile comment)
+tavily-python>=0.5.0
+lxml>=5.0.0

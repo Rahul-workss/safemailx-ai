@@ -281,3 +281,11 @@ class CallAnalysisResponse(BaseModel):
     composite_score: float = 0.0
     floor_score: float = 0.0
     layer_results: dict = {}
+    # Qwen3 thinking-mode fields
+    qwen_available: bool = False
+    qwen_confidence: float | None = None
+    plain_english: str = ""
+    tactics_detected: list[str] = []
+    # Live policy fact-check
+    live_policy_check: dict | None = None
+
