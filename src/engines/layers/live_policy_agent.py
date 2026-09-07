@@ -1,17 +1,16 @@
-"""
-SafeMail X - Live Policy Fact-Checker Agent
-============================================
-When an org is detected, searches the official website in real-time
-to verify if the caller's claimed behavior is legitimate.
+﻿"""
+SafeMail X - Live Policy Fact-Checker Agent (v2)
+================================================
+Uses Tavily AI answer feature to directly answer whether an org's
+claimed behavior is legitimate — no Qwen3 needed for basic verdict.
 
 Flow:
-  1. Resolve official policy URL (pre-mapped or Tavily search)
-  2. Fetch + scrape page content
-  3. Qwen3 reads the page and answers: Is this behavior allowed?
-  4. Return verdict + direct source link
+  1. Build a direct yes/no question about the org's claim
+  2. Tavily searches the web and returns a direct answer + source URLs
+  3. Parse the answer for yes/no verdict + confidence
+  4. (Optional) Qwen3 enhances the answer if LM Studio is running
 
-Full fallback chain:
-  Tavily -> pre-mapped URL scrape -> static org_policies.json -> "cannot verify"
+Full fallback: Tavily offline -> static org_policies.json -> cannot verify
 """
 
 import hashlib
@@ -26,17 +25,16 @@ import requests
 
 logger = logging.getLogger("LIVE_POLICY_AGENT")
 
-# ── In-memory cache (org_key -> result, expires after 24h) ───────────────────
+# In-memory cache (24h TTL)
 _CACHE: dict = {}
-_CACHE_TTL = 86400  # 24 hours
+_CACHE_TTL = 86400
 
-def _cache_key(org: str, action_type: str) -> str:
-    return hashlib.md5(f"{org.lower().strip()}::{action_type.lower().strip()}".encode()).hexdigest()
+def _cache_key(org: str, action: str) -> str:
+    return hashlib.md5(f"{org.lower().strip()}::{action.lower().strip()}".encode()).hexdigest()
 
 def _cache_get(key: str) -> Optional[dict]:
     entry = _CACHE.get(key)
     if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
-        logger.info("[LIVE_POLICY] Cache hit for key=%s", key[:8])
         return entry["data"]
     return None
 
@@ -44,78 +42,113 @@ def _cache_set(key: str, data: dict):
     _CACHE[key] = {"data": data, "ts": time.time()}
 
 
-# ── Tavily search ─────────────────────────────────────────────────────────────
-
-def _tavily_search(query: str, official_domain: str = "") -> list[dict]:
-    """Search Tavily AI for official policy pages. Returns list of {url, content}."""
+def _get_tavily_key() -> str:
     try:
         from utils.config import TAVILY_API_KEY
+        if TAVILY_API_KEY:
+            return TAVILY_API_KEY
     except ImportError:
-        TAVILY_API_KEY = ""
-    try:
-        import os
-        TAVILY_API_KEY = TAVILY_API_KEY or os.getenv("TAVILY_API_KEY", "")
-    except Exception:
         pass
+    import os
+    return os.getenv("TAVILY_API_KEY", "")
 
-    if not TAVILY_API_KEY:
-        logger.info("[LIVE_POLICY] No TAVILY_API_KEY — skipping web search.")
-        return []
 
-    search_query = query
-    if official_domain:
-        search_query = f"site:{official_domain} {query}"
+def _tavily_ask(question: str, org_name: str, official_domain: str = "") -> Optional[dict]:
+    """
+    Use Tavily's answer feature to directly answer the policy question.
+    Returns {answer, sources, confidence} or None.
+    """
+    api_key = _get_tavily_key()
+    if not api_key:
+        logger.info("[LIVE_POLICY] No TAVILY_API_KEY.")
+        return None
 
     try:
         from tavily import TavilyClient
-        client = TavilyClient(api_key=TAVILY_API_KEY)
+        client = TavilyClient(api_key=api_key)
+
+        # Build search query — site-restricted first if we have official domain
+        query = question
+        if official_domain:
+            query = f"site:{official_domain} {question}"
+
         resp = client.search(
-            query=search_query,
+            query=query,
             search_depth="advanced",
-            max_results=3,
-            include_raw_content=True,
+            max_results=5,
+            include_answer=True,
         )
-        results = []
+
+        answer_text = (resp.get("answer") or "").strip()
+
+        # If site-restricted gave no answer, retry without domain restriction
+        if not answer_text and official_domain:
+            resp = client.search(
+                query=question,
+                search_depth="advanced",
+                max_results=5,
+                include_answer=True,
+            )
+            answer_text = (resp.get("answer") or "").strip()
+
+        sources = []
         for r in resp.get("results", []):
-            content = (r.get("raw_content") or r.get("content") or "").strip()
             url = r.get("url", "")
-            if content and url:
-                results.append({"url": url, "content": content[:4000]})
-        logger.info("[LIVE_POLICY] Tavily returned %d results.", len(results))
-        return results
+            content = (r.get("content") or "").strip()
+            if url:
+                sources.append({"url": url, "snippet": content[:300]})
+
+        logger.info("[LIVE_POLICY] Tavily answer (%d chars). Sources: %d", len(answer_text), len(sources))
+        return {"answer": answer_text, "sources": sources}
+
     except ImportError:
         logger.info("[LIVE_POLICY] tavily-python not installed.")
-        return []
+        return None
     except Exception as e:
-        logger.warning("[LIVE_POLICY] Tavily search failed: %s", e)
-        return []
+        logger.warning("[LIVE_POLICY] Tavily failed: %s", e)
+        return None
 
 
-def _scrape_url(url: str, timeout: int = 8) -> str:
-    """Scrape a URL and return clean text content."""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (SafeMailX Policy Checker/1.0)"}
-        resp = requests.get(url, headers=headers, timeout=timeout)
-        resp.raise_for_status()
+def _parse_answer_verdict(answer_text: str, action_claim: str) -> dict:
+    """
+    Parse Tavily's natural language answer into a structured verdict.
+    Returns {policy_allows, confidence, policy_quote}.
+    """
+    if not answer_text:
+        return {"policy_allows": None, "confidence": 0.0, "policy_quote": None}
 
-        try:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(resp.text, "lxml")
-        except ImportError:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(resp.text, "html.parser")
+    text_lower = answer_text.lower()
 
-        # Remove nav/footer/script
-        for tag in soup(["script","style","nav","footer","header","aside","form"]):
-            tag.decompose()
+    # Strong NEGATIVE signals — org does NOT do this
+    negative_phrases = [
+        "does not call", "never call", "do not call", "never ask",
+        "does not ask", "will not call", "never contacts", "not call",
+        "scam", "fraudulent", "do not share", "never share",
+        "never request", "does not request", "not legitimate",
+        "fraud", "not authorized to call", "never initiates",
+    ]
+    # Strong POSITIVE signals — org IS allowed to do this
+    positive_phrases = [
+        "does call", "may call", "can call", "will call",
+        "is authorized to call", "calls customers", "legitimate to call",
+        "customer service calls", "does contact",
+    ]
 
-        text = soup.get_text(separator="\n")
-        # Clean up whitespace
-        lines = [l.strip() for l in text.splitlines() if len(l.strip()) > 30]
-        return "\n".join(lines)[:4000]
-    except Exception as e:
-        logger.warning("[LIVE_POLICY] Scrape failed for %s: %s", url, e)
-        return ""
+    neg_hits = sum(1 for p in negative_phrases if p in text_lower)
+    pos_hits = sum(1 for p in positive_phrases if p in text_lower)
+
+    if neg_hits > 0 and pos_hits == 0:
+        confidence = min(0.95, 0.70 + neg_hits * 0.08)
+        return {"policy_allows": False, "confidence": round(confidence, 2), "policy_quote": answer_text[:250]}
+    elif pos_hits > 0 and neg_hits == 0:
+        confidence = min(0.90, 0.65 + pos_hits * 0.08)
+        return {"policy_allows": True, "confidence": round(confidence, 2), "policy_quote": answer_text[:250]}
+    elif neg_hits > pos_hits:
+        return {"policy_allows": False, "confidence": 0.55, "policy_quote": answer_text[:250]}
+    elif pos_hits > neg_hits:
+        return {"policy_allows": True, "confidence": 0.55, "policy_quote": answer_text[:250]}
+    else:
+        return {"policy_allows": None, "confidence": 0.30, "policy_quote": answer_text[:250]}
 
 
 def _load_org_policies() -> dict:
@@ -131,7 +164,8 @@ def _find_org_entry(org_claimed: str) -> Optional[dict]:
     policies = _load_org_policies()
     org_lower = org_claimed.lower()
     for key, entry in policies.items():
-        if entry.get("name","").lower() in org_lower or org_lower in entry.get("name","").lower():
+        name = entry.get("name", "").lower()
+        if name in org_lower or org_lower in name:
             return entry
         for alias in entry.get("aliases", []):
             if alias.lower() in org_lower or org_lower in alias.lower():
@@ -139,74 +173,93 @@ def _find_org_entry(org_claimed: str) -> Optional[dict]:
     return None
 
 
-def _qwen3_read_policy(org: str, action_claim: str, page_text: str, source_url: str) -> Optional[dict]:
-    """Ask Qwen3 to read the official page and answer the policy question."""
-    system = f"""You are a fraud policy fact-checker for SafeMail X.
-You are given text from {org}'s OFFICIAL website.
-Answer ONLY based on what the page says - do not use outside knowledge.
-
-Return ONLY a JSON object:
-{{
-  "policy_allows": <true | false | null (if page doesn't address this)>,
-  "policy_quote": <exact quote from the page that answers the question, max 200 chars, or null>,
-  "confidence": <float 0.0-1.0>,
-  "verdict_text": <1 sentence plain English verdict for the user>
-}}"""
-
-    user = f"""Official page from {org} (source: {source_url}):
-
----
-{page_text[:3000]}
----
-
-Question: Does {org} call customers to perform the following action over the phone?
-Action: "{action_claim}"
-
-Answer ONLY from the page content above. Return the JSON."""
-
-    try:
-        from engines.layers.qwen_call_layer import _get_llm_cfg, _parse_json
-        cfg = _get_llm_cfg()
-        payload = {
-            "model": cfg["model"],
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user",   "content": user},
-            ],
-            "temperature": 0.1,
-            "top_p": 0.80,
-            "max_tokens": 400,
-            "stream": False,
+def _static_fallback(org_claimed: str, actions_requested: list) -> dict:
+    """
+    Check static org_policies.json as fallback when Tavily is unavailable.
+    Returns a partial result with no source URL.
+    """
+    entry = _find_org_entry(org_claimed)
+    if not entry:
+        return {
+            "checked": False, "policy_allows": None,
+            "verdict_text": f"No official policy data found for '{org_claimed}'. Call their official number to verify.",
+            "policy_quote": None, "source_url": entry.get("verified_source") if entry else None,
+            "source_label": None, "confidence": 0.0, "error": "org_not_found",
         }
-        if cfg["thinking"]:
-            payload["chat_template_kwargs"] = {"enable_thinking": True}
 
-        resp = requests.post(cfg["base_url"], json=payload, timeout=45)
-        resp.raise_for_status()
-        content = (resp.json()["choices"][0]["message"].get("content","") or "").strip()
-        parsed = _parse_json(content)
-        if parsed and isinstance(parsed, dict):
-            return parsed
-    except Exception as e:
-        logger.warning("[LIVE_POLICY] Qwen3 policy read failed: %s", e)
-    return None
+    action_str = " ".join(actions_requested).lower()
+    never_list = entry.get("never_via_call", [])
+    special = entry.get("special_rule", "")
+
+    # Check if any requested action matches the never_via_call list
+    matched_prohibition = None
+    for prohibited in never_list:
+        prohibited_lower = prohibited.lower()
+        # Check word overlap
+        prohibited_words = set(prohibited_lower.split())
+        action_words = set(action_str.split())
+        overlap = prohibited_words & action_words - {"a", "the", "an", "for", "to", "of", "or", "and"}
+        if len(overlap) >= 2:
+            matched_prohibition = prohibited
+            break
+
+    source_url = entry.get("verified_source", "")
+    m = re.match(r"https?://(?:www\.)?([^/]+)", source_url) if source_url else None
+    source_label = m.group(1) if m else None
+
+    if special:
+        return {
+            "checked": True, "policy_allows": False,
+            "verdict_text": special,
+            "policy_quote": special,
+            "source_url": source_url, "source_label": source_label,
+            "confidence": 0.95, "error": None,
+        }
+    if matched_prohibition:
+        return {
+            "checked": True, "policy_allows": False,
+            "verdict_text": f"{entry.get('name', org_claimed)} never calls customers to {matched_prohibition}. This is against their official policy.",
+            "policy_quote": f"Official policy: {entry.get('name', org_claimed)} does not {matched_prohibition} via phone calls.",
+            "source_url": source_url, "source_label": source_label,
+            "confidence": 0.88, "error": None,
+        }
+
+    return {
+        "checked": True, "policy_allows": None,
+        "verdict_text": f"No specific prohibition found for this request. Verify directly with {entry.get('name', org_claimed)} at their official number.",
+        "policy_quote": None,
+        "source_url": source_url, "source_label": source_label,
+        "confidence": 0.30, "error": None,
+    }
+
+
+def _build_question(org_name: str, action_claim: str) -> str:
+    """Build a natural-language question for Tavily to answer."""
+    action_lower = action_claim.lower()
+    if any(k in action_lower for k in ["otp", "one time password", "pin", "cvv", "password"]):
+        return f"Does {org_name} ask customers for OTP PIN or password over a phone call? Is this a scam?"
+    elif any(k in action_lower for k in ["kyc", "know your customer", "verification", "verify"]):
+        return f"Does {org_name} call customers to update KYC over phone? Is this legitimate or a scam?"
+    elif any(k in action_lower for k in ["install", "app", "anydesk", "teamviewer", "screen", "remote"]):
+        return f"Does {org_name} ask customers to install apps or share screen over phone? Is this legitimate?"
+    elif any(k in action_lower for k in ["arrest", "police", "court", "legal", "warrant", "digital arrest"]):
+        return f"Is digital arrest over phone by police or CBI legitimate in India? Is this a scam?"
+    elif any(k in action_lower for k in ["upi", "payment", "transfer", "money", "fee"]):
+        return f"Does {org_name} ask customers to make UPI payments or money transfers over phone? Is this legitimate?"
+    elif any(k in action_lower for k in ["aadhaar", "aadhar", "pan"]):
+        return f"Does {org_name} call customers to verify Aadhaar or PAN over phone? Is this legitimate or fraud?"
+    else:
+        return f"Does {org_name} call customers for '{action_claim}'? Is this legitimate or a scam?"
 
 
 def check(org_claimed: str, actions_requested: list, timeout: int = 50) -> dict:
     """
-    Main entry point: verify whether org's claimed actions are legitimate
-    by searching their official website in real-time.
+    Main entry: verify org's claimed actions against official policy via web search.
 
     Returns:
     {
-        "checked": bool,
-        "policy_allows": bool | None,
-        "verdict_text": str,
-        "policy_quote": str | None,
-        "source_url": str | None,
-        "source_label": str | None,
-        "confidence": float,
-        "error": str | None,
+        checked, policy_allows, verdict_text, policy_quote,
+        source_url, source_label, confidence, error
     }
     """
     _not_checked = {
@@ -224,100 +277,60 @@ def check(org_claimed: str, actions_requested: list, timeout: int = 50) -> dict:
 
     cached = _cache_get(cache_key)
     if cached:
+        logger.info("[LIVE_POLICY] Cache hit for %s + %s", org_claimed, action_claim[:30])
         return cached
 
     org_entry = _find_org_entry(org_claimed)
-    page_text = ""
-    source_url = ""
-    source_label = ""
+    org_name = org_entry.get("name", org_claimed) if org_entry else org_claimed
+    official_domain = org_entry.get("official_domain", "") if org_entry else ""
 
-    # Step 1: Try pre-mapped official policy URLs (fastest, most reliable)
-    policy_urls = org_entry.get("policy_urls", []) if org_entry else []
-    for url in policy_urls[:2]:
-        text = _scrape_url(url, timeout=8)
-        if len(text) > 200:
-            page_text = text
-            source_url = url
-            # Extract domain as label
-            m = re.match(r"https?://(?:www\.)?([^/]+)", url)
-            source_label = m.group(1) if m else url
-            logger.info("[LIVE_POLICY] Used pre-mapped URL: %s", url)
-            break
+    # ── Stage A: Tavily answer (primary — works without Qwen3) ───────────────
+    question = _build_question(org_name, action_claim)
+    logger.info("[LIVE_POLICY] Asking Tavily: %s", question)
+    tavily_result = _tavily_ask(question, org_name, official_domain)
 
-    # Step 2: Tavily search if no pre-mapped URL worked
-    if not page_text:
-        official_domain = org_entry.get("official_domain", "") if org_entry else ""
-        org_name = org_entry.get("name", org_claimed) if org_entry else org_claimed
+    if tavily_result and tavily_result.get("answer"):
+        answer_text = tavily_result["answer"]
+        sources = tavily_result.get("sources", [])
 
-        # Build action-aware queries — prioritise fraud awareness pages
-        action_lower = action_claim.lower()
-        if any(k in action_lower for k in ["otp", "one time", "password", "pin", "cvv"]):
-            query = f'"{org_name}" "never ask" OTP password phone call fraud awareness'
-        elif any(k in action_lower for k in ["kyc", "know your customer", "verification"]):
-            query = f'"{org_name}" KYC phone call fraud awareness "never call"'
-        elif any(k in action_lower for k in ["install", "app", "anydesk", "teamviewer", "screen"]):
-            query = f'"{org_name}" remote access app phone call scam fraud'
-        elif any(k in action_lower for k in ["arrest", "police", "court", "legal", "warrant"]):
-            query = f'"digital arrest" scam fraud India official advisory'
-        elif any(k in action_lower for k in ["upi", "payment", "transfer", "money"]):
-            query = f'"{org_name}" UPI payment phone call fraud scam advisory'
-        else:
-            query = f'"{org_name}" phone call fraud awareness safety tips official'
+        verdict_parsed = _parse_answer_verdict(answer_text, action_claim)
 
-        # Try with domain restriction first, then without
-        results = _tavily_search(query, official_domain=official_domain)
-        if not results:
-            results = _tavily_search(query, official_domain="")
+        # Pick best source — prefer official domain
+        best_source_url = None
+        best_source_label = None
+        for s in sources:
+            url = s.get("url", "")
+            if official_domain and official_domain in url:
+                best_source_url = url
+                m = re.match(r"https?://(?:www\.)?([^/]+)", url)
+                best_source_label = m.group(1) if m else url
+                break
+        # Fallback to first source
+        if not best_source_url and sources:
+            best_source_url = sources[0]["url"]
+            m = re.match(r"https?://(?:www\.)?([^/]+)", best_source_url)
+            best_source_label = m.group(1) if m else best_source_url
 
-        if results:
-            best = results[0]
-            page_text = best["content"]
-            source_url = best["url"]
-            m = re.match(r"https?://(?:www\.)?([^/]+)", source_url)
-
-            source_label = m.group(1) if m else source_url
-
-    # Step 3: No content found — return graceful fallback
-    if not page_text:
-        result = {
-            **_not_checked,
-            "verdict_text": f"Could not find official policy page for {org_claimed}. "
-                            "Call the organization's official number to verify.",
-            "error": "no_content_found",
-        }
-        _cache_set(cache_key, result)
-        return result
-
-    # Step 4: Ask Qwen3 to read the policy page
-    qwen_result = _qwen3_read_policy(org_claimed, action_claim, page_text, source_url)
-
-    if qwen_result:
         result = {
             "checked": True,
-            "policy_allows": qwen_result.get("policy_allows"),
-            "verdict_text": qwen_result.get("verdict_text", ""),
-            "policy_quote": qwen_result.get("policy_quote"),
-            "source_url": source_url,
-            "source_label": source_label,
-            "confidence": float(qwen_result.get("confidence", 0.75)),
+            "policy_allows": verdict_parsed["policy_allows"],
+            "verdict_text": answer_text[:400],
+            "policy_quote": verdict_parsed["policy_quote"],
+            "source_url": best_source_url,
+            "source_label": best_source_label,
+            "confidence": verdict_parsed["confidence"],
             "error": None,
         }
-    else:
-        # Qwen3 failed but we have the page — return page source at least
-        result = {
-            "checked": True,
-            "policy_allows": None,
-            "verdict_text": f"Found {org_claimed}'s official page but could not extract a clear policy statement. View the source to verify.",
-            "policy_quote": None,
-            "source_url": source_url,
-            "source_label": source_label,
-            "confidence": 0.40,
-            "error": "qwen_read_failed",
-        }
 
+        _cache_set(cache_key, result)
+        logger.info(
+            "[LIVE_POLICY] Tavily verdict: allows=%s conf=%.2f src=%s",
+            result["policy_allows"], result["confidence"], best_source_label
+        )
+        return result
+
+    # ── Stage B: Static org_policies.json fallback ───────────────────────────
+    logger.info("[LIVE_POLICY] Tavily unavailable — using static fallback.")
+    result = _static_fallback(org_claimed, actions_requested)
     _cache_set(cache_key, result)
-    logger.info(
-        "[LIVE_POLICY] %s | allows=%s | conf=%.2f | src=%s",
-        org_claimed, result["policy_allows"], result["confidence"], source_label
-    )
     return result
