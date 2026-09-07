@@ -56,15 +56,12 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
         org_claimed = claims.get("org_claimed", "")
         actions_requested = claims.get("actions_requested", [])
 
-    if not org_claimed:
-        # Try to detect from transcript
-        org_claimed = transcript[:500] if transcript else ""
-
-    if not org_claimed:
+    # If no org is claimed at all, return a neutral/slightly cautious score
+    if not org_claimed or not org_claimed.strip():
         return {
-            "score": 0.30,
+            "score": 0.25,
             "finding": "no_org_claimed",
-            "plain_english": "No organization name detected in the description.",
+            "plain_english": "No organization name was provided. Cannot run policy verification. If the caller did not identify their organization, this itself is a warning sign.",
             "evidence": {},
             "hard_floor": None,
             "official_callback": ""
@@ -72,38 +69,39 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
 
     org_lower = org_claimed.lower()
 
-    # Special case: orgs that NEVER call citizens
-    for never_call in NEVER_CALL_ORGS:
-        if never_call in org_lower:
-            return {
-                "score": 0.97,
-                "finding": "org_never_calls_citizens",
-                "plain_english": f"POLICY VIOLATION: {org_claimed.title()} NEVER calls citizens directly for any reason. Any call claiming to be from this organization is fraudulent.",
-                "evidence": {"org_claimed": org_claimed, "rule": "never_calls_citizens"},
-                "hard_floor": 0.97,
-                "official_callback": "1947 (UIDAI Helpline)" if "uidai" in never_call or "aadhaar" in never_call else ""
-            }
+    # Special case: orgs that NEVER call citizens (only when org is actually named)
+    if org_lower:
+        for never_call in NEVER_CALL_ORGS:
+            if never_call in org_lower:
+                return {
+                    "score": 0.97,
+                    "finding": "org_never_calls_citizens",
+                    "plain_english": f"POLICY VIOLATION: {org_claimed.title()} NEVER calls citizens directly for any reason. Any call claiming to be from this organization is fraudulent.",
+                    "evidence": {"org_claimed": org_claimed, "rule": "never_calls_citizens"},
+                    "hard_floor": 0.97,
+                    "official_callback": "1947 (UIDAI Helpline)" if "uidai" in never_call or "aadhaar" in never_call else ""
+                }
 
-    # Special case: law enforcement digital arrest
-    for le_kw in LAW_ENFORCEMENT_KEYWORDS:
-        if le_kw in org_lower:
-            return {
-                "score": 0.96,
-                "finding": "law_enforcement_phone_scam",
-                "plain_english": f"POLICY VIOLATION: {org_claimed.title()} agencies NEVER arrest citizens via phone or video call. 'Digital arrest' is not a legal concept in India. This is a scam.",
-                "evidence": {"org_claimed": org_claimed, "rule": "no_phone_arrests"},
-                "hard_floor": 0.96,
-                "official_callback": "1930 (Cyber Crime Helpline)"
-            }
+        # Special case: law enforcement digital arrest (only when org is named)
+        for le_kw in LAW_ENFORCEMENT_KEYWORDS:
+            if le_kw in org_lower:
+                return {
+                    "score": 0.96,
+                    "finding": "law_enforcement_phone_scam",
+                    "plain_english": f"POLICY VIOLATION: {org_claimed.title()} agencies NEVER arrest citizens via phone or video call. 'Digital arrest' is not a legal concept in India. This is a scam.",
+                    "evidence": {"org_claimed": org_claimed, "rule": "no_phone_arrests"},
+                    "hard_floor": 0.96,
+                    "official_callback": "1930 (Cyber Crime Helpline)"
+                }
 
     # Look up org in policy database
     org_entry = _find_org(org_claimed)
 
     if not org_entry:
         return {
-            "score": 0.45,
+            "score": 0.52,
             "finding": "org_not_in_database",
-            "plain_english": f"Cannot verify official policies for '{org_claimed}'. Exercise caution and call the organization's official number directly to verify.",
+            "plain_english": f"Cannot verify official policies for '{org_claimed}'. We have no record of this organization. Treat the call with caution and call the organization's official number from their website to verify.",
             "evidence": {"org_claimed": org_claimed},
             "hard_floor": None,
             "official_callback": ""
@@ -115,15 +113,20 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
     for action in actions_requested:
         action_lower = action.lower()
         for forbidden in never_list:
-            if any(word in forbidden.lower() for word in action_lower.split() if len(word) > 3):
+            # Require meaningful word (>4 chars) to avoid single-word false positives
+            meaningful_words = [w for w in action_lower.split() if len(w) > 4]
+            if meaningful_words and any(word in forbidden.lower() for word in meaningful_words):
                 violations.append({"action": action, "policy_rule": forbidden})
                 break
 
-    # Also scan transcript for action keywords
-    if not actions_requested and transcript:
+    # Scan transcript ONLY when no structured actions given AND transcript has real content
+    # Require 2+ meaningful keyword hits to prevent false positives from innocent synthetic text
+    if not actions_requested and transcript and len(transcript.strip()) > 60:
         transcript_lower = transcript.lower()
         for forbidden in never_list:
-            if any(word in transcript_lower for word in forbidden.lower().split() if len(word) > 3):
+            forbidden_words = [w for w in forbidden.lower().split() if len(w) > 4]
+            hits = sum(1 for word in forbidden_words if word in transcript_lower)
+            if hits >= 2:
                 violations.append({"action": "detected in description", "policy_rule": forbidden})
 
     official_numbers = org_entry.get("official_numbers", [])

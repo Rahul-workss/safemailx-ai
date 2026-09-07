@@ -130,7 +130,7 @@ def analyze(input_data: dict) -> dict:
     # Risk band
     if final_score > 0.70:
         risk_band = "CRITICAL"
-    elif final_score >= 0.40:
+    elif final_score >= 0.30:
         risk_band = "SUSPICIOUS"
     else:
         risk_band = "SAFE"
