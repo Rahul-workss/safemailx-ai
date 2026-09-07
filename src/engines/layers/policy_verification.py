@@ -15,8 +15,12 @@ _ORG_POLICIES_PATH = Path(__file__).resolve().parents[2] / "data" / "org_policie
 # Special: these orgs NEVER legitimately call citizens at all
 NEVER_CALL_ORGS = ["uidai", "rbi", "reserve bank", "aadhaar"]
 
-# Special: law enforcement never does these
-LAW_ENFORCEMENT_KEYWORDS = ["cbi", "police", "enforcement directorate", "ed ", "cyber crime", "narcotics"]
+# Special: law enforcement / customs never arrest or demand payment via phone
+LAW_ENFORCEMENT_KEYWORDS = ["cbi", "police", "enforcement directorate", "ed ", "cyber crime", "narcotics", "customs", "dri"]
+
+# Special: tax authorities never collect payment via phone
+NEVER_PAYMENT_ORGS = ["income tax", "income-tax", "tax department", "tax officer", "tds"]
+PAYMENT_DEMAND_KEYWORDS = ["upi", "payment", "pay", "transfer", "money", "dues", "fine", "fee", "rupees", "amount"]
 
 
 def _load_policies() -> dict:
@@ -82,17 +86,42 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
                     "official_callback": "1947 (UIDAI Helpline)" if "uidai" in never_call or "aadhaar" in never_call else ""
                 }
 
-        # Special case: law enforcement digital arrest (only when org is named)
+        # Special case: law enforcement / customs digital arrest or payment demand
         for le_kw in LAW_ENFORCEMENT_KEYWORDS:
             if le_kw in org_lower:
+                is_customs = "customs" in org_lower or "dri" in org_lower
+                msg = (
+                    "POLICY VIOLATION: Indian Customs NEVER calls citizens to demand payment. "
+                    "Any call claiming a parcel contains drugs and demanding UPI/bank transfer is a scam."
+                    if is_customs else
+                    f"POLICY VIOLATION: {org_claimed.title()} agencies NEVER arrest citizens via phone or video call. "
+                    "'Digital arrest' is not a legal concept in India. This is a scam."
+                )
                 return {
                     "score": 0.96,
                     "finding": "law_enforcement_phone_scam",
-                    "plain_english": f"POLICY VIOLATION: {org_claimed.title()} agencies NEVER arrest citizens via phone or video call. 'Digital arrest' is not a legal concept in India. This is a scam.",
+                    "plain_english": msg,
                     "evidence": {"org_claimed": org_claimed, "rule": "no_phone_arrests"},
                     "hard_floor": 0.96,
                     "official_callback": "1930 (Cyber Crime Helpline)"
                 }
+
+        # Special case: income tax / tax orgs demanding payment via phone call
+        for tax_kw in NEVER_PAYMENT_ORGS:
+            if tax_kw in org_lower:
+                all_actions_text = " ".join(actions_requested).lower()
+                if any(pk in all_actions_text for pk in PAYMENT_DEMAND_KEYWORDS):
+                    return {
+                        "score": 0.95,
+                        "finding": "tax_payment_phone_scam",
+                        "plain_english": (
+                            f"POLICY VIOLATION: The Income Tax Department NEVER collects payments over the phone. "
+                            "Tax dues are paid only via the official portal at incometax.gov.in. This call is a scam."
+                        ),
+                        "evidence": {"org_claimed": org_claimed, "rule": "no_phone_payment_collection"},
+                        "hard_floor": 0.92,
+                        "official_callback": "1800-103-0025 (Income Tax Helpline)"
+                    }
 
     # Look up org in policy database
     org_entry = _find_org(org_claimed)

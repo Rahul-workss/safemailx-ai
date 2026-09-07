@@ -253,7 +253,12 @@
       "ask for OTP to process a refund",
       "ask for UPI payment for tax dues",
       "ask for card details",
-      "conduct raids via phone call"
+      "conduct raids via phone call",
+      "ask for UPI transfer or payment over phone",
+      "demand payment via phone call",
+      "collect money via phone or UPI",
+      "threaten arrest for unpaid taxes over phone",
+      "call to collect pending dues via phone"
     ],
     "legitimate_call_reasons": [
       "send SMS/email about pending notices (not phone calls)"
@@ -439,7 +444,11 @@
       "ask for card details over phone",
       "claim a parcel contains illegal items",
       "ask for Aadhaar details to process a return",
-      "demand customs duty payment via UPI"
+      "demand customs duty payment via UPI",
+      "ask to install any remote access app like AnyDesk or TeamViewer",
+      "ask to share your screen",
+      "ask for UPI payment to process refund",
+      "ask to install any app on your phone"
     ],
     "legitimate_call_reasons": [
       "delivery confirmation",
@@ -513,6 +522,34 @@
     "official_domain": "airtel.in",
     "policy_urls": [
       "https://www.airtel.in/fraud-prevention"
+    ]
+  },
+  "customs_department": {
+    "name": "Customs Department",
+    "aliases": [
+      "Customs",
+      "Customs officer",
+      "DRI",
+      "Customs Department India",
+      "Indian Customs"
+    ],
+    "org_type": "law_enforcement",
+    "special_rule": "Indian Customs NEVER calls citizens to demand UPI payment or money transfer over phone. Any call claiming a parcel contains drugs and demanding payment is a scam.",
+    "never_via_call": [
+      "demand payment via UPI to release a parcel",
+      "claim parcel contains drugs and ask for money",
+      "ask for bank transfer to clear your name",
+      "collect customs duty via phone call",
+      "ask for money transfer to avoid arrest"
+    ],
+    "legitimate_call_reasons": [],
+    "official_numbers": [
+      "1800-11-2598"
+    ],
+    "verified_source": "https://www.cbic.gov.in/htdocs-cbec/customs",
+    "official_domain": "cbic.gov.in",
+    "policy_urls": [
+      "https://www.cbic.gov.in/htdocs-cbec/customs"
     ]
   }
 }
