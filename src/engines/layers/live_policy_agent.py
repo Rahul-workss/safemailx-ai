@@ -1,4 +1,4 @@
-﻿"""
+"""
 SafeMail X - Live Policy Fact-Checker Agent
 ============================================
 When an org is detected, searches the official website in real-time
@@ -248,16 +248,33 @@ def check(org_claimed: str, actions_requested: list, timeout: int = 50) -> dict:
     if not page_text:
         official_domain = org_entry.get("official_domain", "") if org_entry else ""
         org_name = org_entry.get("name", org_claimed) if org_entry else org_claimed
-        query = f"{org_name} KYC phone call policy fraud awareness"
-        if action_claim and action_claim != "call customers":
-            query = f"{org_name} {action_claim} policy official"
 
+        # Build action-aware queries — prioritise fraud awareness pages
+        action_lower = action_claim.lower()
+        if any(k in action_lower for k in ["otp", "one time", "password", "pin", "cvv"]):
+            query = f'"{org_name}" "never ask" OTP password phone call fraud awareness'
+        elif any(k in action_lower for k in ["kyc", "know your customer", "verification"]):
+            query = f'"{org_name}" KYC phone call fraud awareness "never call"'
+        elif any(k in action_lower for k in ["install", "app", "anydesk", "teamviewer", "screen"]):
+            query = f'"{org_name}" remote access app phone call scam fraud'
+        elif any(k in action_lower for k in ["arrest", "police", "court", "legal", "warrant"]):
+            query = f'"digital arrest" scam fraud India official advisory'
+        elif any(k in action_lower for k in ["upi", "payment", "transfer", "money"]):
+            query = f'"{org_name}" UPI payment phone call fraud scam advisory'
+        else:
+            query = f'"{org_name}" phone call fraud awareness safety tips official'
+
+        # Try with domain restriction first, then without
         results = _tavily_search(query, official_domain=official_domain)
+        if not results:
+            results = _tavily_search(query, official_domain="")
+
         if results:
             best = results[0]
             page_text = best["content"]
             source_url = best["url"]
             m = re.match(r"https?://(?:www\.)?([^/]+)", source_url)
+
             source_label = m.group(1) if m else source_url
 
     # Step 3: No content found — return graceful fallback
