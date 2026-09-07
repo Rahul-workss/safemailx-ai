@@ -549,7 +549,7 @@ function AnalyzingView() {
           <Animated.View key={i} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.cyan, opacity: d }} />
         ))}
       </View>
-      {['Policy Check', 'Manipulation Detect', 'Script Match', 'Isolation Signal'].map((layer, i) => (
+      {['Policy Check', 'Manipulation Detect', 'Script Match', 'Isolation Signal', 'Qwen3 Thinking', 'Live Web Search'].map((layer, i) => (
         <Text key={i} style={{ color: 'rgba(0,243,255,0.4)', fontSize: 11, marginTop: 6, letterSpacing: 0.8 }}>
           ▶ {layer}
         </Text>
@@ -619,6 +619,97 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
           <Text style={{ color: '#fff', fontSize: 14, lineHeight: 21 }}>{result.recommended_action}</Text>
         </View>
       ) : null}
+
+      {/* ── Qwen3 AI Explanation ─────────────────────────────── */}
+      {result.plain_english ? (
+        <View style={[glassStyles.card, { marginBottom: 16, borderColor: 'rgba(140,82,255,0.35)' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Ionicons name="hardware-chip" size={15} color={C.violet} style={{ marginRight: 8 }} />
+            <Text style={{ color: C.violet, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>AI Analysis</Text>
+            {result.qwen_available && (
+              <View style={{ marginLeft: 8, backgroundColor: 'rgba(140,82,255,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                <Text style={{ color: C.violet, fontSize: 9, fontWeight: '700' }}>QWEN3 THINKING</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 21 }}>{result.plain_english}</Text>
+          {result.tactics_detected && result.tactics_detected.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 6 }}>
+              {result.tactics_detected.filter(t => t !== 'none_detected').map((tactic, i) => (
+                <View key={i} style={{ backgroundColor: 'rgba(255,61,113,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,61,113,0.3)' }}>
+                  <Text style={{ color: C.rose, fontSize: 10, fontWeight: '600', textTransform: 'capitalize' }}>
+                    {tactic.replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {/* ── Live Policy Fact-Check ────────────────────────────── */}
+      {result.live_policy_check?.checked && (
+        <View style={[glassStyles.card, {
+          marginBottom: 16,
+          borderColor: result.live_policy_check.policy_allows === false
+            ? 'rgba(255,61,113,0.4)'
+            : result.live_policy_check.policy_allows === true
+            ? 'rgba(52,199,89,0.4)'
+            : 'rgba(255,170,0,0.3)',
+        }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Ionicons name="globe-outline" size={15} color={C.cyan} style={{ marginRight: 8 }} />
+            <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Live Web Verification</Text>
+            <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,243,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+              <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700' }}>TAVILY AI</Text>
+            </View>
+          </View>
+
+          {/* Verdict pill */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <View style={{
+              paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+              backgroundColor: result.live_policy_check.policy_allows === false
+                ? 'rgba(255,61,113,0.15)' : result.live_policy_check.policy_allows === true
+                ? 'rgba(52,199,89,0.15)' : 'rgba(255,170,0,0.15)',
+            }}>
+              <Text style={{
+                fontSize: 11, fontWeight: '700',
+                color: result.live_policy_check.policy_allows === false ? C.rose
+                  : result.live_policy_check.policy_allows === true ? C.green : C.gold,
+              }}>
+                {result.live_policy_check.policy_allows === false ? '⛔ POLICY PROHIBITS THIS'
+                  : result.live_policy_check.policy_allows === true ? '✅ POLICY ALLOWS THIS'
+                  : '⚠️ POLICY UNCLEAR'}
+              </Text>
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 8 }}>
+              {Math.round((result.live_policy_check.confidence || 0) * 100)}% conf
+            </Text>
+          </View>
+
+          {/* Web answer text */}
+          {result.live_policy_check.verdict_text ? (
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>
+              {result.live_policy_check.verdict_text}
+            </Text>
+          ) : null}
+
+          {/* Source link */}
+          {result.live_policy_check.source_url ? (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
+              onPress={() => Linking.openURL(result.live_policy_check!.source_url!)}
+            >
+              <Ionicons name="link-outline" size={13} color={C.cyan} style={{ marginRight: 5 }} />
+              <Text style={{ color: C.cyan, fontSize: 12, textDecorationLine: 'underline', flex: 1 }} numberOfLines={1}>
+                {result.live_policy_check.source_label || result.live_policy_check.source_url}
+              </Text>
+              <Ionicons name="open-outline" size={13} color={C.cyan} style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
 
       {/* Official number */}
       {result.official_callback_number ? (
