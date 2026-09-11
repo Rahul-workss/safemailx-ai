@@ -348,6 +348,9 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
         // For now, construct a client-side result and use URL scan if available
         try {
           const urlResult = await scanUrl(data);
+          const normScore = urlResult.risk_score / 100;
+          const verdict = urlResult.verdict === 'phishing' ? 'dangerous'
+            : urlResult.verdict === 'suspicious' ? 'suspicious' : 'safe';
           setResult({
             qr_codes_found: 1,
             decoded_payloads: [data],
@@ -356,12 +359,11 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
             url_verdicts: [{
               url: data,
               verdict: urlResult.verdict,
-              risk_score: urlResult.risk_score,
+              risk_score: normScore,
               summary: urlResult.summary,
             }],
-            overall_verdict: urlResult.risk_score >= 0.7 ? 'dangerous'
-              : urlResult.risk_score >= 0.35 ? 'suspicious' : 'safe',
-            overall_risk_score: urlResult.risk_score,
+            overall_verdict: verdict,
+            overall_risk_score: normScore,
             summary: urlResult.summary,
             is_upi_payment: false,
             upi_details: null,

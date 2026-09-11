@@ -1343,7 +1343,7 @@ async def instant_scan_qr(
                 _user_id(_auth),
             )
             verdict_str = scan_result.verdict
-            risk = scan_result.risk_score
+            risk = scan_result.risk_score / 100.0  # normalize 0-100 → 0-1
             summary = scan_result.summary or ""
         except Exception as exc:
             logger.warning("[QR] URL scan failed for %s: %s", url, exc)
@@ -1354,7 +1354,7 @@ async def instant_scan_qr(
         url_verdicts.append(QRUrlVerdict(
             url=url,
             verdict=verdict_str,
-            risk_score=risk,
+            risk_score=round(risk, 3),
             summary=summary,
         ))
         max_risk = max(max_risk, risk)
