@@ -207,6 +207,28 @@ def startup_event():
         name="gmail-watcher",
     ).start()
 
+    # -- Keep-alive self-ping (prevents Render free-tier sleep) --
+    def _keep_alive_ping():
+        import time, requests as _req, os
+        base_url = os.getenv("RENDER_EXTERNAL_URL", "").strip()
+        if not base_url:
+            # Fallback: construct from known domain
+            base_url = "https://safemailx-ai.onrender.com"
+        health_url = f"{base_url}/api/health"
+        interval = 600  # 10 minutes
+        print(f"[KEEP-ALIVE] Pinging {health_url} every {interval}s to prevent sleep")
+        while True:
+            time.sleep(interval)
+            try:
+                r = _req.get(health_url, timeout=30)
+                print(f"[KEEP-ALIVE] Ping OK: {r.status_code}")
+            except Exception as e:
+                print(f"[KEEP-ALIVE] Ping failed: {e}")
+
+    _on_render = __import__("os").getenv("RENDER") or __import__("os").getenv("SAFEMAILX_PRODUCTION", "").lower() in {"true", "1", "yes"}
+    if _on_render:
+        threading.Thread(target=_keep_alive_ping, daemon=True, name="keep-alive").start()
+
 repository = ScanRepository()
 scan_service = ScanService(repository)
 inline_scan_service = InlineScanService(repository)
