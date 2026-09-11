@@ -60,9 +60,10 @@ import {
 } from "./src/session";
 import { C, colors, verdictColor } from "./src/theme";
 import CallAnalyzerScreen from "./src/screens/CallAnalyzerScreen";
+import QRScannerScreen from "./src/screens/QRScannerScreen";
 const { width: SW } = Dimensions.get("window");
 
-type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help";
+type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help" | "qr";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component<
@@ -1012,6 +1013,9 @@ function App() {
               <View style={{ display: activeTab === "help" ? "flex" : "none" }}>
                 <HelpCenterScreen onBack={() => switchTab("settings")} />
               </View>
+              {activeTab === "qr" && (
+                <QRScannerScreen onClose={() => switchTab("dashboard")} />
+              )}
             </Animated.View>
           </ScrollView>
           <BottomNavBar active={activeTab} onSwitch={switchTab} bottomInset={insets.bottom} />
@@ -1721,7 +1725,7 @@ function BottomNavBar({ active, onSwitch, bottomInset }: { active: Tab; onSwitch
       </View>
 
       {/* Right items */}
-      <NavItem label="Reports" icon="document-text-outline" active={active === "reports"} onPress={() => onSwitch("reports")} />
+      <NavItem label="QR Scan" icon="qr-code-outline" active={active === "qr"} onPress={() => onSwitch("qr")} />
       <NavItem label="Settings" icon="settings-outline" active={active === "settings"} onPress={() => onSwitch("settings")} />
     </LinearGradient>
   );

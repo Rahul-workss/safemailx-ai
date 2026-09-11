@@ -66,6 +66,8 @@ from server.schemas import (
     InstantSmsScanRequest,
     InstantUrlScanRequest,
     InstantScanResult,
+    QRScanResponse,
+    QRUrlVerdict,
 )
 from server.inline_scan_service import InlineScanService
 try:
@@ -1245,6 +1247,136 @@ def instant_scan_email(payload: InstantEmailScanRequest, _auth=Depends(require_a
     Gmail-connected scans go through the worker queue (/api/gmail/run-once).
     """
     return inline_scan_service.scan_email(payload, _user_id(_auth))
+
+
+@app.post("/api/instant/qr", response_model=QRScanResponse)
+async def instant_scan_qr(
+    file: UploadFile = File(...),
+    _auth=Depends(require_auth)
+):
+    """Decode QR codes from an uploaded image and analyze any embedded URLs
+    for phishing. Also detects UPI payment QR scams (India-specific)."""
+    import logging
+    logger = logging.getLogger("QR_ENDPOINT")
+
+    file_bytes = await _read_upload_with_limit(file)
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+
+    # -- Decode QR codes --
+    try:
+        from engines.qr_analyzer import analyze_qr_from_bytes
+        from utils.config import FEATURE_QR_DETECTION_ENABLED
+    except ImportError:
+        raise HTTPException(status_code=501, detail="QR analyzer not available on this server")
+
+    if not FEATURE_QR_DETECTION_ENABLED:
+        raise HTTPException(status_code=501, detail="QR detection feature is disabled")
+
+    suffix = "." + (file.filename or "image.png").rsplit(".", 1)[-1] if file.filename else ".png"
+    qr_result = analyze_qr_from_bytes(file_bytes, suffix=suffix)
+
+    if qr_result["qr_codes_found"] == 0:
+        return QRScanResponse(
+            qr_codes_found=0,
+            summary="No QR code detected in this image. Try pointing the camera directly at the QR code.",
+        )
+
+    decoded = qr_result["qr_decoded_payloads"]
+    urls = qr_result["qr_urls"]
+    non_urls = [p for p in decoded if p not in urls]
+
+    # -- Detect UPI payment QR (India scam vector) --
+    is_upi = False
+    upi_details: dict | None = None
+    for payload in decoded:
+        if payload.lower().startswith("upi://pay"):
+            is_upi = True
+            # Parse UPI params
+            try:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(payload)
+                params = parse_qs(parsed.query)
+                upi_details = {
+                    "raw": payload,
+                    "payee_name": params.get("pn", ["Unknown"])[0],
+                    "payee_vpa": params.get("pa", ["Unknown"])[0],
+                    "amount": params.get("am", [None])[0],
+                    "note": params.get("tn", [None])[0],
+                }
+            except Exception:
+                upi_details = {"raw": payload}
+            break
+
+    # -- Analyze each URL for phishing --
+    url_verdicts: list[QRUrlVerdict] = []
+    max_risk = 0.0
+
+    for url in urls:
+        try:
+            scan_result = inline_scan_service.scan_url(
+                type("Req", (), {"url": url, "scan_mode": "balanced"})(),
+                _user_id(_auth),
+            )
+            verdict_str = scan_result.verdict
+            risk = scan_result.risk_score
+            summary = scan_result.summary or ""
+        except Exception as exc:
+            logger.warning("[QR] URL scan failed for %s: %s", url, exc)
+            verdict_str = "unknown"
+            risk = 0.3
+            summary = "Could not analyze this URL"
+
+        url_verdicts.append(QRUrlVerdict(
+            url=url,
+            verdict=verdict_str,
+            risk_score=risk,
+            summary=summary,
+        ))
+        max_risk = max(max_risk, risk)
+
+    # -- UPI scam scoring --
+    if is_upi:
+        max_risk = max(max_risk, 0.65)
+        url_verdicts.append(QRUrlVerdict(
+            url=upi_details.get("raw", "upi://pay") if upi_details else "upi://pay",
+            verdict="suspicious",
+            risk_score=0.65,
+            summary=f"UPI payment QR detected. Payee: {upi_details.get('payee_name', '?')} ({upi_details.get('payee_vpa', '?')})"
+                    + (f", Amount: Rs.{upi_details['amount']}" if upi_details and upi_details.get('amount') else "")
+                    + ". Never scan & pay QR codes from unknown callers.",
+        ))
+
+    # -- Overall verdict --
+    if max_risk >= 0.7:
+        overall = "dangerous"
+        summary = "DANGER: This QR code contains a phishing or scam link. Do NOT open the URL."
+    elif max_risk >= 0.35:
+        overall = "suspicious"
+        summary = "WARNING: This QR code looks suspicious. Verify the source before proceeding."
+        if is_upi:
+            summary = "WARNING: This is a payment QR code. Never pay via QR from unknown sources."
+    elif len(urls) > 0 or is_upi:
+        overall = "safe"
+        summary = "This QR code appears safe, but always verify the destination before entering personal info."
+    else:
+        overall = "safe"
+        summary = f"QR code contains non-URL data: {', '.join(non_urls[:3])}"
+
+    return QRScanResponse(
+        qr_codes_found=qr_result["qr_codes_found"],
+        decoded_payloads=decoded,
+        urls_found=urls,
+        non_url_payloads=non_urls,
+        url_verdicts=url_verdicts,
+        overall_verdict=overall,
+        overall_risk_score=round(max_risk, 3),
+        summary=summary,
+        is_upi_payment=is_upi,
+        upi_details=upi_details,
+    )
 
 
 @app.post("/api/voice/analyze-call", response_model=CallAnalysisResponse)

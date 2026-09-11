@@ -497,6 +497,51 @@ export async function scanUrl(url: string): Promise<InstantScanResult> {
   return response.json();
 }
 
+// ── QR Scan (Quishing Detection) ─────────────────────────────────────────────
+export type QRUrlVerdict = {
+  url: string;
+  verdict: string;
+  risk_score: number;
+  summary: string;
+};
+
+export type QRScanResult = {
+  qr_codes_found: number;
+  decoded_payloads: string[];
+  urls_found: string[];
+  non_url_payloads: string[];
+  url_verdicts: QRUrlVerdict[];
+  overall_verdict: string;
+  overall_risk_score: number;
+  summary: string;
+  is_upi_payment: boolean;
+  upi_details: {
+    raw?: string;
+    payee_name?: string;
+    payee_vpa?: string;
+    amount?: string | null;
+    note?: string | null;
+  } | null;
+};
+
+export async function scanQrCode(file: {
+  uri: string; name: string; mimeType: string;
+}): Promise<QRScanResult> {
+  const form = new FormData();
+  form.append("file", {
+    uri: file.uri,
+    name: file.name || "qr_scan.jpg",
+    type: file.mimeType || "image/jpeg",
+  } as any);
+  const response = await apiFetch("/api/instant/qr", {
+    method: "POST",
+    headers: authHeaders(),
+    body: form,
+  }, 30000);
+  if (!response.ok) throw new Error("QR scan failed");
+  return response.json();
+}
+
 export async function submitScanFeedback(
   scanId: string,
   feedback: ScanFeedbackChoice,

@@ -289,3 +289,22 @@ class CallAnalysisResponse(BaseModel):
     # Live policy fact-check
     live_policy_check: dict | None = None
 
+
+# ── QR Scan (Quishing Detection) ──────────────────────────────────────────────
+class QRUrlVerdict(BaseModel):
+    url: str
+    verdict: str = "unknown"       # phishing | suspicious | legitimate | unknown
+    risk_score: float = 0.0
+    summary: str = ""
+
+class QRScanResponse(BaseModel):
+    qr_codes_found: int = 0
+    decoded_payloads: list[str] = Field(default_factory=list)
+    urls_found: list[str] = Field(default_factory=list)
+    non_url_payloads: list[str] = Field(default_factory=list)
+    url_verdicts: list[QRUrlVerdict] = Field(default_factory=list)
+    overall_verdict: str = "no_qr_found"   # dangerous | suspicious | safe | no_qr_found
+    overall_risk_score: float = 0.0
+    summary: str = "No QR code detected"
+    is_upi_payment: bool = False
+    upi_details: dict | None = None
