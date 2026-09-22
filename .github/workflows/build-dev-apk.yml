@@ -37,11 +37,47 @@ jobs:
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
+      - name: Patch Gradle repos (ensure mavenCentral for plugins)
+        run: |
+          # Add mavenCentral to pluginManagement repositories if missing
+          SETTINGS_FILE="android/settings.gradle"
+          if [ -f "$SETTINGS_FILE" ] && ! grep -q "mavenCentral()" "$SETTINGS_FILE"; then
+            sed -i '/pluginManagement {/,/repositories {/ {
+              /repositories {/a\        mavenCentral()
+            }' "$SETTINGS_FILE"
+          fi
+          # Also create a Gradle init script as fallback
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+            buildscript {
+              repositories {
+                mavenCentral()
+                google()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              mavenCentral()
+              google()
+            }
+          }
+          settingsEvaluated { settings ->
+            settings.pluginManagement {
+              repositories {
+                mavenCentral()
+                google()
+                gradlePluginPortal()
+              }
+            }
+          }
+          EOF
+
       - name: Build Debug APK (Dev Client)
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --init-script ~/.gradle/init.gradle
 
       - name: Upload Dev APK
         uses: actions/upload-artifact@v4
