@@ -28,8 +28,14 @@
       "intentFilters": [
         {
           "action": "SEND",
-          "data": [{"mimeType": "text/plain"}],
-          "category": ["DEFAULT"]
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -43,7 +49,8 @@
     },
     "owner": "jnvra",
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-speech-recognition"
     ]
   }
 }

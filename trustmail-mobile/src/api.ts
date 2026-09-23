@@ -731,22 +731,33 @@ export type CallAnalysisResult = {
 };
 
 export async function analyzeCall(params: {
-  inputMode: 'voice' | 'structured';
+  inputMode: 'voice' | 'structured' | 'transcript';
   audioUri?: string;
+  transcript?: string;
   orgClaimed?: string;
   actionsRequested?: string[];
   warningPhrases?: string[];
 }): Promise<CallAnalysisResult> {
   const form = new FormData();
-  form.append('input_mode', params.inputMode);
 
   if (params.inputMode === 'voice' && params.audioUri) {
+    // Legacy: audio file upload → server runs Whisper
+    form.append('input_mode', 'voice');
     form.append('audio', {
       uri: params.audioUri,
       name: 'description.wav',
       type: 'audio/wav',
     } as any);
+  } else if (params.inputMode === 'transcript' && params.transcript) {
+    // New: live on-device transcript → no audio upload, same backend pipeline
+    form.append('input_mode', 'structured');   // backend treats transcript same as structured input
+    form.append('transcript', params.transcript.trim());
+    form.append('org_claimed', '');
+    form.append('actions_requested', JSON.stringify([]));
+    form.append('warning_phrases', JSON.stringify([]));
   } else {
+    // Structured form
+    form.append('input_mode', 'structured');
     form.append('org_claimed', params.orgClaimed || '');
     form.append('actions_requested', JSON.stringify(params.actionsRequested || []));
     form.append('warning_phrases', JSON.stringify(params.warningPhrases || []));
