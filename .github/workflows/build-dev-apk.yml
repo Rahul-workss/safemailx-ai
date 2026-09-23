@@ -37,6 +37,17 @@ jobs:
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
+      - name: Enable AndroidX and Jetifier
+        run: |
+          PROPERTIES_FILE="android/gradle.properties"
+          touch "$PROPERTIES_FILE"
+
+          grep -q '^android.useAndroidX=' "$PROPERTIES_FILE" \
+            || echo 'android.useAndroidX=true' >> "$PROPERTIES_FILE"
+
+          grep -q '^android.enableJetifier=' "$PROPERTIES_FILE" \
+            || echo 'android.enableJetifier=true' >> "$PROPERTIES_FILE"
+
       - name: Patch Gradle repos (ensure mavenCentral for plugins)
         run: |
           # Add mavenCentral to pluginManagement repositories if missing
