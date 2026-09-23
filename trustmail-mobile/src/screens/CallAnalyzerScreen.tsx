@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, BackHandler, Linking, Dimensions, Platform, Image,
-  TextInput, KeyboardAvoidingView,
+  TextInput, KeyboardAvoidingView, PermissionsAndroid,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, RadialGradient } from 'react-native-svg';
@@ -10,11 +10,7 @@ import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, RadialGradi
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-  type ExpoSpeechRecognitionOptions,
-} from 'expo-speech-recognition';
+import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
 import { analyzeCall, CallAnalysisResult } from '../api';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -163,12 +159,12 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeLeftRef = useRef(20);
 
-  // Transcript state: finalTranscript = confirmed sentences, partialTranscript = live current word stream
+  // Transcript state
   const [finalTranscript, setFinalTranscript] = useState('');
   const [partialTranscript, setPartialTranscript] = useState('');
-  const [reviewTranscript, setReviewTranscript] = useState(''); // editable in REVIEW state
+  const [reviewTranscript, setReviewTranscript] = useState('');
   const isRecognizingRef = useRef(false);
-  const finalTranscriptRef = useRef(''); // ref so speech event handlers always see latest value
+  const finalTranscriptRef = useRef('');
 
   // Waveform bar animations (5 bars)
   const bar1 = useRef(new Animated.Value(4)).current;
@@ -182,11 +178,11 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const recDotOpacity = useRef(new Animated.Value(1)).current;
   const recDotAniRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // ── Speech recognition event hooks ─────────────────────────────────────────
-  useSpeechRecognitionEvent('result', (event) => {
-    if (event.isFinal) {
-      // A sentence was finalized — append to running transcript
-      const newText = event.results?.[0]?.transcript ?? '';
+  // ── Voice event handlers (set once on mount) ───────────────────────────────
+  useEffect(() => {
+    // Final result — a complete sentence recognized
+    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+      const newText = e.value?.[0] ?? '';
       if (newText.trim()) {
         const updated = finalTranscriptRef.current
           ? finalTranscriptRef.current + ' ' + newText.trim()
@@ -195,47 +191,47 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         setFinalTranscript(updated);
       }
       setPartialTranscript('');
-      // Restart immediately if still within recording window (restart-on-pause trick)
+      // Restart immediately to catch next sentence (restart-on-pause trick)
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
       }
-    } else {
-      // Live partial result — display as they speak
-      const partial = event.results?.[0]?.transcript ?? '';
+    };
+
+    // Partial / live results — words appearing as user speaks
+    Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
+      const partial = e.value?.[0] ?? '';
       setPartialTranscript(partial);
-    }
-  });
+    };
 
-  useSpeechRecognitionEvent('error', (event) => {
-    // "no-speech" is expected when user pauses — just restart quietly
-    if (event.error === 'no-speech' && isRecognizingRef.current && timeLeftRef.current > 1) {
-      restartRecognizer();
-    }
-    // Other errors: stop silently, keep whatever transcript we have
-    setPartialTranscript('');
-  });
+    // Error — "No speech" is normal on a pause, just restart
+    Voice.onSpeechError = (e: SpeechErrorEvent) => {
+      setPartialTranscript('');
+      if (isRecognizingRef.current && timeLeftRef.current > 1) {
+        restartRecognizer();
+      }
+    };
 
-  useSpeechRecognitionEvent('end', (_event) => {
-    // Recognizer stopped — restart if still in recording window
-    if (isRecognizingRef.current && timeLeftRef.current > 1) {
-      restartRecognizer();
-    }
-  });
+    // End of utterance — restart for the next sentence
+    Voice.onSpeechEnd = () => {
+      if (isRecognizingRef.current && timeLeftRef.current > 1) {
+        restartRecognizer();
+      }
+    };
+
+    return () => {
+      // Cleanup on unmount
+      if (timerRef.current) clearInterval(timerRef.current);
+      isRecognizingRef.current = false;
+      Voice.destroy().then(() => Voice.removeAllListeners()).catch(() => {});
+      stopWaveAnimation();
+      stopRecDotPulse();
+    };
+  }, []);
 
   const restartRecognizer = () => {
     try {
-      ExpoSpeechRecognitionModule.start({
-        lang: 'en-IN',
-        interimResults: true,
-        continuous: false, // auto-segments sentences naturally
-        addsPunctuation: true,
-        contextualStrings: [
-          'OTP', 'KYC', 'Aadhaar', 'UIDAI', 'UPI', 'IFSC', 'CVV', 'PIN', 'PAN',
-          'AnyDesk', 'TeamViewer', 'SBI', 'HDFC', 'ICICI', 'TRAI', 'RBI',
-          'digital arrest', 'customs', 'CBI', 'scam', 'fraud', 'phishing',
-        ],
-      });
-    } catch (_) { /* ignore if start fails mid-session */ }
+      Voice.start('en-IN');
+    } catch (_) { /* ignore restart failures mid-session */ }
   };
 
   const startWaveAnimation = () => {
@@ -275,11 +271,16 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   // ── Start live transcription ────────────────────────────────────────────────
   const startRecording = async () => {
     try {
-      const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (!result.granted) {
-        // Fallback to form mode if mic denied
-        setScreenState('STRUCTURED');
-        return;
+      // Request microphone permission
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          { title: 'Microphone Permission', message: 'SafeMail X needs the microphone to transcribe your call description.', buttonPositive: 'Allow' }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setScreenState('STRUCTURED');
+          return;
+        }
       }
 
       // Reset all transcript state
@@ -295,18 +296,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       startWaveAnimation();
       startRecDotPulse();
 
-      // Start the recognizer
-      ExpoSpeechRecognitionModule.start({
-        lang: 'en-IN',
-        interimResults: true,
-        continuous: false,
-        addsPunctuation: true,
-        contextualStrings: [
-          'OTP', 'KYC', 'Aadhaar', 'UIDAI', 'UPI', 'IFSC', 'CVV', 'PIN', 'PAN',
-          'AnyDesk', 'TeamViewer', 'SBI', 'HDFC', 'ICICI', 'TRAI', 'RBI',
-          'digital arrest', 'customs', 'CBI', 'scam', 'fraud', 'phishing',
-        ],
-      });
+      await Voice.start('en-IN');
 
       // 20-second countdown timer
       timerRef.current = setInterval(() => {
@@ -325,25 +315,22 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const finishRecording = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     isRecognizingRef.current = false;
-    try { ExpoSpeechRecognitionModule.stop(); } catch (_) {}
+    try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
 
-    // Small delay to let final 'result' event fire and append last sentence
+    // 600ms delay for final result event to fire and append last sentence
     setTimeout(() => {
       const captured = finalTranscriptRef.current.trim();
       if (!captured || captured.split(' ').length < 5) {
-        // Nothing captured — stay on RECORDING and reset, let user try again
+        // Too short — reset and let user try again
         setFinalTranscript('');
         setPartialTranscript('');
         setTimeLeft(20);
         timeLeftRef.current = 20;
         isRecognizingRef.current = true;
         startRecDotPulse();
-        ExpoSpeechRecognitionModule.start({
-          lang: 'en-IN', interimResults: true, continuous: false,
-          addsPunctuation: true,
-        });
+        Voice.start('en-IN').catch(() => {});
         timerRef.current = setInterval(() => {
           timeLeftRef.current -= 1;
           setTimeLeft(timeLeftRef.current);
@@ -351,7 +338,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         }, 1000);
         return;
       }
-      // Move to REVIEW with the captured transcript
       setReviewTranscript(captured);
       setScreenState('REVIEW');
     }, 600);
@@ -375,24 +361,14 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     }
   };
 
-  // ── Cleanup on unmount ──────────────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      isRecognizingRef.current = false;
-      try { ExpoSpeechRecognitionModule.stop(); } catch (_) {}
-      stopWaveAnimation();
-      stopRecDotPulse();
-    };
-  }, []);
-
   const stopRecordingIfNeeded = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     isRecognizingRef.current = false;
-    try { ExpoSpeechRecognitionModule.stop(); } catch (_) {}
+    try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
   };
+
 
   // Path B — Structured
   const [orgClaimed, setOrgClaimed] = useState('');

@@ -21,6 +21,7 @@
     "android": {
       "package": "tech.safemailx.safemailxai",
       "usesCleartextTraffic": false,
+      "permissions": ["android.permission.RECORD_AUDIO"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/custom-shield.png",
         "backgroundColor": "#080B12"
@@ -49,8 +50,7 @@
     },
     "owner": "jnvra",
     "plugins": [
-      "expo-secure-store",
-      "expo-speech-recognition"
+      "expo-secure-store"
     ]
   }
 }
