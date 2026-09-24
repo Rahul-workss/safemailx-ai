@@ -163,27 +163,23 @@ def consume_ws_ticket(ticket: str, scan_id: str) -> str | None:
 
 
 def create_oauth_exchange_code(email: str, user_id: str, name: str = "User") -> str:
-    """Create a short-lived, single-use code for mobile OAuth handoff."""
+    """Create a short-lived, single-use code for mobile OAuth handoff.
+    Always falls back to in-memory storage if Redis is unavailable.
+    """
     code = secrets.token_urlsafe(32)
     client = _revocation_client()
-    if client is None:
-        if SAFEMAILX_PRODUCTION:
-            raise HTTPException(status_code=503, detail="OAuth handoff unavailable")
-        with _local_oauth_lock:
-            _local_oauth_codes[code] = (
-                time.monotonic() + 90,
-                {"email": email, "uid": user_id, "name": name},
+    stored_in_redis = False
+    if client is not None:
+        try:
+            client.setex(
+                f"safemailx:oauth-exchange:{code}",
+                90,
+                json.dumps({"email": email, "uid": user_id, "name": name}),
             )
-        return code
-    try:
-        client.setex(
-            f"safemailx:oauth-exchange:{code}",
-            90,
-            json.dumps({"email": email, "uid": user_id, "name": name}),
-        )
-    except Exception as exc:
-        if SAFEMAILX_PRODUCTION:
-            raise HTTPException(status_code=503, detail="OAuth handoff unavailable") from exc
+            stored_in_redis = True
+        except Exception:
+            pass  # Fall through to local memory
+    if not stored_in_redis:
         with _local_oauth_lock:
             _local_oauth_codes[code] = (
                 time.monotonic() + 90,
@@ -193,41 +189,35 @@ def create_oauth_exchange_code(email: str, user_id: str, name: str = "User") -> 
 
 
 def consume_oauth_exchange_code(code: str) -> dict[str, str] | None:
+    """Consume a one-time OAuth exchange code. Checks Redis first, then local memory."""
     client = _revocation_client()
-    if client is None:
-        with _local_oauth_lock:
-            stored = _local_oauth_codes.pop(code, None)
-        if not stored or stored[0] < time.monotonic():
-            return None
-        return stored[1]
-    try:
-        key = f"safemailx:oauth-exchange:{code}"
+    if client is not None:
         try:
-            value = client.getdel(key)
-        except AttributeError:
-            value = client.get(key)
-            client.delete(key)
-        if isinstance(value, bytes):
-            value = value.decode("utf-8", errors="ignore")
-        payload = json.loads(value) if isinstance(value, str) else None
-        if not isinstance(payload, dict):
-            if not SAFEMAILX_PRODUCTION:
-                with _local_oauth_lock:
-                    stored = _local_oauth_codes.pop(code, None)
-                if stored and stored[0] >= time.monotonic():
-                    return stored[1]
-            return None
-        if not all(isinstance(payload.get(key), str) and payload[key] for key in ("email", "uid")):
-            return None
-        return payload
-    except Exception:
-        if SAFEMAILX_PRODUCTION:
-            return None
-        with _local_oauth_lock:
-            stored = _local_oauth_codes.pop(code, None)
-        if not stored or stored[0] < time.monotonic():
-            return None
+            key = f"safemailx:oauth-exchange:{code}"
+            try:
+                value = client.getdel(key)
+            except AttributeError:
+                value = client.get(key)
+                client.delete(key)
+            if isinstance(value, bytes):
+                value = value.decode("utf-8", errors="ignore")
+            if isinstance(value, str):
+                payload = json.loads(value)
+                if isinstance(payload, dict) and all(
+                    isinstance(payload.get(k), str) and payload[k] for k in ("email", "uid")
+                ):
+                    return payload
+        except Exception:
+            pass  # Fall through to local memory
+
+    # Always check local memory as fallback (code may have been stored there if Redis was down)
+    with _local_oauth_lock:
+        stored = _local_oauth_codes.pop(code, None)
+    if stored and stored[0] >= time.monotonic():
         return stored[1]
+    return None
+
+
 
 
 def consume_oauth_state(payload: dict[str, Any]) -> bool:
