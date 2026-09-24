@@ -38,11 +38,56 @@ jobs:
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
+      - name: Enable AndroidX and Jetifier
+        run: |
+          PROPERTIES_FILE="android/gradle.properties"
+          touch "$PROPERTIES_FILE"
+
+          grep -q '^android.useAndroidX=' "$PROPERTIES_FILE" \
+            || echo 'android.useAndroidX=true' >> "$PROPERTIES_FILE"
+
+          grep -q '^android.enableJetifier=' "$PROPERTIES_FILE" \
+            || echo 'android.enableJetifier=true' >> "$PROPERTIES_FILE"
+
+      - name: Patch Gradle repos (ensure mavenCentral for plugins)
+        run: |
+          SETTINGS_FILE="android/settings.gradle"
+          if [ -f "$SETTINGS_FILE" ] && ! grep -q "mavenCentral()" "$SETTINGS_FILE"; then
+            sed -i '/pluginManagement {/,/repositories {/ {
+              /repositories {/a\        mavenCentral()
+            }' "$SETTINGS_FILE"
+          fi
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+            buildscript {
+              repositories {
+                mavenCentral()
+                google()
+                gradlePluginPortal()
+              }
+            }
+            repositories {
+              mavenCentral()
+              google()
+            }
+          }
+          settingsEvaluated { settings ->
+            settings.pluginManagement {
+              repositories {
+                mavenCentral()
+                google()
+                gradlePluginPortal()
+              }
+            }
+          }
+          EOF
+
       - name: Build APK (Standalone Release)
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-        run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android --no-daemon
+        run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android --no-daemon --init-script ~/.gradle/init.gradle
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
