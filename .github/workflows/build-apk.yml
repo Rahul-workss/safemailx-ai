@@ -38,6 +38,10 @@ jobs:
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
+      - name: Restore stable debug keystore (fixes Google Sign-In SHA-1)
+        run: |
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+
       - name: Enable AndroidX and Jetifier
         run: |
           PROPERTIES_FILE="android/gradle.properties"
