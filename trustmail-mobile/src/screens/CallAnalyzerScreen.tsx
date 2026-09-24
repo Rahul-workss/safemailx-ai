@@ -230,7 +230,9 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
   const restartRecognizer = () => {
     try {
-      Voice.start('en-IN');
+      Voice.start('en-IN').catch(() => {
+        Voice.start('en-US').catch(() => { /* ignore restart failures */ });
+      });
     } catch (_) { /* ignore restart failures mid-session */ }
   };
 
@@ -282,13 +284,12 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
           }
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          // Stay on CHOOSING — show clear explanation
           Alert.alert(
             'Microphone Permission Denied',
-            'Without microphone access, Speak It cannot transcribe your voice.\n\nYou can:\n• Tap "Speak It" again and allow the permission\n• Use "Type It" to describe the call manually\n\nTo fix: Phone Settings → Apps → SafeMail X → Permissions → Microphone → Allow',
+            'Without microphone access, Speak It cannot transcribe your voice.\n\nYou can:\n• Tap "Speak It" again and allow the permission\n• Use "Type It" to describe the call manually\n\nTo fix: Phone Settings \u2192 Apps \u2192 SafeMail X \u2192 Permissions \u2192 Microphone \u2192 Allow',
             [{ text: 'OK' }]
           );
-          return; // Stay on CHOOSING
+          return;
         }
       }
 
@@ -301,11 +302,18 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       setTimeLeft(20);
       isRecognizingRef.current = true;
 
+      // ── Start speech recognizer BEFORE entering RECORDING state ──────────
+      // Try en-IN first; fall back to en-US if that language pack is missing.
+      try {
+        await Voice.start('en-IN');
+      } catch (_) {
+        await Voice.start('en-US'); // second attempt — throws to outer catch if also fails
+      }
+
+      // Voice is running — now safe to enter RECORDING state
       setScreenState('RECORDING');
       startWaveAnimation();
       startRecDotPulse();
-
-      await Voice.start('en-IN');
 
       // 20-second countdown timer
       timerRef.current = setInterval(() => {
@@ -316,13 +324,17 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         }
       }, 1000);
     } catch (err: any) {
-      // Voice.start() can fail if another app holds the mic, or if the device
-      // speech engine is unavailable. Show a helpful alert instead of silently
-      // redirecting to the wrong screen.
-      console.warn('[CallAnalyzer] startRecording error:', err);
+      // Both locale attempts failed — fully reset to CHOOSING before showing alert.
+      console.warn('[CallAnalyzer] startRecording failed:', err);
+      isRecognizingRef.current = false;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      try { Voice.stop(); } catch (_) {}
+      stopWaveAnimation();
+      stopRecDotPulse();
+      setScreenState('CHOOSING');
       Alert.alert(
         'Could Not Start Microphone',
-        'The speech recognizer failed to start. This can happen if:\n• Another app is using the microphone\n• The device speech engine is unavailable\n\nTry again, or use "Type It" to describe the call manually.',
+        'The speech recognizer failed to start.\n\nThis can happen if:\n• Another app is using the microphone\n• The device speech engine is unavailable\n\nTry again, or use "Type It" to describe the call manually.',
         [
           { text: 'Try Again', onPress: () => startRecording() },
           { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
