@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, BackHandler, Linking, Dimensions, Platform, Image,
-  TextInput, KeyboardAvoidingView, PermissionsAndroid,
+  TextInput, KeyboardAvoidingView, PermissionsAndroid, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, RadialGradient } from 'react-native-svg';
@@ -268,18 +268,27 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     recDotOpacity.setValue(1);
   };
 
-  // ── Start live transcription ────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       // Request microphone permission
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          { title: 'Microphone Permission', message: 'SafeMail X needs the microphone to transcribe your call description.', buttonPositive: 'Allow' }
+          {
+            title: 'Microphone Permission Required',
+            message: 'SafeMail X needs microphone access to transcribe your call description in real time.\n\nPlease tap "Allow" to use Speak It.',
+            buttonPositive: 'Allow',
+            buttonNegative: 'Cancel',
+          }
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setScreenState('STRUCTURED');
-          return;
+          // Stay on CHOOSING — show clear explanation
+          Alert.alert(
+            'Microphone Permission Denied',
+            'Without microphone access, Speak It cannot transcribe your voice.\n\nYou can:\n• Tap "Speak It" again and allow the permission\n• Use "Type It" to describe the call manually\n\nTo fix: Phone Settings → Apps → SafeMail X → Permissions → Microphone → Allow',
+            [{ text: 'OK' }]
+          );
+          return; // Stay on CHOOSING
         }
       }
 
@@ -306,8 +315,19 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
           finishRecording();
         }
       }, 1000);
-    } catch (err) {
-      setScreenState('STRUCTURED');
+    } catch (err: any) {
+      // Voice.start() can fail if another app holds the mic, or if the device
+      // speech engine is unavailable. Show a helpful alert instead of silently
+      // redirecting to the wrong screen.
+      console.warn('[CallAnalyzer] startRecording error:', err);
+      Alert.alert(
+        'Could Not Start Microphone',
+        'The speech recognizer failed to start. This can happen if:\n• Another app is using the microphone\n• The device speech engine is unavailable\n\nTry again, or use "Type It" to describe the call manually.',
+        [
+          { text: 'Try Again', onPress: () => startRecording() },
+          { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
+        ]
+      );
     }
   };
 
