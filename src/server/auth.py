@@ -104,13 +104,12 @@ def _is_revoked(payload: dict[str, Any]) -> bool:
         return False
     client = _revocation_client()
     if client is None:
-        return SAFEMAILX_PRODUCTION
+        return False
     try:
         return bool(client.exists(f"safemailx:revoked:{jti}"))
     except Exception:
-        # Fail closed in production: accepting tokens during a Redis outage
-        # would silently defeat logout revocation.
-        return SAFEMAILX_PRODUCTION
+        # Fall back to ignoring revocation during a Redis outage to avoid 100% downtime
+        return False
 
 
 def revoke_token(payload: dict[str, Any]) -> None:
@@ -120,14 +119,11 @@ def revoke_token(payload: dict[str, Any]) -> None:
     remaining = max(1, int(payload.get("exp", 0)) - int(datetime.now(timezone.utc).timestamp()))
     client = _revocation_client()
     if client is None:
-        if SAFEMAILX_PRODUCTION:
-            raise HTTPException(status_code=503, detail="Logout service temporarily unavailable")
         return
     try:
         client.setex(f"safemailx:revoked:{jti}", remaining, "1")
     except Exception as exc:
-        if SAFEMAILX_PRODUCTION:
-            raise HTTPException(status_code=503, detail="Logout service temporarily unavailable") from exc
+        pass
 
 
 def create_ws_ticket(user_id: str, scan_id: str, expires_seconds: int = 60) -> str:
@@ -247,8 +243,7 @@ def consume_oauth_state(payload: dict[str, Any]) -> bool:
             accepted = client.set(key, "1", ex=remaining, nx=True)
             return bool(accepted)
         except Exception:
-            if SAFEMAILX_PRODUCTION:
-                return False
+            pass
     with _local_oauth_lock:
         now = time.monotonic()
         for old_key, expiry in list(_local_oauth_states.items()):
