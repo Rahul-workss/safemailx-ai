@@ -50,7 +50,8 @@
     },
     "owner": "jnvra",
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-voice/voice"
     ]
   }
 }
