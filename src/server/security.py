@@ -64,9 +64,9 @@ def consume_rate_limit(key: str, rule: str) -> tuple[bool, int]:
                 redis_client.expire(redis_key, window)
             ttl = max(1, int(redis_client.ttl(redis_key)))
             return count <= limit, ttl
-        except Exception:
-            if SAFEMAILX_PRODUCTION:
-                return False, 60
+        except Exception as e:
+            print(f"[SECURITY] Redis rate limit failed, falling back to memory: {e}")
+            pass # Fall through to memory counters
 
     now = time.monotonic()
     with _memory_lock:
