@@ -71,3 +71,17 @@ index 8fce879..9702653 100644
 +    implementation 'androidx.appcompat:appcompat:1.7.0'
      implementation 'com.facebook.react:react-native:+'
  }
+diff --git a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+index f22833e..f2ef799 100644
+--- a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
++++ b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+@@ -146,7 +146,8 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+ 
+   @Override
+   public String getName() {
+-    return "RCTVoice";
++    // JS dist/index.js reads NativeModules.Voice — module name must match
++    return "Voice";
+   }
+ 
+   @ReactMethod
