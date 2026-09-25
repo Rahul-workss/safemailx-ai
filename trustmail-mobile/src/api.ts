@@ -749,12 +749,9 @@ export async function analyzeCall(params: {
       type: 'audio/wav',
     } as any);
   } else if (params.inputMode === 'transcript' && params.transcript) {
-    // New: live on-device transcript → no audio upload, same backend pipeline
-    form.append('input_mode', 'structured');   // backend treats transcript same as structured input
+    // On-device STT transcript — send directly to the new 'transcript' backend path
+    form.append('input_mode', 'transcript');
     form.append('transcript', params.transcript.trim());
-    form.append('org_claimed', '');
-    form.append('actions_requested', JSON.stringify([]));
-    form.append('warning_phrases', JSON.stringify([]));
   } else {
     // Structured form
     form.append('input_mode', 'structured');

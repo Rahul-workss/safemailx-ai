@@ -154,10 +154,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  // ── Path A — Live Transcription (expo-speech-recognition) ──────────────────
+  // ── Path A — Live Transcription ────────────────────────────────────────────
   const [timeLeft, setTimeLeft] = useState(20);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeLeftRef = useRef(20);
+  // Timestamp-based timer: tracks actual wall-clock start so timer never drifts
+  const timerStartRef = useRef<number>(0);
+  const timerDurationRef = useRef<number>(20000); // ms
 
   // Transcript state
   const [finalTranscript, setFinalTranscript] = useState('');
@@ -165,6 +168,8 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const [reviewTranscript, setReviewTranscript] = useState('');
   const isRecognizingRef = useRef(false);
   const finalTranscriptRef = useRef('');
+  // Debounce ref for partial results — limits re-renders to max ~10/sec
+  const partialDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waveform bar animations (5 bars)
   const bar1 = useRef(new Animated.Value(4)).current;
@@ -190,6 +195,8 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         finalTranscriptRef.current = updated;
         setFinalTranscript(updated);
       }
+      // Clear partial immediately on final result
+      if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       setPartialTranscript('');
       // Restart immediately to catch next sentence (restart-on-pause trick)
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
@@ -197,14 +204,18 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       }
     };
 
-    // Partial / live results — words appearing as user speaks
+    // Partial / live results — debounced to ~100ms to reduce re-renders
     Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
       const partial = e.value?.[0] ?? '';
-      setPartialTranscript(partial);
+      if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
+      partialDebounceRef.current = setTimeout(() => {
+        setPartialTranscript(partial);
+      }, 100);
     };
 
     // Error — "No speech" is normal on a pause, just restart
     Voice.onSpeechError = (e: SpeechErrorEvent) => {
+      if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       setPartialTranscript('');
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
@@ -221,6 +232,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     return () => {
       // Cleanup on unmount
       if (timerRef.current) clearInterval(timerRef.current);
+      if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       isRecognizingRef.current = false;
       Voice.destroy().then(() => Voice.removeAllListeners()).catch(() => {});
       stopWaveAnimation();
@@ -315,14 +327,25 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       startWaveAnimation();
       startRecDotPulse();
 
-      // 20-second countdown timer
+      // ── Timestamp-based countdown timer ──────────────────────────────────
+      // Using Date.now() instead of counting intervals avoids drift caused by
+      // JS thread being busy with speech recognition callbacks.
+      timerStartRef.current = Date.now();
+      timerDurationRef.current = 20000;
+      timeLeftRef.current = 20;
+      setTimeLeft(20);
+
       timerRef.current = setInterval(() => {
-        timeLeftRef.current -= 1;
-        setTimeLeft(timeLeftRef.current);
-        if (timeLeftRef.current <= 0) {
+        const elapsed = Date.now() - timerStartRef.current;
+        const remaining = Math.max(0, Math.ceil((timerDurationRef.current - elapsed) / 1000));
+        if (remaining !== timeLeftRef.current) {
+          timeLeftRef.current = remaining;
+          setTimeLeft(remaining);
+        }
+        if (elapsed >= timerDurationRef.current) {
           finishRecording();
         }
-      }, 1000);
+      }, 250); // poll every 250ms — accurate without being expensive
     } catch (err: any) {
       // Both locale attempts failed — fully reset to CHOOSING before showing alert.
       console.warn('[CallAnalyzer] startRecording failed:', err);
@@ -367,11 +390,20 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         Voice.start('en-IN').catch(() => {
           Voice.start('en-US').catch(() => {});
         });
+        // Restart timestamp-based timer for fresh 20 seconds
+        timerStartRef.current = Date.now();
+        timerDurationRef.current = 20000;
+        timeLeftRef.current = 20;
+        setTimeLeft(20);
         timerRef.current = setInterval(() => {
-          timeLeftRef.current -= 1;
-          setTimeLeft(timeLeftRef.current);
-          if (timeLeftRef.current <= 0) finishRecording();
-        }, 1000);
+          const elapsed = Date.now() - timerStartRef.current;
+          const remaining = Math.max(0, Math.ceil((timerDurationRef.current - elapsed) / 1000));
+          if (remaining !== timeLeftRef.current) {
+            timeLeftRef.current = remaining;
+            setTimeLeft(remaining);
+          }
+          if (elapsed >= timerDurationRef.current) finishRecording();
+        }, 250);
         return;
       }
       setReviewTranscript(captured);

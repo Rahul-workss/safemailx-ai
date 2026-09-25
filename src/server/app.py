@@ -1408,12 +1408,14 @@ async def analyze_call_description(
     org_claimed: str = Form(""),
     actions_requested: str = Form("[]"),
     warning_phrases: str = Form("[]"),
+    transcript: str = Form(""),   # Direct transcript from on-device STT (Speak It mode)
     _auth=Depends(require_auth)
 ):
     """
     Hold + Describe: Analyze a suspicious phone call.
-    Supports two input modes:
-    - voice: User records a 20-second voice description
+    Supports three input modes:
+    - voice: User records a 20-second voice description (Whisper transcribes)
+    - transcript: On-device STT transcript sent directly (no audio upload)
     - structured: User taps checkboxes describing what happened
     """
     from utils.config import FEATURE_CALL_ANALYSIS_ENABLED
@@ -1428,9 +1430,9 @@ async def analyze_call_description(
         actions = []
         phrases = []
 
-    transcript = ""
+    final_transcript = ""
 
-    # Path A: Voice recording
+    # Path A: Voice recording → Whisper transcription
     if input_mode == "voice" and audio is not None:
         audio_bytes = await audio.read()
         if len(audio_bytes) > 5 * 1024 * 1024:  # 5MB limit
@@ -1441,7 +1443,7 @@ async def analyze_call_description(
             from engines.vishing_analyzer import transcribe_voice_description
             result = transcribe_voice_description(audio_bytes, filename=audio.filename or "description.wav")
             if result.get("success"):
-                transcript = result.get("transcript", "")
+                final_transcript = result.get("transcript", "")
             else:
                 # Transcription failed — fall back to structured if we have it
                 if not org_claimed and not actions:
@@ -1450,16 +1452,24 @@ async def analyze_call_description(
             if not org_claimed and not actions:
                 raise HTTPException(status_code=503, detail="Transcription service unavailable. Please use structured input.")
 
-    # Path B: Structured input — transcript will be built by engine
+    # Path B: On-device STT transcript (Speak It mode — no audio upload needed)
+    elif input_mode == "transcript":
+        cleaned = transcript.strip()
+        if not cleaned:
+            raise HTTPException(status_code=422, detail="Transcript is empty. Please speak clearly and try again.")
+        final_transcript = cleaned
+
+    # Path C: Structured input — transcript will be built by engine from form fields
     elif input_mode == "structured":
         if not org_claimed and not actions and not phrases:
             raise HTTPException(status_code=422, detail="Please select at least one option.")
+
     else:
-        raise HTTPException(status_code=422, detail="Invalid input_mode. Use 'voice' or 'structured'.")
+        raise HTTPException(status_code=422, detail="Invalid input_mode. Use 'voice', 'transcript', or 'structured'.")
 
     from engines.scam_intelligence_engine import analyze as scam_analyze
     result = scam_analyze({
-        "transcript": transcript,
+        "transcript": final_transcript,
         "org_claimed": org_claimed,
         "actions_requested": actions,
         "warning_phrases": phrases,
@@ -1467,6 +1477,7 @@ async def analyze_call_description(
     })
 
     return CallAnalysisResponse(**result)
+
 
 
 import urllib.request
