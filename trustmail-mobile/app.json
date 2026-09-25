@@ -49,6 +49,7 @@
     },
     "owner": "jnvra",
     "plugins": [
+      "./plugins/withVoicePackage",
       "expo-secure-store",
       ["expo-camera", { "cameraPermission": "Allow SafeMail X AI to access your camera for scanning documents." }],
       ["expo-image-picker", { "photosPermission": "Allow SafeMail X AI to access your photos." }],
