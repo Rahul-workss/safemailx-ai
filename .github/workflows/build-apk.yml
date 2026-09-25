@@ -91,7 +91,16 @@ jobs:
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-        run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android --no-daemon --init-script ~/.gradle/init.gradle
+        run: |
+          # NOTE: Signed with stable debug keystore so Google Sign-In SHA-1 stays consistent.
+          # For Play Store upload, replace with a dedicated release keystore secret.
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --init-script ~/.gradle/init.gradle \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

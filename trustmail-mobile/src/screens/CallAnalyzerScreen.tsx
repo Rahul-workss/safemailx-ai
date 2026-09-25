@@ -355,14 +355,18 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     setTimeout(() => {
       const captured = finalTranscriptRef.current.trim();
       if (!captured || captured.split(' ').length < 5) {
-        // Too short — reset and let user try again
+        // Too short — reset and give user another 20 seconds automatically
         setFinalTranscript('');
         setPartialTranscript('');
         setTimeLeft(20);
         timeLeftRef.current = 20;
         isRecognizingRef.current = true;
+        startWaveAnimation();    // ← was missing: restart wave bars
         startRecDotPulse();
-        Voice.start('en-IN').catch(() => {});
+        // Try en-IN then fallback to en-US (same as startRecording)
+        Voice.start('en-IN').catch(() => {
+          Voice.start('en-US').catch(() => {});
+        });
         timerRef.current = setInterval(() => {
           timeLeftRef.current -= 1;
           setTimeLeft(timeLeftRef.current);

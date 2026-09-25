@@ -21,7 +21,6 @@
     "android": {
       "package": "tech.safemailx.safemailxai",
       "usesCleartextTraffic": false,
-      "permissions": ["android.permission.RECORD_AUDIO"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/custom-shield.png",
         "backgroundColor": "#080B12"
@@ -51,7 +50,9 @@
     "owner": "jnvra",
     "plugins": [
       "expo-secure-store",
-      "@react-native-voice/voice"
+      ["expo-camera", { "cameraPermission": "Allow SafeMail X AI to access your camera for scanning documents." }],
+      ["expo-image-picker", { "photosPermission": "Allow SafeMail X AI to access your photos." }],
+      ["@react-native-voice/voice", { "microphonePermission": "Allow SafeMail X AI to use the microphone to transcribe call descriptions." }]
     ]
   }
 }
