@@ -165,6 +165,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   // Transcript state
   const [finalTranscript, setFinalTranscript] = useState('');
   const [partialTranscript, setPartialTranscript] = useState('');
+  const partialTranscriptRef = useRef('');
   const [reviewTranscript, setReviewTranscript] = useState('');
   const isRecognizingRef = useRef(false);
   const finalTranscriptRef = useRef('');
@@ -191,6 +192,19 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
   // ── Voice event handlers (set once on mount) ───────────────────────────────
   useEffect(() => {
+    const commitPartialTranscript = () => {
+      const partial = partialTranscriptRef.current.trim();
+      if (partial) {
+        const updated = finalTranscriptRef.current
+          ? finalTranscriptRef.current + ' ' + partial
+          : partial;
+        finalTranscriptRef.current = updated;
+        setFinalTranscript(updated);
+      }
+      partialTranscriptRef.current = '';
+      setPartialTranscript('');
+    };
+
     // Final result — a complete sentence recognized
     Voice.onSpeechResults = (e: SpeechResultsEvent) => {
       const newText = e.value?.[0] ?? '';
@@ -204,6 +218,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       }
       // Clear partial immediately — the final text replaces it
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
+      partialTranscriptRef.current = '';
       setPartialTranscript('');
       // NOTE: do NOT call restartRecognizer() here — onSpeechEnd always fires after
       // onSpeechResults for the same utterance and handles the restart exactly once.
@@ -212,6 +227,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     // Partial / live results — debounced to ~100ms to reduce re-renders
     Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
       const partial = e.value?.[0] ?? '';
+      partialTranscriptRef.current = partial;
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       partialDebounceRef.current = setTimeout(() => {
         setPartialTranscript(partial);
@@ -221,7 +237,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     // Error — "No speech" is normal on a pause, just restart
     Voice.onSpeechError = (e: SpeechErrorEvent) => {
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
-      setPartialTranscript('');
+      commitPartialTranscript();
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
       }
@@ -229,6 +245,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
     // End of utterance — restart for the next sentence
     Voice.onSpeechEnd = () => {
+      commitPartialTranscript();
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
       }
@@ -337,6 +354,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       // Reset all transcript state for a fresh recording
       finalTranscriptRef.current = '';
       setFinalTranscript('');
+      partialTranscriptRef.current = '';
       setPartialTranscript('');
       setReviewTranscript('');
       // Reset guard flags
@@ -410,12 +428,24 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
-    if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
-    setPartialTranscript('');
 
     // Wait 600ms for the last onSpeechResults event to fire and append final text
     setTimeout(() => {
       isFinishingRef.current = false; // unlock for possible re-entry via extension
+
+      // Commit any leftover partial text that didn't trigger onSpeechResults
+      if (partialTranscriptRef.current.trim()) {
+        const updated = finalTranscriptRef.current
+          ? finalTranscriptRef.current + ' ' + partialTranscriptRef.current.trim()
+          : partialTranscriptRef.current.trim();
+        finalTranscriptRef.current = updated;
+        setFinalTranscript(updated);
+      }
+      
+      // Now safely clear the debounce and refs
+      if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+      partialTranscriptRef.current = '';
+      setPartialTranscript('');
 
       const captured = finalTranscriptRef.current.trim();
       const wordCount = captured ? captured.split(/\s+/).filter(Boolean).length : 0;
@@ -475,6 +505,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     // Keep finalTranscriptRef and finalTranscript state — do NOT reset them.
     // Only clear the partial (in-flight) text since we're starting a new utterance.
     if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+    partialTranscriptRef.current = '';
     setPartialTranscript('');
 
     isRecognizingRef.current = true;
@@ -525,6 +556,8 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const stopRecordingIfNeeded = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+    partialTranscriptRef.current = '';
+    setPartialTranscript('');
     isRecognizingRef.current = false;
     isFinishingRef.current = false;
     extensionCountRef.current = 0;
