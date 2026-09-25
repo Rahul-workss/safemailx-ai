@@ -170,6 +170,12 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const finalTranscriptRef = useRef('');
   // Debounce ref for partial results — limits re-renders to max ~10/sec
   const partialDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guard: prevents finishRecording from being invoked multiple times simultaneously
+  const isFinishingRef = useRef(false);
+  // Tracks how many 20s extensions have been granted (max 2 → 60s total session)
+  const extensionCountRef = useRef(0);
+  // Consecutive restart failures — after 3, surface captured text and stop silently
+  const restartFailCountRef = useRef(0);
 
   // Waveform bar animations (5 bars)
   const bar1 = useRef(new Animated.Value(4)).current;
@@ -194,14 +200,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
           : newText.trim();
         finalTranscriptRef.current = updated;
         setFinalTranscript(updated);
+        restartFailCountRef.current = 0; // successful result resets the failure counter
       }
-      // Clear partial immediately on final result
+      // Clear partial immediately — the final text replaces it
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       setPartialTranscript('');
-      // Restart immediately to catch next sentence (restart-on-pause trick)
-      if (isRecognizingRef.current && timeLeftRef.current > 1) {
-        restartRecognizer();
-      }
+      // NOTE: do NOT call restartRecognizer() here — onSpeechEnd always fires after
+      // onSpeechResults for the same utterance and handles the restart exactly once.
     };
 
     // Partial / live results — debounced to ~100ms to reduce re-renders
@@ -241,11 +246,35 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   }, []);
 
   const restartRecognizer = () => {
-    try {
-      Voice.start('en-IN').catch(() => {
-        Voice.start('en-US').catch(() => { /* ignore restart failures */ });
+    if (!isRecognizingRef.current) return; // don't restart if stopped or finished
+    Voice.start('en-IN').catch(() => {
+      if (!isRecognizingRef.current) return;
+      Voice.start('en-US').catch(() => {
+        if (!isRecognizingRef.current) return;
+        restartFailCountRef.current += 1;
+        if (restartFailCountRef.current >= 3) {
+          // Speech engine has died — stop silently and surface whatever was captured
+          isRecognizingRef.current = false;
+          if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+          stopWaveAnimation();
+          stopRecDotPulse();
+          const captured = finalTranscriptRef.current.trim();
+          if (captured.split(/\s+/).filter(Boolean).length >= 1) {
+            setReviewTranscript(captured);
+            setScreenState('REVIEW');
+          } else {
+            Alert.alert(
+              'Speech Engine Stopped',
+              'The speech recognizer stopped responding.\n\nUse "Type It" to describe the call manually.',
+              [
+                { text: 'Try Again', onPress: () => startRecording() },
+                { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
+              ]
+            );
+          }
+        }
       });
-    } catch (_) { /* ignore restart failures mid-session */ }
+    });
   };
 
   const startWaveAnimation = () => {
@@ -305,13 +334,15 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         }
       }
 
-      // Reset all transcript state
+      // Reset all transcript state for a fresh recording
       finalTranscriptRef.current = '';
       setFinalTranscript('');
       setPartialTranscript('');
       setReviewTranscript('');
-      timeLeftRef.current = 20;
-      setTimeLeft(20);
+      // Reset guard flags
+      isFinishingRef.current = false;
+      extensionCountRef.current = 0;
+      restartFailCountRef.current = 0;
       isRecognizingRef.current = true;
 
       // ── Start speech recognizer BEFORE entering RECORDING state ──────────
@@ -319,33 +350,15 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       try {
         await Voice.start('en-IN');
       } catch (_) {
-        await Voice.start('en-US'); // second attempt — throws to outer catch if also fails
+        await Voice.start('en-US'); // throws to outer catch if also fails
       }
 
       // Voice is running — now safe to enter RECORDING state
       setScreenState('RECORDING');
       startWaveAnimation();
       startRecDotPulse();
+      startCountdownTimer();
 
-      // ── Timestamp-based countdown timer ──────────────────────────────────
-      // Using Date.now() instead of counting intervals avoids drift caused by
-      // JS thread being busy with speech recognition callbacks.
-      timerStartRef.current = Date.now();
-      timerDurationRef.current = 20000;
-      timeLeftRef.current = 20;
-      setTimeLeft(20);
-
-      timerRef.current = setInterval(() => {
-        const elapsed = Date.now() - timerStartRef.current;
-        const remaining = Math.max(0, Math.ceil((timerDurationRef.current - elapsed) / 1000));
-        if (remaining !== timeLeftRef.current) {
-          timeLeftRef.current = remaining;
-          setTimeLeft(remaining);
-        }
-        if (elapsed >= timerDurationRef.current) {
-          finishRecording();
-        }
-      }, 250); // poll every 250ms — accurate without being expensive
     } catch (err: any) {
       // Both locale attempts failed — fully reset to CHOOSING before showing alert.
       console.warn('[CallAnalyzer] startRecording failed:', err);
@@ -366,50 +379,130 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     }
   };
 
-  // ── Stop recording and move to REVIEW ──────────────────────────────────────
+  // ── Timer helper shared by startRecording and extendRecording ────────────────
+  const startCountdownTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    timerStartRef.current = Date.now();
+    timerDurationRef.current = 20000;
+    timeLeftRef.current = 20;
+    setTimeLeft(20);
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - timerStartRef.current;
+      const remaining = Math.max(0, Math.ceil((timerDurationRef.current - elapsed) / 1000));
+      if (remaining !== timeLeftRef.current) {
+        timeLeftRef.current = remaining;
+        setTimeLeft(remaining);
+      }
+      if (elapsed >= timerDurationRef.current) {
+        finishRecording();
+      }
+    }, 250);
+  };
+
+  // ── Stop recording and decide next step ────────────────────────────────────
   const finishRecording = () => {
+    // ── Guard: prevent double-invocation (250ms interval can fire multiple times) ──
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
+
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     isRecognizingRef.current = false;
     try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
+    if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+    setPartialTranscript('');
 
-    // 600ms delay for final result event to fire and append last sentence
+    // Wait 600ms for the last onSpeechResults event to fire and append final text
     setTimeout(() => {
+      isFinishingRef.current = false; // unlock for possible re-entry via extension
+
       const captured = finalTranscriptRef.current.trim();
-      if (!captured || captured.split(' ').length < 5) {
-        // Too short — reset and give user another 20 seconds automatically
-        setFinalTranscript('');
-        setPartialTranscript('');
-        setTimeLeft(20);
-        timeLeftRef.current = 20;
-        isRecognizingRef.current = true;
-        startWaveAnimation();    // ← was missing: restart wave bars
-        startRecDotPulse();
-        // Try en-IN then fallback to en-US (same as startRecording)
-        Voice.start('en-IN').catch(() => {
-          Voice.start('en-US').catch(() => {});
-        });
-        // Restart timestamp-based timer for fresh 20 seconds
-        timerStartRef.current = Date.now();
-        timerDurationRef.current = 20000;
-        timeLeftRef.current = 20;
-        setTimeLeft(20);
-        timerRef.current = setInterval(() => {
-          const elapsed = Date.now() - timerStartRef.current;
-          const remaining = Math.max(0, Math.ceil((timerDurationRef.current - elapsed) / 1000));
-          if (remaining !== timeLeftRef.current) {
-            timeLeftRef.current = remaining;
-            setTimeLeft(remaining);
-          }
-          if (elapsed >= timerDurationRef.current) finishRecording();
-        }, 250);
+      const wordCount = captured ? captured.split(/\s+/).filter(Boolean).length : 0;
+      const atCap = extensionCountRef.current >= 2; // 60s total used (2 extensions)
+
+      // ── Case 1: Enough text → go to REVIEW ────────────────────────────────
+      if (wordCount >= 5) {
+        setReviewTranscript(captured);
+        setScreenState('REVIEW');
         return;
       }
-      setReviewTranscript(captured);
-      setScreenState('REVIEW');
+
+      // ── Case 2: At 60s cap ─────────────────────────────────────────────────
+      if (atCap) {
+        if (wordCount > 0) {
+          // Have some words → force REVIEW anyway so nothing is lost
+          setReviewTranscript(captured);
+          setScreenState('REVIEW');
+        } else {
+          // Truly nothing captured in 60s → offer fresh start or Type It
+          Alert.alert(
+            "We Didn't Hear You",
+            "We couldn't capture any speech in 60 seconds.\n\nTry speaking louder and closer to the mic, or use \"Type It\" to describe the call manually.",
+            [
+              { text: 'Try Again', onPress: () => startRecording() },
+              { text: 'Type It Instead', onPress: () => { stopRecordingIfNeeded(); setScreenState('STRUCTURED'); } },
+            ]
+          );
+        }
+        return;
+      }
+
+      // ── Case 3: Nothing heard yet → ask user to try again ─────────────────
+      if (wordCount === 0) {
+        Alert.alert(
+          "We Didn't Hear You",
+          `No speech was detected.\n\nSpeak clearly towards the mic and tap Try Again for another 20 seconds.\n(${2 - extensionCountRef.current} attempt${2 - extensionCountRef.current === 1 ? '' : 's'} remaining)`,
+          [
+            { text: 'Try Again', onPress: () => extendRecording() },
+            { text: 'Type It Instead', onPress: () => { stopRecordingIfNeeded(); setScreenState('STRUCTURED'); } },
+          ]
+        );
+        return;
+      }
+
+      // ── Case 4: Some words but < 5 → silently extend, keep everything ─────
+      // User is still speaking; give them 20 more seconds automatically.
+      extendRecording();
     }, 600);
   };
+
+  // ── Extend recording by 20s without wiping accumulated transcript ──────────
+  const extendRecording = () => {
+    extensionCountRef.current += 1;
+    restartFailCountRef.current = 0;
+
+    // Keep finalTranscriptRef and finalTranscript state — do NOT reset them.
+    // Only clear the partial (in-flight) text since we're starting a new utterance.
+    if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+    setPartialTranscript('');
+
+    isRecognizingRef.current = true;
+    startWaveAnimation();
+    startRecDotPulse();
+
+    Voice.start('en-IN').catch(() => {
+      Voice.start('en-US').catch(() => {
+        // Both locales failed on extension — transition gracefully
+        isRecognizingRef.current = false;
+        stopWaveAnimation();
+        stopRecDotPulse();
+        const captured = finalTranscriptRef.current.trim();
+        if (captured.split(/\s+/).filter(Boolean).length >= 1) {
+          setReviewTranscript(captured);
+          setScreenState('REVIEW');
+        } else {
+          Alert.alert('Microphone Error', 'Could not restart recording.', [
+            { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
+          ]);
+        }
+      });
+    });
+
+    startCountdownTimer();
+  };
+
+
 
   // ── Submit transcript for analysis ─────────────────────────────────────────
   const submitTranscript = async (text: string) => {
@@ -431,7 +524,10 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
   const stopRecordingIfNeeded = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
     isRecognizingRef.current = false;
+    isFinishingRef.current = false;
+    extensionCountRef.current = 0;
     try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
