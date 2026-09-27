@@ -1158,7 +1158,11 @@ function AnalyzingView() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       {/* Shield + spinner */}
-      <Animated.View style={{ transform: [{ scale: shieldScale }], opacity: shieldOp, alignItems: 'center', marginBottom: 32 }}>
+      <Animated.View style={{
+        transform: [{ scale: shieldScale }], opacity: shieldOp,
+        alignItems: 'center', justifyContent: 'center',
+        width: 130, height: 130, marginBottom: 32
+      }}>
         <Animated.View style={{
           position: 'absolute', width: 130, height: 130, borderRadius: 65,
           borderWidth: 2, borderColor: C.cyan, borderTopColor: 'transparent',
@@ -1411,7 +1415,7 @@ const S = StyleSheet.create({
     backgroundColor: '#00d4ff',
     padding: 18, borderRadius: 16,
     width: '100%', alignItems: 'center',
-    shadowColor: '#00d4ff', shadowRadius: 12, shadowOpacity: 0.35, elevation: 6,
+    shadowColor: '#00d4ff', shadowRadius: 12, shadowOpacity: 0.35,
   },
   btnText: {
     color: '#06080f', fontSize: 16, fontWeight: '700', letterSpacing: 0.3,
