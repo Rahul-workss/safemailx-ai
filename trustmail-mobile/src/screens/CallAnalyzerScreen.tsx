@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
@@ -70,19 +69,16 @@ function GlassCard({ children, style, accentColor }: {
   return (
     <View style={[{
       borderRadius: 20, borderWidth: 1,
-      borderColor: accentColor ? `${accentColor}40` : 'rgba(255,255,255,0.1)',
+      borderColor: accentColor ? `${accentColor}45` : 'rgba(255,255,255,0.12)',
+      backgroundColor: accentColor ? `${accentColor}0f` : 'rgba(255,255,255,0.07)',
       overflow: 'hidden',
     }, style]}>
-      <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
       <LinearGradient
-        colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.0)']}
+        colors={['rgba(255,255,255,0.11)', 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0.0)']}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
-      {/* Top specular lip */}
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.14)' }} />
-      {/* Left accent edge */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.18)' }} />
       {accentColor && (
         <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, backgroundColor: accentColor, opacity: 0.85 }} />
       )}
@@ -561,15 +557,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
         return (
           <View style={{ flex: 1 }}>
-            {/* Sub-page background overlay */}
-            <View style={StyleSheet.absoluteFillObject}>
-              <Image
-                source={require('../../assets/call-analyzer-bg.png')}
-                style={{ width: '100%', height: '100%', opacity: 0.35 }}
-                resizeMode="cover"
-              />
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
-            </View>
 
             <ScrollView
               contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
@@ -595,15 +582,12 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
                 </Text>
               </View>
 
-              {/* Timer ring */}
               <View style={{ alignItems: 'center', marginBottom: 24 }}>
                 <View style={{
                   width: 110, height: 110, borderRadius: 55,
                   borderWidth: 3, borderColor: timeLeft <= 5 ? C.rose : C.cyan,
                   alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'rgba(0,212,255,0.08)',
-                  shadowColor: timeLeft <= 5 ? C.rose : C.cyan,
-                  shadowRadius: 20, shadowOpacity: 0.5, elevation: 8,
+                  backgroundColor: 'rgba(0,212,255,0.06)',
                 }}>
                   <Text style={{ fontSize: 34, fontWeight: '200', color: timeLeft <= 5 ? C.rose : '#fff', letterSpacing: 2 }}>
                     {timeLeft.toString().padStart(2, '0')}
@@ -637,19 +621,17 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
               {/* Live Transcript Card */}
               <View style={{
                 borderRadius: 20, borderWidth: 1,
-                borderColor: isEmpty ? 'rgba(255,255,255,0.08)' : `${C.cyan}50`,
-                overflow: 'hidden', marginBottom: 20, minHeight: 160,
+                borderColor: isEmpty ? 'rgba(255,255,255,0.10)' : `${C.cyan}50`,
+                backgroundColor: isEmpty ? 'rgba(255,255,255,0.05)' : 'rgba(0,212,255,0.07)',
+                marginBottom: 20, minHeight: 160, overflow: 'hidden',
               }}>
-                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
                 <LinearGradient
-                  colors={['rgba(0,212,255,0.08)', 'rgba(0,0,0,0.0)']}
+                  colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.0)']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.14)' }} />
-                {/* Cyan left accent */}
-                {!isEmpty && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: C.cyan, opacity: 0.8 }} />}
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' }} />
+                {!isEmpty && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: C.cyan, opacity: 0.85 }} />}
 
                 <View style={{ padding: 18, minHeight: 160, justifyContent: 'flex-end' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -683,14 +665,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
                 Speak clearly · English or Hinglish both work
               </Text>
 
-              {/* Stop & Review button */}
+              {/* Stop & Review button — no elevation (creates black surface on Android) */}
               <TouchableOpacity
                 onPress={finishRecording}
                 style={{
-                  borderRadius: 16, borderWidth: 1, borderColor: C.rose,
-                  backgroundColor: 'rgba(255,61,113,0.15)', padding: 18,
+                  borderRadius: 16, borderWidth: 1.5, borderColor: C.rose,
+                  backgroundColor: 'rgba(255,61,113,0.18)', padding: 18,
                   alignItems: 'center',
-                  shadowColor: C.rose, shadowRadius: 12, shadowOpacity: 0.35, elevation: 6,
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -711,17 +692,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         const canAnalyze = wordCount >= 5;
 
         return (
-          <View style={{ flex: 1 }}>
-            <View style={StyleSheet.absoluteFillObject}>
-              <Image
-                source={require('../../assets/call-analyzer-bg.png')}
-                style={{ width: '100%', height: '100%', opacity: 0.35 }}
-                resizeMode="cover"
-              />
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
-            </View>
-
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
               <ScrollView
                 contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
                 keyboardShouldPersistTaps="handled"
@@ -818,24 +789,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
                 </TouchableOpacity>
               </ScrollView>
             </KeyboardAvoidingView>
-          </View>
-        );
-      }
+          );
+        }
 
       // ── STRUCTURED ────────────────────────────────────────────────────────
       case 'STRUCTURED':
         return (
-          <View style={{ flex: 1 }}>
-            <View style={StyleSheet.absoluteFillObject}>
-              <Image
-                source={require('../../assets/call-analyzer-bg.png')}
-                style={{ width: '100%', height: '100%', opacity: 0.35 }}
-                resizeMode="cover"
-              />
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
               {/* Page header */}
               <View style={{ alignItems: 'center', marginBottom: 28 }}>
                 <View style={{
@@ -869,8 +829,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
                 </View>
               </TouchableOpacity>
             </ScrollView>
-          </View>
-        );
+          );
 
       case 'ANALYZING':
         return <AnalyzingView />;
@@ -988,29 +947,10 @@ function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => vo
         {/* ── Shield Hero ── */}
         <Animated.View style={{ transform: [{ translateY: slideUp }], alignItems: 'center', marginBottom: 32 }}>
           <Animated.View style={{ transform: [{ translateY: floatY }, { scale: shieldScale }], alignItems: 'center' }}>
-            {/* Outer cyan glow halo */}
-            <Animated.View style={{
-              position: 'absolute',
-              width: 220, height: 220,
-              borderRadius: 110,
-              backgroundColor: 'rgba(0,212,255,0.12)',
-              opacity: shieldGlow,
-              shadowColor: C.cyan,
-              shadowRadius: 60, shadowOpacity: 1,
-              top: -20,
-            }} />
-            {/* Purple ambient glow */}
-            <View style={{
-              position: 'absolute',
-              width: 200, height: 200,
-              borderRadius: 100,
-              backgroundColor: 'rgba(140,82,255,0.08)',
-              top: 0,
-            }} />
-            {/* Shield image */}
+            {/* Shield image — built-in blue glow, no extra dark circles needed */}
             <Image
               source={require('../../assets/shield-call.png')}
-              style={{ width: 180, height: 180 }}
+              style={{ width: 200, height: 200 }}
               resizeMode="contain"
             />
           </Animated.View>
@@ -1086,16 +1026,10 @@ function ChoiceCard({ icon, iconColor, title, subtitle, badge, badgeColor, onPre
         overflow: 'hidden',
         padding: 18,
         transform: [{ scale }],
-        shadowColor: glowColor, shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
       }}>
-        {/* Frosted glass blur */}
-        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
-        {/* Dark fill */}
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        {/* Specular sheen */}
+        {/* Specular sheen — no BlurView, no dark fill (they create opaque black on Android) */}
         <LinearGradient
-          colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.0)']}
+          colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.02)', 'rgba(255,255,255,0.0)']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
