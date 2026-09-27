@@ -5,7 +5,6 @@ import {
   TextInput, KeyboardAvoidingView, PermissionsAndroid, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, RadialGradient } from 'react-native-svg';
 
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +20,7 @@ const C = {
   bg: '#06080f',
   surface: 'rgba(255,255,255,0.05)',
   border: 'rgba(255,255,255,0.09)',
-  cyan: '#00f3ff',
+  cyan: '#00d4ff',
   violet: '#8c52ff',
   rose: '#ff3d71',
   gold: '#ffaa00',
@@ -30,48 +29,24 @@ const C = {
   frost4: '#4a5568',
 };
 
-// ─── Glassmorphic Card ────────────────────────────────────────────────────────
-function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
-  return (
-    <View style={[glassStyles.card, style]}>
-      {children}
-    </View>
-  );
-}
-
-const glassStyles = StyleSheet.create({
-  card: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    padding: 20,
-  },
-});
-
-// ─── Animated Chip ────────────────────────────────────────────────────────────
-function AnimatedChip({
-  label, active, color, onPress,
-}: {
+// ─── Animated Chip (tap-to-describe chips) ───────────────────────────────────
+function AnimatedChip({ label, active, color, onPress }: {
   label: string; active: boolean; color: string; onPress: () => void;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const glow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Keep native driver (scale) and JS driver (glow) SEPARATE — never mix on same node
     Animated.spring(scale, { toValue: active ? 1.04 : 1, useNativeDriver: true }).start();
     Animated.timing(glow, { toValue: active ? 1 : 0, duration: 200, useNativeDriver: false }).start();
   }, [active]);
 
-  const bgColor = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.05)', `${color}20`] });
-  const borderColor = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.09)', color] });
+  const bgColor = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.06)', `${color}25`] });
+  const borderColor = glow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.12)', color] });
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      {/* Outer: JS-driven colors (useNativeDriver: false) */}
       <Animated.View style={[chipStyles.chip, { backgroundColor: bgColor, borderColor }]}>
-        {/* Inner: native-driven transform (useNativeDriver: true) — separate node */}
         <Animated.View style={{ transform: [{ scale }] }}>
           <Text style={[chipStyles.text, active && { color, fontWeight: '700' }]}>{label}</Text>
         </Animated.View>
@@ -81,66 +56,39 @@ function AnimatedChip({
 }
 
 const chipStyles = StyleSheet.create({
-  chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24, borderWidth: 1, margin: 4 },
-  text: { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '500' },
+  chip: {
+    paddingVertical: 10, paddingHorizontal: 16, borderRadius: 24,
+    borderWidth: 1, margin: 4,
+  },
+  text: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '500' },
 });
 
-// ─── Pulsing Mic Button ───────────────────────────────────────────────────────
-function PulsingMic({ onStop }: { onStop: () => void }) {
-  const ring1 = useRef(new Animated.Value(1)).current;
-  const ring2 = useRef(new Animated.Value(1)).current;
-  const ring3 = useRef(new Animated.Value(1)).current;
-  const ring1Opacity = useRef(new Animated.Value(0.6)).current;
-  const ring2Opacity = useRef(new Animated.Value(0.4)).current;
-  const ring3Opacity = useRef(new Animated.Value(0.2)).current;
-
-  useEffect(() => {
-    const pulse = (anim: Animated.Value, opAnim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.parallel([
-            Animated.timing(anim, { toValue: 1.8, duration: 1200, useNativeDriver: true }),
-            Animated.timing(opAnim, { toValue: 0, duration: 1200, useNativeDriver: true }),
-          ]),
-          Animated.parallel([
-            Animated.timing(anim, { toValue: 1, duration: 0, useNativeDriver: true }),
-            Animated.timing(opAnim, { toValue: 0.5, duration: 0, useNativeDriver: true }),
-          ]),
-        ])
-      );
-    const a1 = pulse(ring1, ring1Opacity, 0);
-    const a2 = pulse(ring2, ring2Opacity, 400);
-    const a3 = pulse(ring3, ring3Opacity, 800);
-    a1.start(); a2.start(); a3.start();
-    return () => { a1.stop(); a2.stop(); a3.stop(); };
-  }, []);
-
+// ─── Shared Glass Card ────────────────────────────────────────────────────────
+function GlassCard({ children, style, accentColor }: {
+  children: React.ReactNode; style?: any; accentColor?: string;
+}) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', height: 200 }}>
-      {/* Ripple rings */}
-      {[ring1, ring2, ring3].map((r, i) => (
-        <Animated.View key={i} style={{
-          position: 'absolute',
-          width: 120, height: 120, borderRadius: 60,
-          borderWidth: 2, borderColor: C.rose,
-          transform: [{ scale: r }],
-          opacity: [ring1Opacity, ring2Opacity, ring3Opacity][i],
-        }} />
-      ))}
-      {/* Core mic button */}
-      <TouchableOpacity onPress={onStop} activeOpacity={0.85}>
-        <View style={{
-          width: 100, height: 100, borderRadius: 50,
-          backgroundColor: 'rgba(255,61,113,0.2)',
-          borderWidth: 2, borderColor: C.rose,
-          alignItems: 'center', justifyContent: 'center',
-          shadowColor: C.rose, shadowRadius: 20, shadowOpacity: 0.8,
-          elevation: 12,
-        }}>
-          <Ionicons name="mic" size={40} color={C.rose} />
-        </View>
-      </TouchableOpacity>
+    <View style={[{
+      borderRadius: 20, borderWidth: 1,
+      borderColor: accentColor ? `${accentColor}40` : 'rgba(255,255,255,0.1)',
+      overflow: 'hidden',
+    }, style]}>
+      <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+      <LinearGradient
+        colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.0)']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      {/* Top specular lip */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+      {/* Left accent edge */}
+      {accentColor && (
+        <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, backgroundColor: accentColor, opacity: 0.85 }} />
+      )}
+      <View style={{ padding: 20 }}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -150,7 +98,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const insets = useSafeAreaInsets();
   const [screenState, setScreenState] = useState<ScreenState>('CHOOSING');
 
-  // Animations
+  // Entrance animation
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -158,9 +106,8 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const [timeLeft, setTimeLeft] = useState(20);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeLeftRef = useRef(20);
-  // Timestamp-based timer: tracks actual wall-clock start so timer never drifts
   const timerStartRef = useRef<number>(0);
-  const timerDurationRef = useRef<number>(20000); // ms
+  const timerDurationRef = useRef<number>(20000);
 
   // Transcript state
   const [finalTranscript, setFinalTranscript] = useState('');
@@ -169,16 +116,12 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const [reviewTranscript, setReviewTranscript] = useState('');
   const isRecognizingRef = useRef(false);
   const finalTranscriptRef = useRef('');
-  // Debounce ref for partial results — limits re-renders to max ~10/sec
   const partialDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Guard: prevents finishRecording from being invoked multiple times simultaneously
   const isFinishingRef = useRef(false);
-  // Tracks how many 20s extensions have been granted (max 2 → 60s total session)
   const extensionCountRef = useRef(0);
-  // Consecutive restart failures — after 3, surface captured text and stop silently
   const restartFailCountRef = useRef(0);
 
-  // Waveform bar animations (5 bars)
+  // Waveform bar animations
   const bar1 = useRef(new Animated.Value(4)).current;
   const bar2 = useRef(new Animated.Value(8)).current;
   const bar3 = useRef(new Animated.Value(14)).current;
@@ -190,7 +133,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const recDotOpacity = useRef(new Animated.Value(1)).current;
   const recDotAniRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // ── Voice event handlers (set once on mount) ───────────────────────────────
+  // ── Voice event handlers ───────────────────────────────────────────────────
   useEffect(() => {
     const commitPartialTranscript = () => {
       const partial = partialTranscriptRef.current.trim();
@@ -205,7 +148,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       setPartialTranscript('');
     };
 
-    // Final result — a complete sentence recognized
     Voice.onSpeechResults = (e: SpeechResultsEvent) => {
       const newText = e.value?.[0] ?? '';
       if (newText.trim()) {
@@ -214,17 +156,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
           : newText.trim();
         finalTranscriptRef.current = updated;
         setFinalTranscript(updated);
-        restartFailCountRef.current = 0; // successful result resets the failure counter
+        restartFailCountRef.current = 0;
       }
-      // Clear partial immediately — the final text replaces it
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       partialTranscriptRef.current = '';
       setPartialTranscript('');
-      // NOTE: do NOT call restartRecognizer() here — onSpeechEnd always fires after
-      // onSpeechResults for the same utterance and handles the restart exactly once.
     };
 
-    // Partial / live results — debounced to ~100ms to reduce re-renders
     Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
       const partial = e.value?.[0] ?? '';
       partialTranscriptRef.current = partial;
@@ -234,8 +172,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       }, 100);
     };
 
-    // Error — "No speech" is normal on a pause, just restart
-    Voice.onSpeechError = (e: SpeechErrorEvent) => {
+    Voice.onSpeechError = (_e: SpeechErrorEvent) => {
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       commitPartialTranscript();
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
@@ -243,7 +180,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       }
     };
 
-    // End of utterance — restart for the next sentence
     Voice.onSpeechEnd = () => {
       commitPartialTranscript();
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
@@ -252,7 +188,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     };
 
     return () => {
-      // Cleanup on unmount
       if (timerRef.current) clearInterval(timerRef.current);
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       isRecognizingRef.current = false;
@@ -263,14 +198,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   }, []);
 
   const restartRecognizer = () => {
-    if (!isRecognizingRef.current) return; // don't restart if stopped or finished
+    if (!isRecognizingRef.current) return;
     Voice.start('en-IN').catch(() => {
       if (!isRecognizingRef.current) return;
       Voice.start('en-US').catch(() => {
         if (!isRecognizingRef.current) return;
         restartFailCountRef.current += 1;
         if (restartFailCountRef.current >= 3) {
-          // Speech engine has died — stop silently and surface whatever was captured
           isRecognizingRef.current = false;
           if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
           stopWaveAnimation();
@@ -280,14 +214,10 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
             setReviewTranscript(captured);
             setScreenState('REVIEW');
           } else {
-            Alert.alert(
-              'Speech Engine Stopped',
-              'The speech recognizer stopped responding.\n\nUse "Type It" to describe the call manually.',
-              [
-                { text: 'Try Again', onPress: () => startRecording() },
-                { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
-              ]
-            );
+            Alert.alert('Speech Engine Stopped', 'The speech recognizer stopped responding.\n\nUse "Type It" to describe the call manually.', [
+              { text: 'Try Again', onPress: () => startRecording() },
+              { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
+            ]);
           }
         }
       });
@@ -328,76 +258,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     recDotOpacity.setValue(1);
   };
 
-  const startRecording = async () => {
-    try {
-      // Request microphone permission
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Microphone Permission Required',
-            message: 'SafeMail X needs microphone access to transcribe your call description in real time.\n\nPlease tap "Allow" to use Speak It.',
-            buttonPositive: 'Allow',
-            buttonNegative: 'Cancel',
-          }
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert(
-            'Microphone Permission Denied',
-            'Without microphone access, Speak It cannot transcribe your voice.\n\nYou can:\n• Tap "Speak It" again and allow the permission\n• Use "Type It" to describe the call manually\n\nTo fix: Phone Settings \u2192 Apps \u2192 SafeMail X \u2192 Permissions \u2192 Microphone \u2192 Allow',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-
-      // Reset all transcript state for a fresh recording
-      finalTranscriptRef.current = '';
-      setFinalTranscript('');
-      partialTranscriptRef.current = '';
-      setPartialTranscript('');
-      setReviewTranscript('');
-      // Reset guard flags
-      isFinishingRef.current = false;
-      extensionCountRef.current = 0;
-      restartFailCountRef.current = 0;
-      isRecognizingRef.current = true;
-
-      // ── Start speech recognizer BEFORE entering RECORDING state ──────────
-      // Try en-IN first; fall back to en-US if that language pack is missing.
-      try {
-        await Voice.start('en-IN');
-      } catch (_) {
-        await Voice.start('en-US'); // throws to outer catch if also fails
-      }
-
-      // Voice is running — now safe to enter RECORDING state
-      setScreenState('RECORDING');
-      startWaveAnimation();
-      startRecDotPulse();
-      startCountdownTimer();
-
-    } catch (err: any) {
-      // Both locale attempts failed — fully reset to CHOOSING before showing alert.
-      console.warn('[CallAnalyzer] startRecording failed:', err);
-      isRecognizingRef.current = false;
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-      try { Voice.stop(); } catch (_) {}
-      stopWaveAnimation();
-      stopRecDotPulse();
-      setScreenState('CHOOSING');
-      Alert.alert(
-        'Could Not Start Microphone',
-        'The speech recognizer failed to start.\n\nThis can happen if:\n• Another app is using the microphone\n• The device speech engine is unavailable\n\nTry again, or use "Type It" to describe the call manually.',
-        [
-          { text: 'Try Again', onPress: () => startRecording() },
-          { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
-        ]
-      );
-    }
-  };
-
-  // ── Timer helper shared by startRecording and extendRecording ────────────────
+  // ── Shared countdown timer ─────────────────────────────────────────────────
   const startCountdownTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     timerStartRef.current = Date.now();
@@ -417,9 +278,70 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     }, 250);
   };
 
-  // ── Stop recording and decide next step ────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Microphone Permission Required',
+            message: 'SafeMail X needs microphone access to transcribe your call description in real time.\n\nPlease tap "Allow" to use Speak It.',
+            buttonPositive: 'Allow',
+            buttonNegative: 'Cancel',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Microphone Permission Denied',
+            'Without microphone access, Speak It cannot transcribe your voice.\n\nYou can:\n• Tap "Speak It" again and allow the permission\n• Use "Type It" to describe the call manually\n\nTo fix: Phone Settings → Apps → SafeMail X → Permissions → Microphone → Allow',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
+      // Reset all transcript state for a fresh recording
+      finalTranscriptRef.current = '';
+      setFinalTranscript('');
+      partialTranscriptRef.current = '';
+      setPartialTranscript('');
+      setReviewTranscript('');
+      // Reset guard flags
+      isFinishingRef.current = false;
+      extensionCountRef.current = 0;
+      restartFailCountRef.current = 0;
+      isRecognizingRef.current = true;
+
+      try {
+        await Voice.start('en-IN');
+      } catch (_) {
+        await Voice.start('en-US');
+      }
+
+      setScreenState('RECORDING');
+      startWaveAnimation();
+      startRecDotPulse();
+      startCountdownTimer();
+    } catch (err: any) {
+      console.warn('[CallAnalyzer] startRecording failed:', err);
+      isRecognizingRef.current = false;
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      try { Voice.stop(); } catch (_) {}
+      stopWaveAnimation();
+      stopRecDotPulse();
+      setScreenState('CHOOSING');
+      Alert.alert(
+        'Could Not Start Microphone',
+        'The speech recognizer failed to start.\n\nThis can happen if:\n• Another app is using the microphone\n• The device speech engine is unavailable\n\nTry again, or use "Type It" to describe the call manually.',
+        [
+          { text: 'Try Again', onPress: () => startRecording() },
+          { text: 'Type It Instead', onPress: () => setScreenState('STRUCTURED') },
+        ]
+      );
+    }
+  };
+
   const finishRecording = () => {
-    // ── Guard: prevent double-invocation (250ms interval can fire multiple times) ──
     if (isFinishingRef.current) return;
     isFinishingRef.current = true;
 
@@ -429,11 +351,10 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     stopWaveAnimation();
     stopRecDotPulse();
 
-    // Wait 600ms for the last onSpeechResults event to fire and append final text
     setTimeout(() => {
-      isFinishingRef.current = false; // unlock for possible re-entry via extension
+      isFinishingRef.current = false;
 
-      // Commit any leftover partial text that didn't trigger onSpeechResults
+      // Commit any leftover partial text
       if (partialTranscriptRef.current.trim()) {
         const updated = finalTranscriptRef.current
           ? finalTranscriptRef.current + ' ' + partialTranscriptRef.current.trim()
@@ -441,31 +362,25 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         finalTranscriptRef.current = updated;
         setFinalTranscript(updated);
       }
-      
-      // Now safely clear the debounce and refs
       if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
       partialTranscriptRef.current = '';
       setPartialTranscript('');
 
       const captured = finalTranscriptRef.current.trim();
       const wordCount = captured ? captured.split(/\s+/).filter(Boolean).length : 0;
-      const atCap = extensionCountRef.current >= 2; // 60s total used (2 extensions)
+      const atCap = extensionCountRef.current >= 2;
 
-      // ── Case 1: Enough text → go to REVIEW ────────────────────────────────
       if (wordCount >= 5) {
         setReviewTranscript(captured);
         setScreenState('REVIEW');
         return;
       }
 
-      // ── Case 2: At 60s cap ─────────────────────────────────────────────────
       if (atCap) {
         if (wordCount > 0) {
-          // Have some words → force REVIEW anyway so nothing is lost
           setReviewTranscript(captured);
           setScreenState('REVIEW');
         } else {
-          // Truly nothing captured in 60s → offer fresh start or Type It
           Alert.alert(
             "We Didn't Hear You",
             "We couldn't capture any speech in 60 seconds.\n\nTry speaking louder and closer to the mic, or use \"Type It\" to describe the call manually.",
@@ -478,7 +393,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         return;
       }
 
-      // ── Case 3: Nothing heard yet → ask user to try again ─────────────────
       if (wordCount === 0) {
         Alert.alert(
           "We Didn't Hear You",
@@ -491,19 +405,14 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
         return;
       }
 
-      // ── Case 4: Some words but < 5 → silently extend, keep everything ─────
-      // User is still speaking; give them 20 more seconds automatically.
       extendRecording();
     }, 600);
   };
 
-  // ── Extend recording by 20s without wiping accumulated transcript ──────────
   const extendRecording = () => {
     extensionCountRef.current += 1;
     restartFailCountRef.current = 0;
 
-    // Keep finalTranscriptRef and finalTranscript state — do NOT reset them.
-    // Only clear the partial (in-flight) text since we're starting a new utterance.
     if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
     partialTranscriptRef.current = '';
     setPartialTranscript('');
@@ -514,7 +423,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
     Voice.start('en-IN').catch(() => {
       Voice.start('en-US').catch(() => {
-        // Both locales failed on extension — transition gracefully
         isRecognizingRef.current = false;
         stopWaveAnimation();
         stopRecDotPulse();
@@ -533,9 +441,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     startCountdownTimer();
   };
 
-
-
-  // ── Submit transcript for analysis ─────────────────────────────────────────
   const submitTranscript = async (text: string) => {
     const cleaned = text.trim();
     if (!cleaned) return;
@@ -566,7 +471,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     stopRecDotPulse();
   };
 
-
   // Path B — Structured
   const [orgClaimed, setOrgClaimed] = useState('');
   const [actions, setActions] = useState<string[]>([]);
@@ -577,7 +481,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const [errorMsg, setErrorMsg] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
 
-  // ── Entrance animation ──────────────────────────────────────────────────────
+  // Entrance animation
   useEffect(() => {
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -585,7 +489,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     ]).start();
   }, []);
 
-  // ── Android back button ─────────────────────────────────────────────────────
+  // Android back button
   useEffect(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleBack();
@@ -601,7 +505,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     ]).start(() => onClose());
   }, []);
 
-
   const handleBack = useCallback(() => {
     if (screenState === 'CHOOSING') {
       handleClose();
@@ -609,7 +512,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       stopRecordingIfNeeded();
       setScreenState('CHOOSING');
     } else if (screenState === 'REVIEW') {
-      // From review, go back to re-record
       finalTranscriptRef.current = '';
       setFinalTranscript('');
       setPartialTranscript('');
@@ -622,7 +524,6 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     }
   }, [screenState]);
 
-  // ── Path B: Structured ──────────────────────────────────────────────────────
   const submitStructured = async () => {
     setAnalyzing(true);
     setScreenState('ANALYZING');
@@ -644,162 +545,209 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
   const canSubmit = orgClaimed.length > 0 || actions.length > 0 || warnings.length > 0;
 
-  // ── Render content per state ────────────────────────────────────────────────
+  // ── Render content per state ───────────────────────────────────────────────
   const renderContent = () => {
     switch (screenState) {
-      case 'CHOOSING': return <ChoosingView onSpeak={startRecording} onTap={() => setScreenState('STRUCTURED')} />;
+      case 'CHOOSING':
+        return <ChoosingView onSpeak={startRecording} onTap={() => setScreenState('STRUCTURED')} />;
 
-      // ── RECORDING: Live transcript with waveform ──────────────────────────
+      // ── RECORDING ─────────────────────────────────────────────────────────
       case 'RECORDING': {
         const displayText = finalTranscript
           ? (partialTranscript ? finalTranscript + ' ' + partialTranscript : finalTranscript)
           : partialTranscript;
         const isEmpty = !displayText.trim();
+        const progress = ((20 - timeLeft) / 20) * 100;
 
         return (
-          <View style={{ flex: 1, padding: 20, paddingTop: 12 }}>
+          <View style={{ flex: 1 }}>
+            {/* Sub-page background overlay */}
+            <View style={StyleSheet.absoluteFillObject}>
+              <Image
+                source={require('../../assets/call-analyzer-bg.png')}
+                style={{ width: '100%', height: '100%', opacity: 0.35 }}
+                resizeMode="cover"
+              />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
+            </View>
 
-            {/* ── Timer row ── */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Animated.View style={{
-                  width: 10, height: 10, borderRadius: 5,
-                  backgroundColor: C.rose, opacity: recDotOpacity,
-                  shadowColor: C.rose, shadowRadius: 6, shadowOpacity: 0.8,
-                }} />
-                <Text style={{ color: C.rose, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>LISTENING</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
-                  {timeLeft <= 5 ? '⚠️' : '⏱'}
+            <ScrollView
+              contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Header label */}
+              <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                <View style={{
+                  backgroundColor: 'rgba(0,212,255,0.12)', borderWidth: 1,
+                  borderColor: 'rgba(0,212,255,0.35)', borderRadius: 20,
+                  paddingHorizontal: 14, paddingVertical: 6,
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.cyan }} />
+                  <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 }}>SPEAK IT</Text>
+                </View>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 12, textAlign: 'center' }}>
+                  We're Listening...
                 </Text>
-                <Text style={{
-                  fontSize: 28, fontWeight: '200', color: timeLeft <= 5 ? C.rose : '#fff',
-                  letterSpacing: 2,
-                }}>{timeLeft.toString().padStart(2, '0')}s</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+                  Describe what happened on the call
+                </Text>
               </View>
-            </View>
 
-            {/* ── Progress bar ── */}
-            <View style={{ height: 2, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 1, marginBottom: 20 }}>
-              <View style={{
-                height: 2, borderRadius: 1, backgroundColor: C.cyan,
-                width: `${((20 - timeLeft) / 20) * 100}%`,
-              }} />
-            </View>
+              {/* Timer ring */}
+              <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                <View style={{
+                  width: 110, height: 110, borderRadius: 55,
+                  borderWidth: 3, borderColor: timeLeft <= 5 ? C.rose : C.cyan,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'rgba(0,212,255,0.08)',
+                  shadowColor: timeLeft <= 5 ? C.rose : C.cyan,
+                  shadowRadius: 20, shadowOpacity: 0.5, elevation: 8,
+                }}>
+                  <Text style={{ fontSize: 34, fontWeight: '200', color: timeLeft <= 5 ? C.rose : '#fff', letterSpacing: 2 }}>
+                    {timeLeft.toString().padStart(2, '0')}
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: 1 }}>SEC</Text>
+                </View>
+                {/* Progress bar */}
+                <View style={{ width: 160, height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, marginTop: 12 }}>
+                  <View style={{ height: 3, borderRadius: 2, backgroundColor: timeLeft <= 5 ? C.rose : C.cyan, width: `${progress}%` }} />
+                </View>
+              </View>
 
-            {/* ── Live Transcript Card ── */}
-            <View style={{ flex: 1 }}>
+              {/* LISTENING pill + waveform */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 16 }}>
+                <Animated.View style={{
+                  width: 8, height: 8, borderRadius: 4,
+                  backgroundColor: C.rose, opacity: recDotOpacity,
+                  shadowColor: C.rose, shadowRadius: 6, shadowOpacity: 0.9,
+                }} />
+                <Text style={{ color: C.rose, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>LISTENING</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, height: 24 }}>
+                  {[bar1, bar2, bar3, bar4, bar5].map((bar, i) => (
+                    <Animated.View key={i} style={{
+                      width: 3, height: bar, borderRadius: 2,
+                      backgroundColor: C.cyan, opacity: 0.8,
+                    }} />
+                  ))}
+                </View>
+              </View>
+
+              {/* Live Transcript Card */}
               <View style={{
-                flex: 1,
                 borderRadius: 20, borderWidth: 1,
-                borderColor: isEmpty ? 'rgba(255,255,255,0.08)' : `${C.cyan}40`,
-                overflow: 'hidden',
-                minHeight: 180,
+                borderColor: isEmpty ? 'rgba(255,255,255,0.08)' : `${C.cyan}50`,
+                overflow: 'hidden', marginBottom: 20, minHeight: 160,
               }}>
-                <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
+                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
                 <LinearGradient
-                  colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.0)']}
+                  colors={['rgba(0,212,255,0.08)', 'rgba(0,0,0,0.0)']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+                {/* Cyan left accent */}
+                {!isEmpty && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: C.cyan, opacity: 0.8 }} />}
 
-                <View style={{ flex: 1, padding: 18, justifyContent: 'flex-end' }}>
+                <View style={{ padding: 18, minHeight: 160, justifyContent: 'flex-end' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <Ionicons name="mic" size={12} color={C.cyan} style={{ marginRight: 6 }} />
+                    <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                      Live Transcript
+                    </Text>
+                  </View>
                   {isEmpty ? (
-                    <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 15, textAlign: 'center', lineHeight: 24 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.22)', fontSize: 15, lineHeight: 24, fontStyle: 'italic' }}>
                       {"Speak clearly...\n\nTell us who called and\nwhat they asked for"}
                     </Text>
                   ) : (
                     <Text style={{ color: '#fff', fontSize: 16, lineHeight: 26, letterSpacing: 0.2 }}>
-                      {/* Final (confirmed) text in full white */}
                       {finalTranscript ? (
                         <Text style={{ color: '#ffffff' }}>{finalTranscript}</Text>
                       ) : null}
-                      {/* Partial (live) text in dimmer white */}
                       {partialTranscript ? (
                         <Text style={{ color: 'rgba(255,255,255,0.5)' }}>
                           {finalTranscript ? ' ' : ''}{partialTranscript}
                         </Text>
                       ) : null}
-                      {/* Blinking cursor */}
                       <Text style={{ color: C.cyan }}>▌</Text>
                     </Text>
                   )}
                 </View>
               </View>
-            </View>
 
-            {/* ── Waveform bars ── */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 20, height: 36 }}>
-              {[bar1, bar2, bar3, bar4, bar5].map((bar, i) => (
-                <Animated.View key={i} style={{
-                  width: 4, height: bar, borderRadius: 2,
-                  backgroundColor: C.cyan, opacity: 0.7,
-                }} />
-              ))}
-            </View>
+              {/* Hint */}
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', marginBottom: 16 }}>
+                Speak clearly · English or Hinglish both work
+              </Text>
 
-            {/* ── Hint + Stop button ── */}
-            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', marginTop: 14 }}>
-              Speak clearly · English or Hinglish both work
-            </Text>
-            <TouchableOpacity
-              style={[S.stopBtn, { marginTop: 14 }]}
-              onPress={finishRecording}
-            >
-              <Text style={[S.btnText, { color: C.rose }]}>Stop & Review →</Text>
-            </TouchableOpacity>
+              {/* Stop & Review button */}
+              <TouchableOpacity
+                onPress={finishRecording}
+                style={{
+                  borderRadius: 16, borderWidth: 1, borderColor: C.rose,
+                  backgroundColor: 'rgba(255,61,113,0.15)', padding: 18,
+                  alignItems: 'center',
+                  shadowColor: C.rose, shadowRadius: 12, shadowOpacity: 0.35, elevation: 6,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="stop-circle" size={18} color={C.rose} />
+                  <Text style={{ color: C.rose, fontSize: 16, fontWeight: '700', letterSpacing: 0.3 }}>
+                    Stop &amp; Review →
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         );
       }
 
-      // ── REVIEW: Editable transcript before analysis ───────────────────────
+      // ── REVIEW ────────────────────────────────────────────────────────────
       case 'REVIEW': {
         const wordCount = reviewTranscript.trim().split(/\s+/).filter(Boolean).length;
         const canAnalyze = wordCount >= 5;
 
         return (
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <ScrollView
-              contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* ── Header ── */}
-              <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                <View style={{
-                  width: 56, height: 56, borderRadius: 28,
-                  backgroundColor: `${C.green}20`, alignItems: 'center', justifyContent: 'center',
-                  borderWidth: 1, borderColor: `${C.green}50`, marginBottom: 12,
-                }}>
-                  <Ionicons name="checkmark-circle" size={28} color={C.green} />
+          <View style={{ flex: 1 }}>
+            <View style={StyleSheet.absoluteFillObject}>
+              <Image
+                source={require('../../assets/call-analyzer-bg.png')}
+                style={{ width: '100%', height: '100%', opacity: 0.35 }}
+                resizeMode="cover"
+              />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
+            </View>
+
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <ScrollView
+                contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Header */}
+                <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                  <View style={{
+                    width: 64, height: 64, borderRadius: 32,
+                    backgroundColor: `${C.green}18`, alignItems: 'center', justifyContent: 'center',
+                    borderWidth: 2, borderColor: `${C.green}50`, marginBottom: 14,
+                    shadowColor: C.green, shadowRadius: 16, shadowOpacity: 0.4,
+                  }}>
+                    <Ionicons name="checkmark-circle" size={32} color={C.green} />
+                  </View>
+                  <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800' }}>Got it!</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 20 }}>
+                    Review what we heard.{'\n'}Tap the text to fix any errors before analyzing.
+                  </Text>
                 </View>
-                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>Got it!</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-                  Review what we heard. Tap the text to fix any errors.
-                </Text>
-              </View>
 
-              {/* ── Editable transcript card ── */}
-              <View style={{
-                borderRadius: 20, borderWidth: 1,
-                borderColor: `${C.cyan}40`, overflow: 'hidden', marginBottom: 16,
-              }}>
-                <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
-                <LinearGradient
-                  colors={['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.0)']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
-
-                <View style={{ padding: 16 }}>
+                {/* Editable transcript card */}
+                <GlassCard accentColor={C.cyan} style={{ marginBottom: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                    <Ionicons name="mic" size={14} color={C.cyan} style={{ marginRight: 6 }} />
-                    <Text style={{ color: C.cyan, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
+                    <Ionicons name="mic" size={13} color={C.cyan} style={{ marginRight: 6 }} />
+                    <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' }}>
                       Transcribed · Tap to edit
                     </Text>
                   </View>
@@ -809,113 +757,173 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
                     multiline
                     style={{
                       color: '#fff', fontSize: 15, lineHeight: 24,
-                      textAlignVertical: 'top', minHeight: 100,
+                      textAlignVertical: 'top', minHeight: 120,
                     }}
                     placeholderTextColor="rgba(255,255,255,0.3)"
                     placeholder="Your description will appear here..."
                   />
-                </View>
-              </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
+                    <Ionicons name="document-text" size={12} color="rgba(255,255,255,0.35)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
+                      {wordCount} words {canAnalyze ? '✓' : `(need ${5 - wordCount} more)`}
+                    </Text>
+                  </View>
+                </GlassCard>
 
-              {/* ── Word count hint ── */}
-              {!canAnalyze && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <Ionicons name="warning" size={14} color={C.gold} />
-                  <Text style={{ color: C.gold, fontSize: 12 }}>
-                    Add a few more words to get an accurate analysis.
-                  </Text>
-                </View>
-              )}
+                {/* Warning if too short */}
+                {!canAnalyze && (
+                  <View style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 8,
+                    backgroundColor: `${C.gold}15`, borderWidth: 1, borderColor: `${C.gold}40`,
+                    borderRadius: 12, padding: 12, marginBottom: 16,
+                  }}>
+                    <Ionicons name="warning" size={16} color={C.gold} />
+                    <Text style={{ color: C.gold, fontSize: 13, flex: 1 }}>
+                      Add a few more words to get an accurate analysis.
+                    </Text>
+                  </View>
+                )}
 
-              {/* ── Analyze button ── */}
-              <TouchableOpacity
-                style={[S.primaryBtn, { opacity: canAnalyze ? 1 : 0.4, marginBottom: 12 }]}
-                disabled={!canAnalyze}
-                onPress={() => submitTranscript(reviewTranscript)}
-              >
-                <Text style={S.btnText}>🔍 Analyze This Call →</Text>
-              </TouchableOpacity>
+                {/* Analyze button */}
+                <TouchableOpacity
+                  style={[S.primaryBtn, { opacity: canAnalyze ? 1 : 0.4, marginBottom: 12 }]}
+                  disabled={!canAnalyze}
+                  onPress={() => submitTranscript(reviewTranscript)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="shield-checkmark" size={18} color="#06080f" />
+                    <Text style={S.btnText}>Analyze This Call →</Text>
+                  </View>
+                </TouchableOpacity>
 
-              {/* ── Re-record button ── */}
-              <TouchableOpacity
-                style={{ padding: 14, alignItems: 'center' }}
-                onPress={() => {
-                  finalTranscriptRef.current = '';
-                  setFinalTranscript('');
-                  setPartialTranscript('');
-                  setReviewTranscript('');
-                  startRecording();
-                }}
-              >
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>🔄  Re-record</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </KeyboardAvoidingView>
+                {/* Re-record button */}
+                <TouchableOpacity
+                  style={{
+                    padding: 14, alignItems: 'center',
+                    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                  }}
+                  onPress={() => {
+                    finalTranscriptRef.current = '';
+                    setFinalTranscript('');
+                    setPartialTranscript('');
+                    setReviewTranscript('');
+                    startRecording();
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="mic" size={16} color="rgba(255,255,255,0.5)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Re-record</Text>
+                  </View>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </View>
         );
       }
 
-      case 'STRUCTURED': return (
-        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-          <StructuredForm
-            orgClaimed={orgClaimed} setOrgClaimed={setOrgClaimed}
-            actions={actions} setActions={setActions}
-            warnings={warnings} setWarnings={setWarnings}
-            onToggle={toggleItem}
-          />
-          <TouchableOpacity
-            style={[S.primaryBtn, { opacity: canSubmit ? 1 : 0.4, marginTop: 24 }]}
-            disabled={!canSubmit}
-            onPress={submitStructured}
-          >
-            <Text style={S.btnText}>Analyze Now →</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      );
-      case 'ANALYZING': return <AnalyzingView />;
-      case 'VERDICT': return result ? (
-        <VerdictView result={result} onClose={handleClose} onRetry={() => { setResult(null); setScreenState('CHOOSING'); }} />
-      ) : null;
-      case 'ERROR': return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Ionicons name="alert-circle" size={56} color={C.rose} />
-          <Text style={[S.title, { marginTop: 16 }]}>Analysis Failed</Text>
-          <Text style={[S.mutedText, { marginTop: 8, textAlign: 'center' }]}>{errorMsg}</Text>
-          <TouchableOpacity style={[S.primaryBtn, { marginTop: 32 }]} onPress={() => { setErrorMsg(''); setScreenState('CHOOSING'); }}>
-            <Text style={S.btnText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      );
+      // ── STRUCTURED ────────────────────────────────────────────────────────
+      case 'STRUCTURED':
+        return (
+          <View style={{ flex: 1 }}>
+            <View style={StyleSheet.absoluteFillObject}>
+              <Image
+                source={require('../../assets/call-analyzer-bg.png')}
+                style={{ width: '100%', height: '100%', opacity: 0.35 }}
+                resizeMode="cover"
+              />
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(6,8,15,0.72)' }]} />
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+              {/* Page header */}
+              <View style={{ alignItems: 'center', marginBottom: 28 }}>
+                <View style={{
+                  width: 64, height: 64, borderRadius: 32,
+                  backgroundColor: `${C.violet}20`, alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 2, borderColor: `${C.violet}50`, marginBottom: 14,
+                  shadowColor: C.violet, shadowRadius: 16, shadowOpacity: 0.4,
+                }}>
+                  <Ionicons name="list" size={28} color={C.violet} />
+                </View>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }}>Tap to Describe</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                  Select everything that matches your call
+                </Text>
+              </View>
+
+              <StructuredForm
+                orgClaimed={orgClaimed} setOrgClaimed={setOrgClaimed}
+                actions={actions} setActions={setActions}
+                warnings={warnings} setWarnings={setWarnings}
+                onToggle={toggleItem}
+              />
+              <TouchableOpacity
+                style={[S.primaryBtn, { opacity: canSubmit ? 1 : 0.4, marginTop: 28 }]}
+                disabled={!canSubmit}
+                onPress={submitStructured}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="shield-checkmark" size={18} color="#06080f" />
+                  <Text style={S.btnText}>Analyze Now →</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        );
+
+      case 'ANALYZING':
+        return <AnalyzingView />;
+
+      case 'VERDICT':
+        return result ? (
+          <VerdictView result={result} onClose={handleClose} onRetry={() => { setResult(null); setScreenState('CHOOSING'); }} />
+        ) : null;
+
+      case 'ERROR':
+        return (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: `${C.rose}18`, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: `${C.rose}50`, marginBottom: 16 }}>
+              <Ionicons name="alert-circle" size={40} color={C.rose} />
+            </View>
+            <Text style={[S.title, { marginTop: 4 }]}>Analysis Failed</Text>
+            <Text style={[S.mutedText, { marginTop: 8, textAlign: 'center' }]}>{errorMsg}</Text>
+            <TouchableOpacity style={[S.primaryBtn, { marginTop: 32 }]} onPress={() => { setErrorMsg(''); setScreenState('CHOOSING'); }}>
+              <Text style={S.btnText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        );
     }
   };
 
-
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { opacity: overlayOpacity, zIndex: 9999, elevation: 9999 }]}>
-      {/* ── Dashboard-style Base Background ── */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
-      
-      {/* Centered Logo Watermark (matches TmBg) */}
-      <View style={{ ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" }} pointerEvents="none">
-        <Image
-          source={require('../../assets/new-logo.png')}
-          style={{ width: SCREEN_WIDTH * 0.85, height: SCREEN_WIDTH * 0.85, resizeMode: "contain", opacity: 0.18 }}
-        />
-      </View>
+      {/* Full-bleed background image */}
+      <Image
+        source={require('../../assets/call-analyzer-bg.png')}
+        style={{ position: 'absolute', width: '100%', height: '100%' }}
+        resizeMode="cover"
+      />
+      {/* Dark overlay so text is readable */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,8,15,0.62)' }]} />
 
-      {/* Sheet (now transparent so background shows through, or solid black if preferred. Let's make it transparent) */}
-      <Animated.View style={[S.sheet, { backgroundColor: 'transparent', transform: [{ translateY: slideAnim }], paddingTop: insets.top + 16, paddingBottom: insets.bottom }]}>
+      {/* Sheet */}
+      <Animated.View style={[S.sheet, { transform: [{ translateY: slideAnim }], paddingTop: insets.top + 16, paddingBottom: insets.bottom }]}>
+
         {/* Header bar */}
         <View style={S.headerBar}>
           <TouchableOpacity onPress={handleBack} style={S.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="chevron-back" size={24} color={C.frost} />
+            <Ionicons name="chevron-back" size={20} color={C.frost} />
             <Text style={S.backLabel}>
               {screenState === 'CHOOSING' ? 'Close' : 'Back'}
             </Text>
           </TouchableOpacity>
+
           <View style={S.headerPill}>
             <View style={S.liveIndicator} />
             <Text style={S.headerPillText}>CALL ANALYZER</Text>
           </View>
+
           <View style={{ width: 70 }} />
         </View>
 
@@ -928,39 +936,20 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   );
 }
 
-// ─── Sub-views ─────────────────────────────────────────────────────────────────
-
+// ─── CHOOSING Sub-view ────────────────────────────────────────────────────────
 function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => void }) {
-  // Entrance animations
   const fadeIn  = useRef(new Animated.Value(0)).current;
-  const slideUp = useRef(new Animated.Value(50)).current;
+  const slideUp = useRef(new Animated.Value(40)).current;
   const card1Y  = useRef(new Animated.Value(40)).current;
   const card2Y  = useRef(new Animated.Value(40)).current;
   const card1Op = useRef(new Animated.Value(0)).current;
   const card2Op = useRef(new Animated.Value(0)).current;
 
-  // Shield animations
   const floatY      = useRef(new Animated.Value(0)).current;
-  const shieldGlow  = useRef(new Animated.Value(0.5)).current;
+  const shieldGlow  = useRef(new Animated.Value(0.6)).current;
   const shieldScale = useRef(new Animated.Value(1)).current;
 
-  // Phone vibration (quick horizontal shake)
-  const phoneShake  = useRef(new Animated.Value(0)).current;
-
-  // 3 vibration arcs below shield (each pulses out from center)
-  const arc1Scale   = useRef(new Animated.Value(0.3)).current;
-  const arc2Scale   = useRef(new Animated.Value(0.3)).current;
-  const arc3Scale   = useRef(new Animated.Value(0.3)).current;
-  const arc1Op      = useRef(new Animated.Value(0.8)).current;
-  const arc2Op      = useRef(new Animated.Value(0.6)).current;
-  const arc3Op      = useRef(new Animated.Value(0.4)).current;
-
-  // Bottom glow ring
-  const ringScale   = useRef(new Animated.Value(0.8)).current;
-  const ringOp      = useRef(new Animated.Value(0.4)).current;
-
   useEffect(() => {
-    // Staggered entrance
     Animated.sequence([
       Animated.parallel([
         Animated.timing(fadeIn,  { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -976,201 +965,64 @@ function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => vo
       ]),
     ]).start();
 
-    // Shield gentle float
     Animated.loop(Animated.sequence([
-      Animated.timing(floatY, { toValue: -8, duration: 2200, useNativeDriver: true }),
-      Animated.timing(floatY, { toValue:  0, duration: 2200, useNativeDriver: true }),
+      Animated.timing(floatY, { toValue: -10, duration: 2400, useNativeDriver: true }),
+      Animated.timing(floatY, { toValue:   0, duration: 2400, useNativeDriver: true }),
     ])).start();
 
-    // Shield glow pulse
     Animated.loop(Animated.sequence([
-      Animated.timing(shieldGlow, { toValue: 1.0, duration: 1600, useNativeDriver: true }),
-      Animated.timing(shieldGlow, { toValue: 0.5, duration: 1600, useNativeDriver: true }),
+      Animated.timing(shieldGlow, { toValue: 1.0, duration: 1800, useNativeDriver: true }),
+      Animated.timing(shieldGlow, { toValue: 0.5, duration: 1800, useNativeDriver: true }),
     ])).start();
 
-    // Shield subtle scale pulse
     Animated.loop(Animated.sequence([
-      Animated.timing(shieldScale, { toValue: 1.04, duration: 1600, useNativeDriver: true }),
-      Animated.timing(shieldScale, { toValue: 1.00, duration: 1600, useNativeDriver: true }),
-    ])).start();
-
-    // Phone vibration — rapid left-right jiggle looping
-    const vibrate = () =>
-      Animated.loop(Animated.sequence([
-        Animated.timing(phoneShake, { toValue:  4, duration: 60, useNativeDriver: true }),
-        Animated.timing(phoneShake, { toValue: -4, duration: 60, useNativeDriver: true }),
-        Animated.timing(phoneShake, { toValue:  3, duration: 60, useNativeDriver: true }),
-        Animated.timing(phoneShake, { toValue: -3, duration: 60, useNativeDriver: true }),
-        Animated.timing(phoneShake, { toValue:  0, duration: 60, useNativeDriver: true }),
-        Animated.delay(1400), // pause between vibrations
-      ]));
-    vibrate().start();
-
-    // Vibration arcs — staggered outward pulses
-    const arc = (scale: Animated.Value, opacity: Animated.Value, delay: number) =>
-      Animated.loop(Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.timing(scale,   { toValue: 1.0, duration: 700, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0,   duration: 700, useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(scale,   { toValue: 0.3, duration: 0, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.8, duration: 0, useNativeDriver: true }),
-        ]),
-        Animated.delay(1700 - delay), // keep total loop = 1700ms
-      ]));
-    arc(arc1Scale, arc1Op, 0).start();
-    arc(arc2Scale, arc2Op, 250).start();
-    arc(arc3Scale, arc3Op, 500).start();
-
-    // Bottom glow ring breathe
-    Animated.loop(Animated.sequence([
-      Animated.timing(ringScale, { toValue: 1.1, duration: 1800, useNativeDriver: true }),
-      Animated.timing(ringScale, { toValue: 0.8, duration: 1800, useNativeDriver: true }),
-    ])).start();
-    Animated.loop(Animated.sequence([
-      Animated.timing(ringOp, { toValue: 0.7, duration: 1800, useNativeDriver: true }),
-      Animated.timing(ringOp, { toValue: 0.2, duration: 1800, useNativeDriver: true }),
+      Animated.timing(shieldScale, { toValue: 1.05, duration: 1800, useNativeDriver: true }),
+      Animated.timing(shieldScale, { toValue: 1.00, duration: 1800, useNativeDriver: true }),
     ])).start();
   }, []);
-
-
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeIn }}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
 
-        {/* ── Shield + Vibration ── */}
-        <Animated.View style={{ transform: [{ translateY: slideUp }], alignItems: 'center', marginBottom: 36 }}>
-          <Animated.View style={{ transform: [{ translateY: floatY }], alignItems: 'center' }}>
-
-            {/* ── True Liquid Glass SVG Shield ── */}
+        {/* ── Shield Hero ── */}
+        <Animated.View style={{ transform: [{ translateY: slideUp }], alignItems: 'center', marginBottom: 32 }}>
+          <Animated.View style={{ transform: [{ translateY: floatY }, { scale: shieldScale }], alignItems: 'center' }}>
+            {/* Outer cyan glow halo */}
             <Animated.View style={{
-              width: 140, height: 160,
-              alignItems: 'center', justifyContent: 'center',
-              transform: [{ scale: shieldScale }],
-            }}>
-              {/* Outer glow halo */}
-              <Animated.View style={{
-                position: 'absolute',
-                width: 140, height: 160,
-                opacity: shieldGlow,
-                shadowColor: C.cyan, shadowRadius: 50, shadowOpacity: 1,
-              }}>
-                 <Svg viewBox="0 0 24 24" width="140" height="160">
-                   <Path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" fill="rgba(0,200,255,0.18)" />
-                 </Svg>
-              </Animated.View>
-
-              {/* Shield Liquid Glass Layers */}
-              <View style={{ position: 'absolute' }}>
-                 <Svg viewBox="0 0 24 24" width="140" height="160">
-                   <Defs>
-                     {/* Liquid glass specular gradient (white diagonal sheen) */}
-                     <SvgLinearGradient id="glassGradient" x1="0" y1="0" x2="1" y2="1">
-                       <Stop offset="0" stopColor="rgba(255,255,255,0.45)" />
-                       <Stop offset="0.25" stopColor="rgba(255,255,255,0.05)" />
-                       <Stop offset="0.6" stopColor="rgba(0,180,255,0.02)" />
-                       <Stop offset="1" stopColor="rgba(0,200,255,0.15)" />
-                     </SvgLinearGradient>
-                     
-                     {/* Border glowing metallic edge */}
-                     <SvgLinearGradient id="borderGradient" x1="0" y1="0" x2="0" y2="1">
-                       <Stop offset="0" stopColor="rgba(200,255,255,0.95)" />
-                       <Stop offset="0.4" stopColor="rgba(0,220,255,0.6)" />
-                       <Stop offset="1" stopColor="rgba(0,100,255,0.9)" />
-                     </SvgLinearGradient>
-                     
-                     {/* Deep blue core glow */}
-                     <RadialGradient id="glow" cx="0.5" cy="0.3" r="0.7">
-                       <Stop offset="0" stopColor="rgba(0,230,255,0.35)" />
-                       <Stop offset="1" stopColor="rgba(0,20,80,0.4)" />
-                     </RadialGradient>
-                   </Defs>
-                   
-                   {/* Shield Deep Body */}
-                   <Path 
-                     d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" 
-                     fill="url(#glow)" 
-                   />
-                   
-                   {/* Specular Highlight layer */}
-                   <Path 
-                     d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" 
-                     fill="url(#glassGradient)" 
-                   />
-                   
-                   {/* Thick Glass Border */}
-                   <Path 
-                     d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" 
-                     fill="none" 
-                     stroke="url(#borderGradient)" 
-                     strokeWidth="0.8" 
-                     strokeLinejoin="round"
-                   />
-                 </Svg>
-              </View>
-
-              {/* Phone icon centered on shield, with vibration */}
-              <Animated.View style={{ transform: [{ translateX: phoneShake }], marginTop: -15 }}>
-                <Ionicons name="call" size={48} color="#fff" style={{ shadowColor: '#fff', shadowRadius: 10, shadowOpacity: 0.8 }} />
-              </Animated.View>
-            </Animated.View>
-
-            {/* ── Vibration arcs below shield ── */}
-            {/* These are stacked ellipse arcs, bottom-half only, like the reference */}
-            <View style={{ alignItems: 'center', marginTop: -4 }}>
-              {/* Arc 3 (outermost) */}
-              <Animated.View style={{
-                width: 120, height: 60, borderRadius: 60,
-                borderWidth: 1.5, borderColor: 'rgba(0,200,255,0.6)',
-                borderTopWidth: 0,
-                transform: [{ scaleX: arc3Scale }, { scaleY: arc3Scale }],
-                opacity: arc3Op,
-                shadowColor: C.cyan, shadowRadius: 6, shadowOpacity: 0.5,
-              }} />
-              {/* Arc 2 */}
-              <Animated.View style={{
-                position: 'absolute',
-                width: 80, height: 40, borderRadius: 40,
-                borderWidth: 1.5, borderColor: 'rgba(0,220,255,0.75)',
-                borderTopWidth: 0,
-                transform: [{ scaleX: arc2Scale }, { scaleY: arc2Scale }],
-                opacity: arc2Op,
-                shadowColor: C.cyan, shadowRadius: 4, shadowOpacity: 0.6,
-              }} />
-              {/* Arc 1 (innermost) */}
-              <Animated.View style={{
-                position: 'absolute',
-                width: 44, height: 22, borderRadius: 22,
-                borderWidth: 1.5, borderColor: 'rgba(100,240,255,0.9)',
-                borderTopWidth: 0,
-                transform: [{ scaleX: arc1Scale }, { scaleY: arc1Scale }],
-                opacity: arc1Op,
-                shadowColor: '#fff', shadowRadius: 3, shadowOpacity: 0.8,
-              }} />
-            </View>
-
-            {/* ── Bottom glow ring (platform) ── */}
-            <Animated.View style={{
-              width: 160, height: 20, borderRadius: 80,
-              backgroundColor: 'transparent',
-              borderWidth: 1, borderColor: 'rgba(0,200,255,0.35)',
-              marginTop: 8,
-              transform: [{ scaleX: ringScale }],
-              opacity: ringOp,
-              shadowColor: C.cyan, shadowRadius: 10, shadowOpacity: 0.7,
+              position: 'absolute',
+              width: 220, height: 220,
+              borderRadius: 110,
+              backgroundColor: 'rgba(0,212,255,0.12)',
+              opacity: shieldGlow,
+              shadowColor: C.cyan,
+              shadowRadius: 60, shadowOpacity: 1,
+              top: -20,
             }} />
+            {/* Purple ambient glow */}
+            <View style={{
+              position: 'absolute',
+              width: 200, height: 200,
+              borderRadius: 100,
+              backgroundColor: 'rgba(140,82,255,0.08)',
+              top: 0,
+            }} />
+            {/* Shield image */}
+            <Image
+              source={require('../../assets/shield-call.png')}
+              style={{ width: 180, height: 180 }}
+              resizeMode="contain"
+            />
           </Animated.View>
         </Animated.View>
 
         {/* ── Title ── */}
-        <Animated.View style={{ transform: [{ translateY: slideUp }], alignItems: 'center', marginBottom: 36 }}>
-          <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', textAlign: 'center', letterSpacing: -0.5 }}>
-            Suspicious Call?
+        <Animated.View style={{ transform: [{ translateY: slideUp }], alignItems: 'center', marginBottom: 32 }}>
+          <Text style={{ fontSize: 32, fontWeight: '800', textAlign: 'center', letterSpacing: -0.5, lineHeight: 40 }}>
+            <Text style={{ color: '#fff' }}>Suspicious </Text>
+            <Text style={{ color: C.cyan }}>Call?</Text>
           </Text>
-          <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 10, lineHeight: 22 }}>
+          <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 10, lineHeight: 22 }}>
             Tell SafeMail X what happened{'\n'}and get an instant scam verdict.
           </Text>
         </Animated.View>
@@ -1183,7 +1035,7 @@ function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => vo
             title="Speak It"
             subtitle="Record a 20-second voice description"
             badge="AI POWERED"
-            badgeColor={C.cyan}
+            badgeColor={C.green}
             onPress={onSpeak}
             glowColor={C.cyan}
           />
@@ -1204,8 +1056,8 @@ function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => vo
           />
         </Animated.View>
 
-        {/* ── Bottom hint ── */}
-        <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 32, textAlign: 'center', letterSpacing: 0.5 }}>
+        {/* Footer */}
+        <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, marginTop: 32, textAlign: 'center', letterSpacing: 0.5 }}>
           Powered by On-Device Speech · Qwen3 · Tavily
         </Text>
       </View>
@@ -1213,93 +1065,82 @@ function ChoosingView({ onSpeak, onTap }: { onSpeak: () => void; onTap: () => vo
   );
 }
 
+// ─── Choice Card ──────────────────────────────────────────────────────────────
 function ChoiceCard({ icon, iconColor, title, subtitle, badge, badgeColor, onPress, glowColor }: {
   icon: any; iconColor: string; title: string; subtitle: string;
   badge?: string; badgeColor?: string; onPress: () => void; glowColor: string;
 }) {
-  const scale   = useRef(new Animated.Value(1)).current;
-  const borderG = useRef(new Animated.Value(0)).current;
-
-  const borderColor = borderG.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0.1)', glowColor + '80'],
-  });
-  const bgColor = borderG.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0.05)', glowColor + '12'],
-  });
+  const scale = useRef(new Animated.Value(1)).current;
 
   return (
     <TouchableOpacity
       onPressIn={() => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1.0, useNativeDriver: true }).start()}
       onPress={onPress}
       activeOpacity={1}
     >
       <Animated.View style={{
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: `${glowColor}60`, // 40-60% opacity like dashboard
-        backgroundColor: `${glowColor}15`, // ~10% opacity like dashboard
+        borderRadius: 20, borderWidth: 1,
+        borderColor: `${glowColor}55`,
+        backgroundColor: `${glowColor}12`,
         overflow: 'hidden',
-        padding: 16, // matched dashboard padding
+        padding: 18,
         transform: [{ scale }],
-        // Exact dashboard shadows
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.8,
-        shadowRadius: 20,
-        elevation: 8,
+        shadowColor: glowColor, shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
       }}>
         {/* Frosted glass blur */}
-        <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-        
-        {/* Liquid glass deep color fill */}
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0, 0, 0, 0.35)" }]} />
-        
-        {/* Diagonal specular glossy sheen */}
+        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+        {/* Dark fill */}
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+        {/* Specular sheen */}
         <LinearGradient
-          colors={["rgba(255, 255, 255, 0.08)", "rgba(255, 255, 255, 0.01)", "rgba(255, 255, 255, 0.0)", "rgba(255, 255, 255, 0.03)"]}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
+          colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.0)']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
+        {/* Top lip highlight */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.16)' }} />
+        {/* Left color accent */}
+        <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, backgroundColor: glowColor, opacity: 0.75 }} />
 
-        {/* Polish crystal top lip highlight */}
-        <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1.2, backgroundColor: "rgba(255, 255, 255, 0.15)" }} />
-
-        {/* Content */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {/* Icon orb (Dashboard style: 44x44, radius 22, 20% opacity bg) */}
+        {/* Content row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {/* Icon orb */}
           <View style={{
-            width: 44, height: 44, borderRadius: 22,
-            backgroundColor: `${iconColor}33`, // 20% opacity
-            alignItems: 'center', justifyContent: 'center'
+            width: 52, height: 52, borderRadius: 26,
+            backgroundColor: `${iconColor}28`,
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: `${iconColor}40`,
+            shadowColor: iconColor, shadowRadius: 12, shadowOpacity: 0.5,
           }}>
-            <Ionicons name={icon} size={20} color={iconColor} />
+            <Ionicons name={icon} size={22} color={iconColor} />
           </View>
 
           {/* Text block */}
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{title}</Text>
               {badge && (
-                <View style={{ backgroundColor: `${badgeColor}20`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: `${badgeColor}50` }}>
-                  <Text style={{ color: badgeColor, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>{badge}</Text>
+                <View style={{
+                  backgroundColor: `${badgeColor}22`, paddingHorizontal: 8, paddingVertical: 3,
+                  borderRadius: 8, borderWidth: 1, borderColor: `${badgeColor}55`,
+                }}>
+                  <Text style={{ color: badgeColor, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>{badge}</Text>
                 </View>
               )}
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{subtitle}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>{subtitle}</Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.4)" />
         </View>
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
-
+// ─── Structured Form ──────────────────────────────────────────────────────────
 function StructuredForm({ orgClaimed, setOrgClaimed, actions, setActions, warnings, setWarnings, onToggle }: any) {
   const ORGS = ['SBI Bank', 'HDFC', 'ICICI', 'UIDAI', 'Police/CBI', 'Customs', 'Income Tax'];
   const ACTIONS = ['OTP or PIN', 'Card details / CVV', 'Aadhaar number', 'Transfer money', 'Install an app', 'Share screen'];
@@ -1336,25 +1177,38 @@ function StructuredForm({ orgClaimed, setOrgClaimed, actions, setActions, warnin
 
 function SectionHeader({ label, color, icon }: { label: string; color: string; icon: any }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 28, marginBottom: 12 }}>
-      <Ionicons name={icon} size={16} color={color} style={{ marginRight: 8 }} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 10 }}>
+      <View style={{
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: `${color}20`, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: `${color}40`, marginRight: 10,
+      }}>
+        <Ionicons name={icon} size={14} color={color} />
+      </View>
       <Text style={{ fontSize: 11, color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 }}>{label}</Text>
     </View>
   );
 }
 
+// ─── Analyzing View ───────────────────────────────────────────────────────────
 function AnalyzingView() {
-  const spin = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0.8)).current;
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+  const spin  = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0.9)).current;
+  const dot1  = useRef(new Animated.Value(0)).current;
+  const dot2  = useRef(new Animated.Value(0)).current;
+  const dot3  = useRef(new Animated.Value(0)).current;
+  const shieldScale = useRef(new Animated.Value(0.8)).current;
+  const shieldOp    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1800, useNativeDriver: true })).start();
+    Animated.parallel([
+      Animated.timing(shieldOp, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(shieldScale, { toValue: 1, tension: 60, friction: 10, useNativeDriver: true }),
+    ]).start();
+    Animated.loop(Animated.timing(spin, { toValue: 1, duration: 2000, useNativeDriver: true })).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1.1, duration: 800, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0.8, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1.08, duration: 900, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.90, duration: 900, useNativeDriver: true }),
     ])).start();
     const dotAnim = (d: Animated.Value, delay: number) => Animated.loop(Animated.sequence([
       Animated.delay(delay),
@@ -1369,20 +1223,36 @@ function AnalyzingView() {
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <Animated.View style={{ transform: [{ rotate }, { scale: pulse }] }}>
-        <View style={{ width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: C.cyan, borderTopColor: 'transparent', alignItems: 'center', justifyContent: 'center', shadowColor: C.cyan, shadowRadius: 20, shadowOpacity: 0.6 }}>
-          <Ionicons name="shield-checkmark" size={32} color={C.cyan} />
-        </View>
+      {/* Shield + spinner */}
+      <Animated.View style={{ transform: [{ scale: shieldScale }], opacity: shieldOp, alignItems: 'center', marginBottom: 32 }}>
+        <Animated.View style={{
+          position: 'absolute', width: 130, height: 130, borderRadius: 65,
+          borderWidth: 2, borderColor: C.cyan, borderTopColor: 'transparent',
+          transform: [{ rotate }, { scale: pulse }],
+          shadowColor: C.cyan, shadowRadius: 24, shadowOpacity: 0.6,
+        }} />
+        <Image
+          source={require('../../assets/shield-call.png')}
+          style={{ width: 90, height: 90 }}
+          resizeMode="contain"
+        />
       </Animated.View>
-      <Text style={[S.title, { marginTop: 32, marginBottom: 8, textAlign: 'center' }]}>Analyzing Call</Text>
-      <Text style={[S.mutedText, { textAlign: 'center' }]}>7-layer Scam Intelligence Engine</Text>
-      <View style={{ flexDirection: 'row', marginTop: 24, gap: 8 }}>
+
+      <Text style={[S.title, { textAlign: 'center', marginBottom: 8 }]}>Analyzing Call</Text>
+      <Text style={[S.mutedText, { textAlign: 'center', marginBottom: 20 }]}>
+        7-layer Scam Intelligence Engine
+      </Text>
+
+      {/* Dots */}
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 28 }}>
         {[dot1, dot2, dot3].map((d, i) => (
           <Animated.View key={i} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.cyan, opacity: d }} />
         ))}
       </View>
+
+      {/* Layer labels */}
       {['Policy Check', 'Manipulation Detect', 'Script Match', 'Isolation Signal', 'Qwen3 Thinking', 'Live Web Search'].map((layer, i) => (
-        <Text key={i} style={{ color: 'rgba(0,243,255,0.4)', fontSize: 11, marginTop: 6, letterSpacing: 0.8 }}>
+        <Text key={i} style={{ color: 'rgba(0,212,255,0.4)', fontSize: 11, marginTop: 5, letterSpacing: 0.8 }}>
           ▶ {layer}
         </Text>
       ))}
@@ -1390,20 +1260,21 @@ function AnalyzingView() {
   );
 }
 
+// ─── Verdict View ─────────────────────────────────────────────────────────────
 function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult; onClose: () => void; onRetry: () => void }) {
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const slideUp = useRef(new Animated.Value(40)).current;
+  const fadeIn   = useRef(new Animated.Value(0)).current;
+  const slideUp  = useRef(new Animated.Value(40)).current;
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const [displayScore, setDisplayScore] = useState(0);
 
   const isCritical = result.risk_band === 'CRITICAL';
-  const isSafe = result.risk_band === 'SAFE';
-  const color = isCritical ? C.rose : (isSafe ? C.green : C.gold);
-  const label = isCritical ? '🔴 CRITICAL — SCAM' : (isSafe ? '🟢 SAFE' : '🟡 SUSPICIOUS');
+  const isSafe     = result.risk_band === 'SAFE';
+  const color      = isCritical ? C.rose : (isSafe ? C.green : C.gold);
+  const label      = isCritical ? '🔴 CRITICAL — SCAM' : (isSafe ? '🟢 SAFE' : '🟡 SUSPICIOUS');
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(fadeIn,  { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.spring(slideUp, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
     scoreAnim.addListener(({ value }) => setDisplayScore(Math.round(value)));
@@ -1413,157 +1284,137 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
-      <ScrollView
-        contentContainerStyle={{ padding: 24, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
-      {/* Score card */}
-      <View style={{ alignItems: 'center', marginBottom: 28 }}>
-        <View style={{ width: 130, height: 130, borderRadius: 65, backgroundColor: `${color}18`, borderWidth: 2, borderColor: color, alignItems: 'center', justifyContent: 'center', shadowColor: color, shadowRadius: 24, shadowOpacity: 0.6, marginBottom: 16 }}>
-          <Text style={{ fontSize: 36, fontWeight: '800', color }}>{displayScore}</Text>
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>RISK SCORE</Text>
-        </View>
-        <Text style={{ fontSize: 20, fontWeight: '800', color, letterSpacing: 0.5 }}>{label}</Text>
-      </View>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
-      {/* Flags */}
-      {result.why_flagged.length > 0 && (
-        <View style={[glassStyles.card, { marginBottom: 16, borderColor: `${color}40` }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
-            <Ionicons name="alert-circle" size={16} color={color} style={{ marginRight: 8 }} />
-            <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Why Flagged</Text>
+        {/* Score ring */}
+        <View style={{ alignItems: 'center', marginBottom: 28 }}>
+          <View style={{
+            width: 130, height: 130, borderRadius: 65,
+            backgroundColor: `${color}18`, borderWidth: 2.5, borderColor: color,
+            alignItems: 'center', justifyContent: 'center',
+            shadowColor: color, shadowRadius: 28, shadowOpacity: 0.6, marginBottom: 16,
+          }}>
+            <Text style={{ fontSize: 38, fontWeight: '800', color }}>{displayScore}</Text>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5 }}>RISK SCORE</Text>
           </View>
-          {result.why_flagged.map((f, i) => (
-            <View key={i} style={{ flexDirection: 'row', marginBottom: 12, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: color }}>
-              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1, fontStyle: 'italic' }}>{f}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '800', color, letterSpacing: 0.5 }}>{label}</Text>
+        </View>
+
+        {/* Why flagged */}
+        {result.why_flagged.length > 0 && (
+          <GlassCard accentColor={color} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+              <Ionicons name="alert-circle" size={15} color={color} style={{ marginRight: 8 }} />
+              <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Why Flagged</Text>
             </View>
-          ))}
-        </View>
-      )}
+            {result.why_flagged.map((f, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 10, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: color }}>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1, fontStyle: 'italic' }}>{f}</Text>
+              </View>
+            ))}
+          </GlassCard>
+        )}
 
-      {/* Recommended action */}
-      {result.recommended_action ? (
-        <View style={[glassStyles.card, { marginBottom: 16 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Ionicons name="checkmark-circle" size={16} color={C.cyan} style={{ marginRight: 8 }} />
-            <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Action</Text>
-          </View>
-          <Text style={{ color: '#fff', fontSize: 14, lineHeight: 21 }}>{result.recommended_action}</Text>
-        </View>
-      ) : null}
+        {/* Recommended action */}
+        {result.recommended_action ? (
+          <GlassCard accentColor={C.cyan} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="checkmark-circle" size={15} color={C.cyan} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Action</Text>
+            </View>
+            <Text style={{ color: '#fff', fontSize: 14, lineHeight: 21 }}>{result.recommended_action}</Text>
+          </GlassCard>
+        ) : null}
 
-      {/* ── Qwen3 AI Explanation ─────────────────────────────── */}
-      {result.plain_english ? (
-        <View style={[glassStyles.card, { marginBottom: 16, borderColor: 'rgba(140,82,255,0.35)' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Ionicons name="hardware-chip" size={15} color={C.violet} style={{ marginRight: 8 }} />
-            <Text style={{ color: C.violet, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>AI Analysis</Text>
-            {result.qwen_available && (
-              <View style={{ marginLeft: 8, backgroundColor: 'rgba(140,82,255,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                <Text style={{ color: C.violet, fontSize: 9, fontWeight: '700' }}>QWEN3 THINKING</Text>
+        {/* Qwen3 AI Explanation */}
+        {result.plain_english ? (
+          <GlassCard accentColor={C.violet} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="hardware-chip" size={15} color={C.violet} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.violet, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>AI Analysis</Text>
+              {result.qwen_available && (
+                <View style={{ marginLeft: 8, backgroundColor: 'rgba(140,82,255,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                  <Text style={{ color: C.violet, fontSize: 9, fontWeight: '700' }}>QWEN3 THINKING</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 21 }}>{result.plain_english}</Text>
+            {result.tactics_detected && result.tactics_detected.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 6 }}>
+                {result.tactics_detected.filter(t => t !== 'none_detected').map((tactic, i) => (
+                  <View key={i} style={{ backgroundColor: 'rgba(255,61,113,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,61,113,0.3)' }}>
+                    <Text style={{ color: C.rose, fontSize: 10, fontWeight: '600', textTransform: 'capitalize' }}>
+                      {tactic.replace(/_/g, ' ')}
+                    </Text>
+                  </View>
+                ))}
               </View>
             )}
-          </View>
-          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 21 }}>{result.plain_english}</Text>
-          {result.tactics_detected && result.tactics_detected.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 6 }}>
-              {result.tactics_detected.filter(t => t !== 'none_detected').map((tactic, i) => (
-                <View key={i} style={{ backgroundColor: 'rgba(255,61,113,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,61,113,0.3)' }}>
-                  <Text style={{ color: C.rose, fontSize: 10, fontWeight: '600', textTransform: 'capitalize' }}>
-                    {tactic.replace(/_/g, ' ')}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      ) : null}
+          </GlassCard>
+        ) : null}
 
-      {/* ── Live Policy Fact-Check ────────────────────────────── */}
-      {result.live_policy_check?.checked && (
-        <View style={[glassStyles.card, {
-          marginBottom: 16,
-          borderColor: result.live_policy_check.policy_allows === false
-            ? 'rgba(255,61,113,0.4)'
-            : result.live_policy_check.policy_allows === true
-            ? 'rgba(52,199,89,0.4)'
-            : 'rgba(255,170,0,0.3)',
-        }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Ionicons name="globe-outline" size={15} color={C.cyan} style={{ marginRight: 8 }} />
-            <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Live Web Verification</Text>
-            <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,243,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-              <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700' }}>TAVILY AI</Text>
+        {/* Live Policy Fact-Check */}
+        {result.live_policy_check?.checked && (
+          <GlassCard
+            accentColor={result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold}
+            style={{ marginBottom: 16 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="globe-outline" size={15} color={C.cyan} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Live Web Verification</Text>
+              <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,212,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700' }}>TAVILY AI</Text>
+              </View>
             </View>
-          </View>
-
-          {/* Verdict pill */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <View style={{
-              paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-              backgroundColor: result.live_policy_check.policy_allows === false
-                ? 'rgba(255,61,113,0.15)' : result.live_policy_check.policy_allows === true
-                ? 'rgba(52,199,89,0.15)' : 'rgba(255,170,0,0.15)',
-            }}>
-              <Text style={{
-                fontSize: 11, fontWeight: '700',
-                color: result.live_policy_check.policy_allows === false ? C.rose
-                  : result.live_policy_check.policy_allows === true ? C.green : C.gold,
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <View style={{
+                paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+                backgroundColor: result.live_policy_check.policy_allows === false ? 'rgba(255,61,113,0.15)' : result.live_policy_check.policy_allows === true ? 'rgba(52,199,89,0.15)' : 'rgba(255,170,0,0.15)',
               }}>
-                {result.live_policy_check.policy_allows === false ? '⛔ POLICY PROHIBITS THIS'
-                  : result.live_policy_check.policy_allows === true ? '✅ POLICY ALLOWS THIS'
-                  : '⚠️ POLICY UNCLEAR'}
+                <Text style={{ fontSize: 11, fontWeight: '700', color: result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold }}>
+                  {result.live_policy_check.policy_allows === false ? '⛔ POLICY PROHIBITS THIS' : result.live_policy_check.policy_allows === true ? '✅ POLICY ALLOWS THIS' : '⚠️ POLICY UNCLEAR'}
+                </Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 8 }}>
+                {Math.round((result.live_policy_check.confidence || 0) * 100)}% conf
               </Text>
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 8 }}>
-              {Math.round((result.live_policy_check.confidence || 0) * 100)}% conf
-            </Text>
-          </View>
+            {result.live_policy_check.verdict_text ? (
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>{result.live_policy_check.verdict_text}</Text>
+            ) : null}
+            {result.live_policy_check.source_url ? (
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} onPress={() => Linking.openURL(result.live_policy_check!.source_url!)}>
+                <Ionicons name="link-outline" size={13} color={C.cyan} style={{ marginRight: 5 }} />
+                <Text style={{ color: C.cyan, fontSize: 12, textDecorationLine: 'underline', flex: 1 }} numberOfLines={1}>
+                  {result.live_policy_check.source_label || result.live_policy_check.source_url}
+                </Text>
+                <Ionicons name="open-outline" size={13} color={C.cyan} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+            ) : null}
+          </GlassCard>
+        )}
 
-          {/* Web answer text */}
-          {result.live_policy_check.verdict_text ? (
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>
-              {result.live_policy_check.verdict_text}
-            </Text>
-          ) : null}
+        {/* Official callback */}
+        {result.official_callback_number ? (
+          <GlassCard accentColor={C.cyan} style={{ marginBottom: 24 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>Official Helpline</Text>
+            <Text style={{ color: C.cyan, fontSize: 20, fontWeight: '700' }}>{result.official_callback_number}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>Call this number to verify — not the number they gave you.</Text>
+          </GlassCard>
+        ) : null}
 
-          {/* Source link */}
-          {result.live_policy_check.source_url ? (
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
-              onPress={() => Linking.openURL(result.live_policy_check!.source_url!)}
-            >
-              <Ionicons name="link-outline" size={13} color={C.cyan} style={{ marginRight: 5 }} />
-              <Text style={{ color: C.cyan, fontSize: 12, textDecorationLine: 'underline', flex: 1 }} numberOfLines={1}>
-                {result.live_policy_check.source_label || result.live_policy_check.source_url}
-              </Text>
-              <Ionicons name="open-outline" size={13} color={C.cyan} style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      )}
-
-      {/* Official number */}
-      {result.official_callback_number ? (
-        <View style={[glassStyles.card, { marginBottom: 24 }]}>
-          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>Official Helpline</Text>
-          <Text style={{ color: C.cyan, fontSize: 18, fontWeight: '700' }}>{result.official_callback_number}</Text>
-          <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>Call this number to verify — not the number they gave you.</Text>
-        </View>
-      ) : null}
-
-      {/* CTAs */}
-      {isCritical && (
-        <TouchableOpacity style={[S.primaryBtn, { backgroundColor: C.rose, marginBottom: 12 }]} onPress={() => Linking.openURL('tel:')}>
-          <Text style={S.btnText}>📵  Hang Up Now</Text>
+        {/* CTAs */}
+        {isCritical && (
+          <TouchableOpacity style={[S.primaryBtn, { backgroundColor: C.rose, marginBottom: 12 }]} onPress={() => Linking.openURL('tel:')}>
+            <Text style={[S.btnText, { color: '#fff' }]}>📵  Hang Up Now</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[S.primaryBtn, { backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 12 }]} onPress={onRetry}>
+          <Text style={[S.btnText, { color: 'rgba(255,255,255,0.75)' }]}>Analyze Another Call</Text>
         </TouchableOpacity>
-      )}
-      <TouchableOpacity style={[S.primaryBtn, { backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 12 }]} onPress={onRetry}>
-        <Text style={[S.btnText, { color: 'rgba(255,255,255,0.7)' }]}>Analyze Another Call</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={S.closeBtn} onPress={onClose}>
-        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15 }}>Close</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={S.closeBtn} onPress={onClose}>
+          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15 }}>Close</Text>
+        </TouchableOpacity>
       </ScrollView>
     </Animated.View>
   );
@@ -1573,19 +1424,16 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
 const S = StyleSheet.create({
   sheet: {
     flex: 1,
-    backgroundColor: 'rgba(6,8,15,0.98)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: 'rgba(255,255,255,0.07)',
   },
   backBtn: {
     flexDirection: 'row',
@@ -1593,94 +1441,48 @@ const S = StyleSheet.create({
     width: 70,
   },
   backLabel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.75)',
     fontSize: 15,
     marginLeft: 2,
   },
   headerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,243,255,0.1)',
+    backgroundColor: 'rgba(0,212,255,0.12)',
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(0,243,255,0.3)',
+    borderColor: 'rgba(0,212,255,0.35)',
     gap: 8,
   },
   headerPillText: {
-    color: '#00f3ff',
+    color: '#00d4ff',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
   liveIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#00f3ff',
-    shadowColor: '#00f3ff',
-    shadowRadius: 4,
-    shadowOpacity: 1,
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#00d4ff',
+    shadowColor: '#00d4ff', shadowRadius: 4, shadowOpacity: 1,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.3,
+    fontSize: 26, fontWeight: '700', color: '#fff', letterSpacing: -0.3,
   },
   mutedText: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  sectionLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  timerText: {
-    fontSize: 64,
-    fontWeight: '200',
-    color: '#fff',
-    letterSpacing: 4,
-    marginTop: 8,
-    // fontVariant: ['tabular-nums'],  // removed — causes crash on some RN versions
+    color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 20,
   },
   primaryBtn: {
-    backgroundColor: '#00f3ff',
-    padding: 18,
-    borderRadius: 16,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#00f3ff',
-    shadowRadius: 10,
-    shadowOpacity: 0.3,
-    elevation: 6,
-  },
-  stopBtn: {
-    backgroundColor: 'rgba(255,61,113,0.15)',
-    padding: 18,
-    borderRadius: 16,
-    width: '100%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ff3d71',
-    shadowColor: '#ff3d71',
-    shadowRadius: 8,
-    shadowOpacity: 0.3,
+    backgroundColor: '#00d4ff',
+    padding: 18, borderRadius: 16,
+    width: '100%', alignItems: 'center',
+    shadowColor: '#00d4ff', shadowRadius: 12, shadowOpacity: 0.35, elevation: 6,
   },
   btnText: {
-    color: '#06080f',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    color: '#06080f', fontSize: 16, fontWeight: '700', letterSpacing: 0.3,
   },
   closeBtn: {
-    alignItems: 'center',
-    padding: 12,
+    alignItems: 'center', padding: 12,
   },
 });
