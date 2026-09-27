@@ -1,4 +1,4 @@
-﻿"""
+"""
 SafeMail X - Qwen3 Call Analysis Layer (Stage 3)
 Only called for grey-zone scores (0.20-0.85).
 Returns None if LM Studio is offline.
@@ -110,7 +110,7 @@ def _parse_json(content):
 
 
 def analyze_with_qwen(transcript, org_claimed, actions_requested, warning_phrases,
-                      rule_results, composite_score, floor_score, hard_floors_triggered,
+                      rule_results, rule_final_score, hard_floors_triggered,
                       timeout=55):
     layers_lines = []
     for name,res in rule_results.items():
@@ -130,7 +130,7 @@ Actions requested : {', '.join(actions_requested) if actions_requested else '(no
 Warning phrases   : {', '.join(warning_phrases) if warning_phrases else '(none)'}
 
 === RULE ENGINE ===
-Composite: {composite_score:.3f}  Floor: {floor_score:.3f}  Combined: {max(composite_score,floor_score):.3f}
+Rule Final Score: {rule_final_score:.3f}
 {floors_block}
 
 Layer breakdown:
@@ -145,7 +145,7 @@ Output ONLY the JSON object."""
     if parsed is None: return None
 
     try:
-        threat_prob = round(max(0.0,min(1.0,float(parsed.get("threat_probability",composite_score)))),3)
+        threat_prob = round(max(0.0,min(1.0,float(parsed.get("threat_probability", rule_final_score)))),3)
         verdict = str(parsed.get("final_verdict","")).upper()
         if verdict not in ("SAFE","SUSPICIOUS","CRITICAL"):
             verdict = "CRITICAL" if threat_prob>0.70 else ("SUSPICIOUS" if threat_prob>=0.30 else "SAFE")
@@ -156,7 +156,7 @@ Output ONLY the JSON object."""
         override_reason = str(override_reason).strip() if override_reason else None
 
         # Safety guard: hard floors >= 0.92 block SAFE verdict
-        if hard_floors_triggered and floor_score>=0.92 and verdict=="SAFE":
+        if hard_floors_triggered and rule_final_score>=0.92 and verdict=="SAFE":
             logger.warning("[QWEN_CALL] Hard floor blocks SAFE - upgrading to SUSPICIOUS.")
             verdict = "SUSPICIOUS"
             threat_prob = max(threat_prob,0.50)

@@ -140,8 +140,12 @@ def analyze(input_data: dict) -> dict:
         if layer_name in layer_results
     )
 
-    # Final score = max of composite and floor
-    final_score = max(composite_score, floor_score)
+    # Find the maximum score returned by any single layer
+    max_layer_score = max((res.get("score", 0.0) for res in layer_results.values()), default=0.0)
+
+    # Final score = max of composite, floor, and max_layer_score
+    # This ensures if one rule is 95% confident, the final score is at least 95%
+    final_score = max(composite_score, floor_score, max_layer_score)
     final_score = round(min(1.0, final_score), 3)
 
     # Risk band from rules
@@ -158,7 +162,9 @@ def analyze(input_data: dict) -> dict:
     live_policy_result = None
 
     def _run_qwen():
-        if not GREY_ZONE:
+        # Always run Qwen3 for unstructured voice transcripts to parse nuance.
+        # For structured (checkbox) input, only run if score is in the grey zone.
+        if not GREY_ZONE and input_mode != "transcript" and input_mode != "voice":
             return None
         return analyze_with_qwen(
             transcript=transcript,
@@ -166,8 +172,7 @@ def analyze(input_data: dict) -> dict:
             actions_requested=actions_requested,
             warning_phrases=warning_phrases,
             rule_results=layer_results,
-            composite_score=composite_score,
-            floor_score=floor_score,
+            rule_final_score=final_score,
             hard_floors_triggered=hard_floors_triggered,
             timeout=55,
         )

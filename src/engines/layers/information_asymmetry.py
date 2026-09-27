@@ -59,13 +59,13 @@ NEVER_LEGITIMATE = {
 }
 
 
-def _classify_org(org_claimed: str) -> Optional[str]:
-    org_lower = org_claimed.lower()
+def _classify_org_from_text(text: str) -> tuple[Optional[str], str]:
+    text_lower = text.lower()
     for org_type, keywords in ORG_TYPE_MAP.items():
         for kw in keywords:
-            if kw in org_lower:
-                return org_type
-    return None
+            if kw in text_lower:
+                return org_type, kw
+    return None, ""
 
 
 def _find_violations(org_type: str, actions: list[str]) -> list[str]:
@@ -85,7 +85,7 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
     Check for information asymmetry violations.
     Works on both Path A transcript and Path B structured claims.
     """
-    # Extract org and actions from claims dict (Path B) or from transcript (Path A)
+    # Extract org and actions from claims dict (Path B)
     org_claimed = ""
     actions_requested = []
 
@@ -93,26 +93,25 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
         org_claimed = claims.get("org_claimed", "")
         actions_requested = claims.get("actions_requested", [])
 
-    # If no structured claims, try to extract from transcript keywords
-    if not org_claimed and transcript:
-        org_claimed = transcript  # layer will try to classify from full text
+    org_type = None
+    matched_entity = ""
 
-    if not org_claimed:
-        return {
-            "score": 0.0,
-            "finding": "no_org_claimed",
-            "plain_english": "No organization identity claimed — cannot assess asymmetry.",
-            "evidence": {},
-            "hard_floor": None
-        }
+    # Try explicit org claim first
+    if org_claimed:
+        org_type, matched_entity = _classify_org_from_text(org_claimed)
+        if not matched_entity:
+            matched_entity = org_claimed # Fallback to what user typed if no keyword match
 
-    org_type = _classify_org(org_claimed)
+    # If no explicit claim or it didn't match, scan the full transcript
+    if not org_type and transcript:
+        org_type, matched_entity = _classify_org_from_text(transcript)
+
     if not org_type:
         return {
             "score": 0.0,
-            "finding": "unrecognized_org_type",
-            "plain_english": f"Cannot classify '{org_claimed}' — no asymmetry rule applies.",
-            "evidence": {"org_claimed": org_claimed},
+            "finding": "no_org_claimed",
+            "plain_english": "No recognized organization identity claimed — cannot assess asymmetry.",
+            "evidence": {},
             "hard_floor": None
         }
 
@@ -126,8 +125,9 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
                 violations.append(forbidden)
 
     if violations:
-        org_display = org_claimed or org_type
-        first_violation = violations[0]
+        # Format entity nicely for display (e.g. "sbi" -> "SBI", "bank" -> "The bank")
+        org_display = matched_entity.upper() if len(matched_entity) <= 4 else matched_entity.title()
+        
         reason = {
             "bank": f"{org_display} SENDS you the OTP — they already know what it is. Asking you to read it back proves this caller is NOT {org_display}.",
             "uidai": f"UIDAI has your Aadhaar on file. They never call citizens. This cannot be UIDAI.",
