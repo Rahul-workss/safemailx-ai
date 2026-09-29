@@ -157,6 +157,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       partialTranscriptRef.current = '';
       setPartialTranscript('');
+
+      // If we're in the drain phase (user pressed Stop / timer expired),
+      // fire the finalize callback now that we have the last words.
+      if (finalizeCallbackRef.current) {
+        finalizeCallbackRef.current();
+        return;
+      }
     };
 
     Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
@@ -171,6 +178,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     Voice.onSpeechError = (_e: SpeechErrorEvent) => {
       if (partialDebounceRef.current) clearTimeout(partialDebounceRef.current);
       commitPartialTranscript();
+
+      // If draining for finalize, fire callback even on error.
+      if (finalizeCallbackRef.current) {
+        finalizeCallbackRef.current();
+        return;
+      }
+
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
       }
@@ -178,6 +192,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
     Voice.onSpeechEnd = () => {
       commitPartialTranscript();
+
+      // If draining for finalize, fire callback — engine has finished speaking.
+      if (finalizeCallbackRef.current) {
+        finalizeCallbackRef.current();
+        return;
+      }
+
       if (isRecognizingRef.current && timeLeftRef.current > 1) {
         restartRecognizer();
       }
@@ -337,72 +358,96 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     }
   };
 
+  // Ref to hold the one-shot "finalize" callback so onSpeechResults/onSpeechEnd
+  // can trigger it as soon as the engine delivers the last words.
+  const finalizeCallbackRef = useRef<(() => void) | null>(null);
+
   const finishRecording = () => {
     if (isFinishingRef.current) return;
     isFinishingRef.current = true;
 
+    // Stop timer immediately — user has committed to stopping.
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    isRecognizingRef.current = false;
-    try { Voice.stop(); } catch (_) {}
     stopWaveAnimation();
     stopRecDotPulse();
 
-    setTimeout(() => {
-      isFinishingRef.current = false;
+    // --- Phase 1: Graceful drain ---
+    // Signal recognizer to stop but DO NOT set isRecognizingRef=false yet.
+    // The engine may still deliver a final onSpeechResults with the last words.
+    // We wait up to 1800ms for that event before forcibly finalizing.
+    try { Voice.stop(); } catch (_) {}
 
-      // Commit any leftover partial text
-      if (partialTranscriptRef.current.trim()) {
-        const updated = finalTranscriptRef.current
-          ? finalTranscriptRef.current + ' ' + partialTranscriptRef.current.trim()
-          : partialTranscriptRef.current.trim();
-        finalTranscriptRef.current = updated;
-        setFinalTranscript(updated);
-      }
-      if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
-      partialTranscriptRef.current = '';
-      setPartialTranscript('');
+    // Safety net: commit + advance after 1800ms even if engine stays silent.
+    const safetyTimer = setTimeout(() => {
+      finalizeCallbackRef.current = null;
+      _doFinalize();
+    }, 1800);
 
-      const captured = finalTranscriptRef.current.trim();
-      const wordCount = captured ? captured.split(/\s+/).filter(Boolean).length : 0;
-      const atCap = extensionCountRef.current >= 2;
+    // Register callback so onSpeechResults / onSpeechEnd can trigger early finalize.
+    finalizeCallbackRef.current = () => {
+      clearTimeout(safetyTimer);
+      finalizeCallbackRef.current = null;
+      // Short extra wait so React state from onSpeechResults has settled.
+      setTimeout(_doFinalize, 150);
+    };
+  };
 
-      if (wordCount >= 5) {
+  const _doFinalize = () => {
+    isRecognizingRef.current = false;
+    isFinishingRef.current = false;
+
+    // Commit any in-flight partial text.
+    if (partialDebounceRef.current) { clearTimeout(partialDebounceRef.current); partialDebounceRef.current = null; }
+    if (partialTranscriptRef.current.trim()) {
+      const updated = finalTranscriptRef.current
+        ? finalTranscriptRef.current + ' ' + partialTranscriptRef.current.trim()
+        : partialTranscriptRef.current.trim();
+      finalTranscriptRef.current = updated;
+      setFinalTranscript(updated);
+    }
+    partialTranscriptRef.current = '';
+    setPartialTranscript('');
+
+    const captured = finalTranscriptRef.current.trim();
+    const wordCount = captured ? captured.split(/\s+/).filter(Boolean).length : 0;
+    const atCap = extensionCountRef.current >= 2;
+
+    if (wordCount >= 5) {
+      setReviewTranscript(captured);
+      setScreenState('REVIEW');
+      return;
+    }
+
+    if (atCap) {
+      if (wordCount > 0) {
         setReviewTranscript(captured);
         setScreenState('REVIEW');
-        return;
-      }
-
-      if (atCap) {
-        if (wordCount > 0) {
-          setReviewTranscript(captured);
-          setScreenState('REVIEW');
-        } else {
-          Alert.alert(
-            "We Didn't Hear You",
-            "We couldn't capture any speech in 60 seconds.\n\nTry speaking louder and closer to the mic, or use \"Type It\" to describe the call manually.",
-            [
-              { text: 'Try Again', onPress: () => startRecording() },
-              { text: 'Type It Instead', onPress: () => { stopRecordingIfNeeded(); setScreenState('STRUCTURED'); } },
-            ]
-          );
-        }
-        return;
-      }
-
-      if (wordCount === 0) {
+      } else {
         Alert.alert(
           "We Didn't Hear You",
-          `No speech was detected.\n\nSpeak clearly towards the mic and tap Try Again for another 20 seconds.\n(${2 - extensionCountRef.current} attempt${2 - extensionCountRef.current === 1 ? '' : 's'} remaining)`,
+          "We couldn't capture any speech in 60 seconds.\n\nTry speaking louder and closer to the mic, or use \"Type It\" to describe the call manually.",
           [
-            { text: 'Try Again', onPress: () => extendRecording() },
+            { text: 'Try Again', onPress: () => startRecording() },
             { text: 'Type It Instead', onPress: () => { stopRecordingIfNeeded(); setScreenState('STRUCTURED'); } },
           ]
         );
-        return;
       }
+      return;
+    }
 
-      extendRecording();
-    }, 600);
+    if (wordCount === 0) {
+      Alert.alert(
+        "We Didn't Hear You",
+        `No speech was detected.\n\nSpeak clearly towards the mic and tap Try Again for another 20 seconds.\n(${2 - extensionCountRef.current} attempt${2 - extensionCountRef.current === 1 ? '' : 's'} remaining)`,
+        [
+          { text: 'Try Again', onPress: () => extendRecording() },
+          { text: 'Type It Instead', onPress: () => { stopRecordingIfNeeded(); setScreenState('STRUCTURED'); } },
+        ]
+      );
+      return;
+    }
+
+    extendRecording();
   };
 
   const extendRecording = () => {
