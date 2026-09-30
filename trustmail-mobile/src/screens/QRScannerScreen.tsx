@@ -294,28 +294,28 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
+
   const handleBarCodeScanned = useCallback(async (scanResult: BarcodeScanningResult) => {
     if (scanned) return;
     setScanned(true);
+
+    const data = scanResult.data;
+
+    // ── Fast-path: gov doc detection (sync, no ANALYZING flash needed) ────────
+    if (!data.toLowerCase().startsWith('upi://pay') &&
+        !data.startsWith('http://') &&
+        !data.startsWith('https://')) {
+      const govDetection = detectGovDocType(data);
+      if (govDetection.isGovDoc) {
+        setGovDocDetection(govDetection);
+        setState('GOV_DOC');
+        return;
+      }
+    }
+
     setState('ANALYZING');
 
-    // The camera gave us the decoded data directly, but we still need to
-    // send the image to the backend for full analysis (URL phishing check).
-    // Since expo-camera gives us only the data, we'll create a QR code image
-    // from the decoded text and send that. OR we capture a photo.
-
-    // For now, take a photo and send it
-    // Actually, we can construct the response locally for barcode data
-    // and only call the backend for URL analysis
     try {
-      // Build minimal image and send to backend
-      // The simplest approach: if it's a URL, use the URL scan. If it's a UPI, flag it.
-      const data = scanResult.data;
-
-      // Create a temporary file-like object — actually, let's use the instant QR endpoint
-      // by capturing a frame. For barcodes detected in-camera, we'll construct
-      // the call differently.
-
       // Quick local check first for UPI
       if (data.toLowerCase().startsWith('upi://pay')) {
         // Parse UPI locally for instant feedback, then confirm with backend
@@ -467,8 +467,21 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
     setState('CAMERA');
   }, []);
 
+  // ── Early returns (all hooks above must fire first) ──────────────────────────
+
+  // Gov doc: full-screen verifier — renders its own header, no QR Scanner chrome needed
+  if (state === 'GOV_DOC' && govDocDetection) {
+    return (
+      <GovDocVerifierScreen
+        detection={govDocDetection}
+        onClose={onClose}
+        onScanAnother={handleRetry}
+      />
+    );
+  }
 
   // No camera permission
+
   if (!permission?.granted && state === 'CAMERA') {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -516,13 +529,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
       )}
 
       {/* Content */}
-      {state === 'GOV_DOC' && govDocDetection ? (
-        <GovDocVerifierScreen
-          detection={govDocDetection}
-          onClose={onClose}
-          onScanAnother={handleRetry}
-        />
-      ) : state === 'ANALYZING' ? (
+      {state === 'ANALYZING' ? (
         <AnalyzingView />
       ) : state === 'VERDICT' && result ? (
         <VerdictView result={result} onRetry={handleRetry} onClose={onClose} />
