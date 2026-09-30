@@ -388,15 +388,17 @@ export default function GovDocVerifierScreen({ detection, onClose, onScanAnother
   useEffect(() => {
     Animated.timing(headerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
 
-    // Auto-verify Aadhaar on mount
+    // Auto-verify Aadhaar on mount (verifyAadhaarQR is async — uses WebCrypto)
     if (detection.type === 'AADHAAR_SECURE' || detection.type === 'AADHAAR_XML') {
       setLoading(true);
-      // Use setTimeout to yield the JS thread so loading spinner appears
-      setTimeout(() => {
-        const result = verifyAadhaarQR(detection.rawData);
-        setAadhaarResult(result);
-        setLoading(false);
-      }, 80);
+      verifyAadhaarQR(detection.rawData)
+        .then(result => {
+          setAadhaarResult(result);
+          setLoading(false);
+        })
+        .catch(() => {
+          setLoading(false);
+        });
     }
   }, []);
 
