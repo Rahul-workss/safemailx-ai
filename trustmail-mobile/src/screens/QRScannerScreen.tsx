@@ -440,7 +440,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.8,
+        quality: 1.0,  // Max quality — Aadhaar QR is dense, needs full res
       });
       if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
 
@@ -451,6 +451,23 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
         name: asset.fileName || 'qr_gallery.jpg',
         mimeType: asset.mimeType || 'image/jpeg',
       });
+
+      // ── Gov doc detection on decoded payloads ────────────────────────────
+      // CRITICAL: gallery scans also need to route through the gov doc verifier.
+      // Without this, scanning an Aadhaar image from gallery shows generic verdict.
+      const allPayloads = [
+        ...(res.decoded_payloads || []),
+        ...(res.non_url_payloads || []),
+      ];
+      for (const payload of allPayloads) {
+        const govDetection = detectGovDocType(payload);
+        if (govDetection.isGovDoc) {
+          setGovDocDetection(govDetection);
+          setState('GOV_DOC');
+          return;
+        }
+      }
+
       setResult(res);
       setState('VERDICT');
     } catch (e: any) {
@@ -458,6 +475,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
       setState('CAMERA');
     }
   }, []);
+
 
   const handleRetry = useCallback(() => {
     setResult(null);
@@ -559,6 +577,23 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
 
                   {/* Scan frame */}
                   <ScanFrame />
+
+                  {/* Aadhaar dense QR tip */}
+                  <View style={{
+                    marginTop: 20, zIndex: 10, paddingHorizontal: 20,
+                    backgroundColor: 'rgba(0,243,255,0.08)',
+                    borderRadius: 12, borderWidth: 1,
+                    borderColor: 'rgba(0,243,255,0.2)',
+                    paddingVertical: 10, marginHorizontal: 24,
+                  }}>
+                    <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textAlign: 'center', marginBottom: 3 }}>
+                      📋 Scanning Aadhaar Card?
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
+                      Aadhaar QR is very dense. Hold steady 10–15cm away in good lighting.{'\n'}
+                      If camera can't detect it, use 🖼️ Gallery below.
+                    </Text>
+                  </View>
 
                   {/* Bottom controls */}
                   <View style={{ flexDirection: 'row', marginTop: 40, gap: 32, zIndex: 10 }}>

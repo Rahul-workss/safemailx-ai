@@ -45,20 +45,38 @@ const GOV_DOMAINS = [
 
 // ─── Detection logic ──────────────────────────────────────────────────────────
 export function detectGovDocType(rawData: string): GovDocDetectResult {
+  // IMPORTANT: trim() strips trailing newlines, spaces, \r that expo-camera
+  // appends and that break regex matching.
   const data = rawData.trim();
 
-  // 1. Aadhaar Secure QR — very long pure numeric string (>100 digits)
-  if (/^\d{100,}$/.test(data)) {
+  // ── 1. Aadhaar Secure QR ────────────────────────────────────────────────────
+  // Post-2019 PVC / e-Aadhaar QR.
+  // Format: very large pure-decimal integer (the RSA-signed payload as a big number).
+  // Typically 2000–8000 digits. expo-camera returns it as a plain digit string.
+  //
+  // Detection rules (any one is sufficient):
+  //   a) 50+ consecutive digits (main case)
+  //   b) Shorter but clearly a large integer (rare edge case)
+  //
+  // NOTE: threshold is 50 (not 100) because some older Aadhaar PVC cards
+  // have shorter payloads, and expo-camera may occasionally truncate.
+  // We also tolerate a single leading digit group with possible space splitting
+  // from some decoders (handled by stripping spaces before check).
+  const digitsOnly = data.replace(/\s/g, ''); // strip any internal whitespace
+  if (/^\d{50,}$/.test(digitsOnly)) {
     return {
       type: 'AADHAAR_SECURE',
       isGovDoc: true,
-      confidence: 'HIGH',
-      rawData: data,
+      confidence: digitsOnly.length > 500 ? 'HIGH' : 'MEDIUM',
+      // Pass the cleaned (whitespace-stripped) string so the verifier can parse it
+      rawData: digitsOnly,
       description: 'Aadhaar Secure QR (digitally signed by UIDAI)',
     };
   }
 
-  // 2. Aadhaar XML QR — starts with XML tag or has uid= pattern
+  // ── 2. Aadhaar XML QR (pre-2019) ────────────────────────────────────────────
+  // Older Aadhaar cards have a plain-text XML QR with demographic data.
+  // Not cryptographically signed — can only be parsed, not verified.
   if (
     data.includes('PrintLetterBarcodeData') ||
     data.includes('uid=') ||
@@ -73,12 +91,12 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 3. CoWIN Vaccination Certificate
+  // ── 3. CoWIN Vaccination Certificate ────────────────────────────────────────
   if (
-    data.includes('cowin') ||
+    data.toLowerCase().includes('cowin') ||
     data.includes('Co-WIN') ||
-    data.includes('vaccination') ||
-    data.includes('vaccine') ||
+    data.toLowerCase().includes('vaccination') ||
+    data.toLowerCase().includes('vaccine') ||
     (data.startsWith('http') && data.includes('cowin.gov.in'))
   ) {
     return {
@@ -91,24 +109,25 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 4. DigiLocker document
-  if (data.includes('digilocker') || data.includes('digitallocker')) {
-    const url = data.startsWith('http') ? data : undefined;
+  // ── 4. DigiLocker document ───────────────────────────────────────────────────
+  if (
+    data.toLowerCase().includes('digilocker') ||
+    data.toLowerCase().includes('digitallocker')
+  ) {
     return {
       type: 'DIGILOCKER_DOC',
       isGovDoc: true,
       confidence: 'HIGH',
       rawData: data,
-      extractedUrl: url,
+      extractedUrl: data.startsWith('http') ? data : undefined,
       description: 'DigiLocker Official Document',
     };
   }
 
-  // 5. CBSE / Board Certificates
+  // ── 5. CBSE / Board Certificates ────────────────────────────────────────────
   if (
-    data.includes('cbse') ||
-    data.includes('cbseresults') ||
-    data.includes('board result') ||
+    data.toLowerCase().includes('cbse') ||
+    data.toLowerCase().includes('cbseresults') ||
     data.includes('CERTIFICATE NO') ||
     data.includes('DigiResult')
   ) {
@@ -122,10 +141,10 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 6. Driving License (mParivahan)
+  // ── 6. Driving License (mParivahan) ─────────────────────────────────────────
   if (
-    data.includes('mparivahan') ||
-    data.includes('parivahan') ||
+    data.toLowerCase().includes('mparivahan') ||
+    data.toLowerCase().includes('parivahan') ||
     data.includes('DRIVING LICENSE') ||
     data.includes('DL No') ||
     (data.startsWith('http') && data.includes('parivahan.gov.in'))
@@ -140,10 +159,10 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 7. PAN Card
+  // ── 7. PAN Card ──────────────────────────────────────────────────────────────
   if (
-    /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(data) || // raw PAN number
-    data.includes('PAN') && data.includes('Income Tax')
+    /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(data) ||
+    (data.includes('PAN') && data.includes('Income Tax'))
   ) {
     return {
       type: 'PAN_CARD',
@@ -154,8 +173,11 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 8. Income Tax / e-Filing
-  if (data.includes('incometax.gov.in') || data.includes('efiling')) {
+  // ── 8. Income Tax / e-Filing ─────────────────────────────────────────────────
+  if (
+    data.includes('incometax.gov.in') ||
+    data.toLowerCase().includes('efiling')
+  ) {
     return {
       type: 'INCOME_TAX_NOTICE',
       isGovDoc: true,
@@ -166,8 +188,12 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 9. e-Court documents
-  if (data.includes('ecourts') || data.includes('eCourt') || data.includes('CNR')) {
+  // ── 9. e-Court documents ─────────────────────────────────────────────────────
+  if (
+    data.toLowerCase().includes('ecourts') ||
+    data.includes('eCourt') ||
+    data.includes('CNR')
+  ) {
     return {
       type: 'COURT_DOCUMENT',
       isGovDoc: true,
@@ -178,7 +204,7 @@ export function detectGovDocType(rawData: string): GovDocDetectResult {
     };
   }
 
-  // 10. Generic .gov.in / .nic.in URL
+  // ── 10. Generic .gov.in / .nic.in URL ───────────────────────────────────────
   if (data.startsWith('http')) {
     try {
       const url = new URL(data);
