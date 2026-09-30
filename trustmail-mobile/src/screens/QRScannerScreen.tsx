@@ -7,6 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { scanQrCode, scanUrl, QRScanResult } from '../api';
+import { detectGovDocType, type GovDocDetectResult } from '../services/govDocDetector';
+import GovDocVerifierScreen from './GovDocVerifierScreen';
+
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -23,7 +26,8 @@ const C = {
   frost4: '#4a5568',
 };
 
-type ScreenState = 'CAMERA' | 'ANALYZING' | 'VERDICT' | 'NO_PERMISSION';
+type ScreenState = 'CAMERA' | 'ANALYZING' | 'VERDICT' | 'NO_PERMISSION' | 'GOV_DOC';
+
 
 // ─── Glassmorphic Card ────────────────────────────────────────────────────────
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
@@ -278,9 +282,11 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<ScreenState>('CAMERA');
   const [result, setResult] = useState<QRScanResult | null>(null);
+  const [govDocDetection, setGovDocDetection] = useState<GovDocDetectResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
   const [torch, setTorch] = useState(false);
+
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -341,8 +347,15 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      // For URLs, call the backend URL scan
+      // For URLs, first check if it's a government document URL
       if (data.startsWith('http://') || data.startsWith('https://')) {
+        const govCheck = detectGovDocType(data);
+        if (govCheck.isGovDoc) {
+          setGovDocDetection(govCheck);
+          setState('GOV_DOC');
+          return;
+        }
+
         // We'll create a simple QR image and send to backend
         // Actually, use the file scan approach — upload a dummy image
         // For now, construct a client-side result and use URL scan if available
@@ -392,7 +405,17 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      // Non-URL, non-UPI QR data
+      // ── Government Document Detection ────────────────────────────────────
+      // Runs on any non-URL, non-UPI QR data (Aadhaar, DigiLocker, DL, CBSE etc.)
+      // Also runs on .gov.in URLs to provide enhanced verification UI.
+      const govDetection = detectGovDocType(data);
+      if (govDetection.isGovDoc) {
+        setGovDocDetection(govDetection);
+        setState('GOV_DOC');
+        return;
+      }
+
+      // Non-URL, non-UPI, non-gov QR data
       setResult({
         qr_codes_found: 1,
         decoded_payloads: [data],
@@ -438,10 +461,12 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
 
   const handleRetry = useCallback(() => {
     setResult(null);
+    setGovDocDetection(null);
     setError(null);
     setScanned(false);
     setState('CAMERA');
   }, []);
+
 
   // No camera permission
   if (!permission?.granted && state === 'CAMERA') {
@@ -491,7 +516,13 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
       )}
 
       {/* Content */}
-      {state === 'ANALYZING' ? (
+      {state === 'GOV_DOC' && govDocDetection ? (
+        <GovDocVerifierScreen
+          detection={govDocDetection}
+          onClose={onClose}
+          onScanAnother={handleRetry}
+        />
+      ) : state === 'ANALYZING' ? (
         <AnalyzingView />
       ) : state === 'VERDICT' && result ? (
         <VerdictView result={result} onRetry={handleRetry} onClose={onClose} />
