@@ -1,42 +1,49 @@
 /**
  * SafeMail X — Aadhaar QR Verifier Service
  *
- * FORMAT A — XML Text QR (pre-2019 / older cards):
- *   Plain-text XML attribute string. No signature. Parse only.
+ * Based on reverse-engineering of pyaadhaar (tanmoysrt/pyaadhaar) and
+ * UIDAI QR Code User Manual v3 (2019).
  *
- * FORMAT B — Secure Numeric QR (post-2019 / PVC / e-Aadhaar):
- *   Large decimal integer → bytes → [version(1)] [compressed_data] [RSA-SHA256 sig(256)]
- *   Multiple decompression strategies tried (zlib / raw-deflate / gzip / uncompressed).
- *   Fields separated by 0xFF delimiter. First two fields are 20-byte binary SHA-1 hashes
- *   (email, mobile) that MUST be skipped before decoding text — raw binary in those
- *   fields causes garbled output if treated as UTF-8.
+ * Secure QR format (post-2019 PVC / e-Aadhaar):
+ *   1. Data is a BASE-10 encoded big integer (decimal string from QR scanner)
+ *   2. Convert to bytes: big-endian, strip leading zeros
+ *   3. Decompress with GZIP (wbits = 16+15, i.e. zlib.decompress(data, 16+MAX_WBITS))
+ *      — NOT plain zlib inflate, NOT raw deflate — strictly GZIP.
+ *   4. Result: binary stream, fields delimited by byte 0xFF (decimal 255)
+ *   5. Decode each field as ISO-8859-1 (Latin-1), NOT UTF-8
+ *   6. Last 256 bytes of the ORIGINAL byte array = RSA-SHA256 signature
+ *      (signature is over the bytes BEFORE decompression, minus the sig itself)
  *
- * NOTE — UIDAI Public Key:
- *   UIDAI_KEY_CONFIGURED is set to false until the real key is installed.
- *   While false: signature shows "CANNOT VERIFY" (honest). Data still parsed.
- *   To configure: replace UIDAI_PUBLIC_KEY_B64 with the real SPKI-DER base64 key
- *   from https://resident.uidai.gov.in/offline-kyc and set UIDAI_KEY_CONFIGURED = true.
+ * Field order (0-indexed, 0xFF delimited):
+ *   [0]  email_mobile_status  — single digit: "0"=none, "1"=email, "2"=mobile, "3"=both
+ *   [1]  referenceid          — first 4 chars = last 4 digits of Aadhaar
+ *   [2]  name
+ *   [3]  dob                  — DD-MM-YYYY or YYYY
+ *   [4]  gender               — M / F / T
+ *   [5]  careof               — care of (c/o)
+ *   [6]  district
+ *   [7]  landmark
+ *   [8]  house
+ *   [9]  location             — locality
+ *   [10] pincode
+ *   [11] postoffice
+ *   [12] state
+ *   [13] street
+ *   [14] subdistrict
+ *   [15] vtc                  — village / town / city
+ *   (Optional Vx version formats may have version field at [0] and mobile last-4 at end)
+ *   Photo: after the last text field, extracted as JPEG-2000 or JPEG binary
+ *
+ * References:
+ *   https://github.com/tanmoysrt/pyaadhaar
+ *   https://uidai.gov.in/images/resource/User_manulal_QR_Code_15032019.pdf
  */
 
 import pako from 'pako';
 
-// ─── UIDAI RSA-2048 Public Key ────────────────────────────────────────────────
-// Set UIDAI_KEY_CONFIGURED = false until the real key is installed.
-// When false, verification is skipped and isGenuine is set to null (cannot verify).
-const UIDAI_KEY_CONFIGURED = false;
-
-const UIDAI_PUBLIC_KEY_B64 =
-  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2a2rwplBQLzHPZe5TRSM' +
-  'oTTbhDe1pRkEWwrMGNpPTECEr7MSZ2aNSINIBvRVs1FsFiZuAKhfRfq5C3hKFl1' +
-  'X+kHLXVjIf6JTpPQ5A/IHFCWCgJ7nKaLFKKz+f5VXcMiA10cO+DvvjXS4LYTP2' +
-  'DF3NKXF8nOsIl6hCHqKApQFbO6cUBVqhR3cNI9IEYZa0PVJgGXHSTkf4hFvL3I' +
-  'RLq9dqXmq/f0y9D+8g3jEzTBtXTj1j8JOjW1NXVqcJXWMpNV2OhZ/zr5D7+G5' +
-  'W1c7K1Z2+P6IEEAbvEGHv8j3mD/bfPd1VsMl9DvV2kF9r4NQLQ2BPbxoJGLYO' +
-  'HwIDAQAB';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AadhaarVerifyResult {
-  isGenuine: boolean | null;     // true=verified, false=mismatch, null=cannot verify
+  isGenuine: boolean | null;     // true=sig verified, false=mismatch, null=cannot verify
   signatureValid: boolean | null;
   format: 'SECURE_QR' | 'XML_QR';
   maskedUID: string;
@@ -61,49 +68,44 @@ export interface AadhaarVerifyResult {
   error?: string;
 }
 
-// ─── Decimal String → Uint8Array (pure JS, no BigInt) ────────────────────────
-// Converts arbitrarily large decimal integer string to big-endian byte array.
-// Uses string long-division by 256 to avoid native BigInt dependency.
+// ─── UIDAI key config ─────────────────────────────────────────────────────────
+// Set true and replace key bytes when you have the real UIDAI production key.
+// From: https://resident.uidai.gov.in/offline-kyc (Offline eKYC SDK)
+const UIDAI_KEY_CONFIGURED = false;
+const UIDAI_PUBLIC_KEY_B64 = ''; // Replace with actual SPKI-DER base64 key
+
+// ─── Decimal String → Uint8Array (no BigInt, pure JS string division) ─────────
+// Converts an arbitrarily large base-10 string to a big-endian byte array.
+// Equivalent to Python's: int(s).to_bytes(5000, 'big').lstrip(b'\x00')
 function decimalToBytes(decimal: string): Uint8Array {
   const bytes: number[] = [];
   let num = decimal.replace(/^0+/, '') || '0';
   while (num !== '0') {
-    let remainder = 0;
-    let quotient = '';
+    let rem = 0;
+    let quot = '';
     for (const ch of num) {
-      remainder = remainder * 10 + parseInt(ch, 10);
-      const q = Math.floor(remainder / 256);
-      remainder %= 256;
-      if (quotient !== '' || q > 0) quotient += q;
+      rem = rem * 10 + parseInt(ch, 10);
+      const q = Math.floor(rem / 256);
+      rem %= 256;
+      if (quot !== '' || q > 0) quot += q;
     }
-    bytes.unshift(remainder);
-    num = quotient === '' ? '0' : quotient;
+    bytes.unshift(rem);
+    num = quot === '' ? '0' : quot;
   }
   return new Uint8Array(bytes);
 }
 
-// ─── Decompress — tries all known strategies ──────────────────────────────────
-// Aadhaar Secure QR uses zlib, raw-deflate, or gzip depending on version and issuer.
-// We attempt all strategies and use the first that succeeds AND produces readable data.
-function tryDecompress(raw: Uint8Array): Uint8Array {
-  // Strategy 1: zlib inflate, skip version byte (most common for version 1)
-  try { return pako.inflate(raw.slice(1)); } catch {}
-  // Strategy 2: raw deflate, skip version byte
-  try { return pako.inflateRaw(raw.slice(1)); } catch {}
-  // Strategy 3: gzip, skip version byte
-  try { return pako.ungzip(raw.slice(1)); } catch {}
-  // Strategy 4: zlib on full payload (no version skip)
-  try { return pako.inflate(raw); } catch {}
-  // Strategy 5: raw deflate on full payload
-  try { return pako.inflateRaw(raw); } catch {}
-  // Strategy 6: gzip on full payload
-  try { return pako.ungzip(raw); } catch {}
-  // Strategy 7: no compression — version 2+ or uncompressed format
-  return raw.slice(1);
+// ─── GZIP decompress via pako ─────────────────────────────────────────────────
+// CRITICAL: Aadhaar Secure QR uses GZIP, not raw zlib/deflate.
+// Python equivalent: zlib.decompress(data, 16 + zlib.MAX_WBITS)
+// pako.ungzip() is the correct equivalent.
+function gzipDecompress(data: Uint8Array): Uint8Array {
+  // pako.ungzip handles wbits=16+MAX_WBITS (gzip format)
+  return pako.ungzip(data);
 }
 
-// ─── Split Uint8Array by delimiter byte ──────────────────────────────────────
-function splitByDelimiter(data: Uint8Array, delim: number): Uint8Array[] {
+// ─── Split byte array by delimiter value ─────────────────────────────────────
+function splitByByte(data: Uint8Array, delim: number): Uint8Array[] {
   const segments: Uint8Array[] = [];
   let start = 0;
   for (let i = 0; i < data.length; i++) {
@@ -116,44 +118,42 @@ function splitByDelimiter(data: Uint8Array, delim: number): Uint8Array[] {
   return segments;
 }
 
-// ─── Detect if a segment is a printable UTF-8 text string ────────────────────
-// Used to decide whether segments are binary (hash) or text.
-function isReadableText(bytes: Uint8Array): boolean {
+// ─── Decode bytes as ISO-8859-1 (Latin-1) ────────────────────────────────────
+// CRITICAL: Aadhaar fields are encoded as Latin-1 (ISO-8859-1), NOT UTF-8.
+// Using UTF-8 on Latin-1 bytes causes the garbled output we were seeing.
+function decodeLatin1(bytes: Uint8Array): string {
+  let str = '';
   for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i];
-    // Allow printable ASCII, common UTF-8 multi-byte sequences, space, tab
-    if (b < 0x09 || (b > 0x0D && b < 0x20) || b === 0x7F) return false;
+    str += String.fromCharCode(bytes[i]);
   }
-  return true;
+  return str;
 }
 
-// ─── RSA-SHA256 verification via WebCrypto (async, Hermes built-in) ──────────
+// ─── RSA-SHA256 via WebCrypto (Hermes built-in) ───────────────────────────────
 async function verifyRSASignature(
   dataBytes: Uint8Array,
-  signatureBytes: Uint8Array,
+  sigBytes: Uint8Array,
 ): Promise<boolean | null> {
+  if (!UIDAI_KEY_CONFIGURED || !UIDAI_PUBLIC_KEY_B64) return null;
   try {
-    const keyBinary = Uint8Array.from(atob(UIDAI_PUBLIC_KEY_B64), c => c.charCodeAt(0));
-    const publicKey = await crypto.subtle.importKey(
+    const keyBin = Uint8Array.from(atob(UIDAI_PUBLIC_KEY_B64), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
       'spki',
-      keyBinary.buffer.slice(0) as ArrayBuffer,
+      keyBin.buffer.slice(0) as ArrayBuffer,
       { name: 'RSASSA-PKCS1-v1.5', hash: { name: 'SHA-256' } },
-      false,
-      ['verify'],
+      false, ['verify'],
     );
     return await crypto.subtle.verify(
-      'RSASSA-PKCS1-v1.5',
-      publicKey,
-      signatureBytes.buffer.slice(0) as ArrayBuffer,
+      'RSASSA-PKCS1-v1.5', key,
+      sigBytes.buffer.slice(0) as ArrayBuffer,
       dataBytes.buffer.slice(0) as ArrayBuffer,
     );
   } catch {
-    // Key import failed or crypto unavailable → cannot verify
     return null;
   }
 }
 
-// ─── Error result ─────────────────────────────────────────────────────────────
+// ─── Error result helper ──────────────────────────────────────────────────────
 function errorResult(format: 'SECURE_QR' | 'XML_QR', msg: string): AadhaarVerifyResult {
   return {
     isGenuine: null, signatureValid: null, format,
@@ -164,16 +164,18 @@ function errorResult(format: 'SECURE_QR' | 'XML_QR', msg: string): AadhaarVerify
   };
 }
 
-// ─── Format A: XML / Attribute-style QR (sync) ───────────────────────────────
+// ─── Format A: Old XML QR (pre-2019, no signature) ───────────────────────────
 function parseXmlFormat(data: string): AadhaarVerifyResult {
   const attr = (name: string): string => {
-    const match = data.match(new RegExp(`${name}="([^"]*)"`, 'i'));
-    return match ? match[1] : '';
+    const m = data.match(new RegExp(`${name}="([^"]*)"`, 'i'));
+    return m ? m[1] : '';
   };
-  const uid = attr('uid') || attr('UID') || 'xxxx xxxx xxxx';
-  const maskedUID = uid.replace(/\d(?=\d{4})/g, 'x').replace(/(.{4})/g, '$1 ').trim();
+  const uid = attr('uid') || attr('UID') || '';
+  const maskedUID = uid
+    ? uid.replace(/\d(?=\d{4})/g, 'x').replace(/(.{4})/g, '$1 ').trim()
+    : 'xxxx xxxx xxxx';
   const rawGender = attr('gender');
-  const gender = rawGender === 'M' ? 'Male' : rawGender === 'F' ? 'Female' : rawGender || 'Unknown';
+  const gender = rawGender === 'M' ? 'Male' : rawGender === 'F' ? 'Female' : rawGender || '';
   return {
     isGenuine: null, signatureValid: null, format: 'XML_QR', maskedUID,
     name: attr('name'), dateOfBirth: attr('dob') || attr('yob'), gender,
@@ -187,148 +189,130 @@ function parseXmlFormat(data: string): AadhaarVerifyResult {
     emailLinked: attr('email_hash').length > 0 || attr('e').length > 0,
     timestamp: '',
     verificationNote:
-      'This is an older Aadhaar QR format (pre-2019). It does not contain a digital signature ' +
-      'and cannot be cryptographically verified. Download the latest e-Aadhaar from myaadhaar.uidai.gov.in for a verifiable QR.',
+      'This is an older Aadhaar QR format (pre-2019). It contains demographic data but ' +
+      'no digital signature, so tamper-detection is not possible. For cryptographic ' +
+      'verification, use a fresh e-Aadhaar downloaded from myaadhaar.uidai.gov.in.',
   };
 }
 
-// ─── Format B: Secure Numeric QR (async) ─────────────────────────────────────
-async function parseSecureFormat(data: string): Promise<AadhaarVerifyResult> {
-  // 1. Decimal → bytes
+// ─── Format B: Secure Numeric QR (post-2019) ─────────────────────────────────
+async function parseSecureFormat(decimal: string): Promise<AadhaarVerifyResult> {
+  // Step 1: Decimal string → bytes
   let bytes: Uint8Array;
   try {
-    bytes = decimalToBytes(data);
+    bytes = decimalToBytes(decimal);
   } catch (e) {
-    return errorResult('SECURE_QR', 'Failed to decode QR payload: ' + String(e));
+    return errorResult('SECURE_QR', 'Could not decode QR payload: ' + String(e));
   }
-
   if (bytes.length < 260) {
-    return errorResult('SECURE_QR', 'QR payload too short for a valid Aadhaar Secure QR (needs >260 bytes).');
+    return errorResult('SECURE_QR', 'QR data too short to be Aadhaar Secure QR.');
   }
 
-  // 2. Extract signature (last 256 bytes = RSA-2048 sig)
-  const signatureBytes = bytes.slice(bytes.length - 256);
+  // Step 2: Last 256 bytes = RSA-SHA256 signature
+  const sigBytes = bytes.slice(bytes.length - 256);
   const dataBytes = bytes.slice(0, bytes.length - 256);
 
-  // 3. Signature verification
-  // If key not configured → null (cannot verify), otherwise true/false
-  const signatureValid: boolean | null = UIDAI_KEY_CONFIGURED
-    ? await verifyRSASignature(dataBytes, signatureBytes)
-    : null;
+  // Step 3: Signature verification (null if key not configured)
+  const signatureValid = await verifyRSASignature(dataBytes, sigBytes);
 
-  // 4. Decompress — try all strategies
+  // Step 4: GZIP decompress (NOT zlib/inflate — must use ungzip)
   let decompressed: Uint8Array;
   try {
-    decompressed = tryDecompress(dataBytes);
-  } catch {
-    return {
-      isGenuine: signatureValid,
-      signatureValid,
-      format: 'SECURE_QR',
-      maskedUID: 'xxxx xxxx xxxx', name: '', dateOfBirth: '', gender: '',
-      address: { careOf: '', house: '', street: '', locality: '', vtc: '', district: '', state: '', pincode: '' },
-      mobileLinked: false, emailLinked: false, timestamp: '',
-      verificationNote: 'Signature checked. Data decompression failed — QR may be corrupt.',
-    };
+    decompressed = gzipDecompress(dataBytes);
+  } catch (e1) {
+    // Fallback 1: try plain zlib inflate
+    try {
+      decompressed = pako.inflate(dataBytes);
+    } catch {
+      // Fallback 2: try raw deflate
+      try {
+        decompressed = pako.inflateRaw(dataBytes);
+      } catch {
+        return {
+          isGenuine: signatureValid, signatureValid, format: 'SECURE_QR',
+          maskedUID: 'xxxx xxxx xxxx', name: '', dateOfBirth: '', gender: '',
+          address: { careOf: '', house: '', street: '', locality: '', vtc: '', district: '', state: '', pincode: '' },
+          mobileLinked: false, emailLinked: false, timestamp: '',
+          verificationNote:
+            'Signature checked. Could not decompress the data payload. ' +
+            'The QR may use an unsupported compression format.',
+        };
+      }
+    }
   }
 
-  // 5. Parse fields
-  // UIDAI field order (0xFF delimited):
-  //   [0] email_hash   — 20 bytes binary SHA-1 (NOT printable — skip before UTF-8 decode)
-  //   [1] mobile_hash  — 20 bytes binary SHA-1 (NOT printable — skip before UTF-8 decode)
-  //   [2] timestamp    — "YYYYMMDDHHMMSS"
-  //   [3] ref_id       — last 4 digits of Aadhaar (or first 8 chars of VID)
-  //   [4] name
-  //   [5] dob          — "DD-MM-YYYY"
-  //   [6] gender       — "M" / "F" / "T"
-  //   [7] care_of
-  //   [8] district
-  //   [9] landmark
-  //   [10] house
-  //   [11] locality
-  //   [12] pincode
-  //   [13] post_office
-  //   [14] state
-  //   [15] street
-  //   [16] vtc (village/town/city)
-  //   [17+] optional fields
-  //   [last] JPEG photo (starts with 0xFF 0xD8)
-  const DELIM = 0xFF;
-  const segments = splitByDelimiter(decompressed, DELIM);
+  // Step 5: Split by 0xFF delimiter, decode each field as ISO-8859-1
+  const segments = splitByByte(decompressed, 0xFF);
 
-  let mobileLinked = false;
-  let emailLinked = false;
+  // Step 6: Detect Vx version marker (newer format extension)
+  // If decompressed starts with "V" + digit (e.g. "V3"), it has an extra version field
+  // and an extra last-4-digits-of-mobile field at the end.
+  let fieldOffset = 0;
+  const firstTwoBytes = decodeLatin1(segments[0]?.slice(0, 2) || new Uint8Array());
+  const hasVersionMarker = firstTwoBytes.length >= 2 &&
+    firstTwoBytes[0] === 'V' && /\d/.test(firstTwoBytes[1]);
+  if (hasVersionMarker) {
+    fieldOffset = 1; // skip version field at [0], mobile-last4 is at the end
+  }
+
+  // Step 7: Extract photo — last segment that starts with JPEG or JPEG-2000 magic bytes
   let photoBase64: string | undefined;
-  let textFields: string[];
+  let textSegments = [...segments];
 
-  const dec = new TextDecoder('utf-8', { fatal: false });
-
-  // ── Detect whether first two segments are binary hashes (20 bytes) ──────────
-  // Binary SHA-1 hashes are NOT readable text. If we find non-readable segments
-  // at positions 0 and 1 with length ≈ 20, they're binary hashes — strip them.
-  // If they're hex strings (40 readable chars), include them but don't decode as text.
-  let segOffset = 0;
-
-  if (segments.length >= 3) {
-    const seg0 = segments[0];
-    const seg1 = segments[1];
-
-    const seg0IsBinaryHash = seg0.length <= 22 && !isReadableText(seg0);
-    const seg1IsBinaryHash = seg1.length <= 22 && !isReadableText(seg1);
-    const seg0IsHexHash = seg0.length === 40 && /^[0-9a-fA-F]+$/.test(dec.decode(seg0));
-    const seg1IsHexHash = seg1.length === 40 && /^[0-9a-fA-F]+$/.test(dec.decode(seg1));
-
-    if (seg0IsBinaryHash || seg0IsHexHash) {
-      emailLinked = seg0.length > 0;
-      segOffset++;
-    }
-    if (seg1IsBinaryHash || seg1IsHexHash) {
-      mobileLinked = seg1.length > 0;
-      segOffset++;
-    }
-  }
-
-  // ── Extract photo from last segment if it's a JPEG ───────────────────────────
-  const lastSeg = segments[segments.length - 1];
-  if (
-    lastSeg && lastSeg.length > 100 &&
-    lastSeg[0] === 0xFF && lastSeg[1] === 0xD8  // JPEG magic bytes
-  ) {
+  const lastSeg = textSegments[textSegments.length - 1];
+  // JPEG: 0xFF 0xD8  |  JPEG-2000: 0x00 0x00 0x00 0x0C 0x6A 0x50
+  if (lastSeg && lastSeg.length > 100 &&
+    ((lastSeg[0] === 0xFF && lastSeg[1] === 0xD8) ||
+     (lastSeg[0] === 0x00 && lastSeg[1] === 0x00 && lastSeg[3] === 0x0C))) {
     let bin = '';
     for (let i = 0; i < lastSeg.length; i++) bin += String.fromCharCode(lastSeg[i]);
     photoBase64 = btoa(bin);
-    textFields = segments.slice(segOffset, segments.length - 1).map(s => dec.decode(s).trim());
-  } else {
-    textFields = segments.slice(segOffset).map(s => dec.decode(s).trim());
+    textSegments = textSegments.slice(0, textSegments.length - 1);
   }
 
-  // ── Map text fields to result ─────────────────────────────────────────────────
-  const f = (i: number) => (textFields[i] || '').trim();
+  // Step 8: Decode text fields as ISO-8859-1
+  const fields = textSegments.map(s => decodeLatin1(s).trim());
 
-  // timestamp → f(0), ref_id → f(1), name → f(2), ...
+  // Step 9: Map fields per UIDAI spec
+  // Without Vx marker:
+  //   [0]=email_mobile_status [1]=referenceid [2]=name [3]=dob [4]=gender
+  //   [5]=careof [6]=district [7]=landmark [8]=house [9]=location
+  //   [10]=pincode [11]=postoffice [12]=state [13]=street [14]=subdistrict [15]=vtc
+  // With Vx marker (fieldOffset=1):
+  //   [0]=version [1]=email_mobile_status [2]=referenceid [3]=name ...
+  const f = (i: number) => (fields[fieldOffset + i] || '').trim();
+
+  // email_mobile_status: "0"=none, "1"=email only, "2"=mobile only, "3"=both
+  const emailMobileStatus = parseInt(f(0) || '0', 10);
+  const emailLinked = emailMobileStatus === 1 || emailMobileStatus === 3;
+  const mobileLinked = emailMobileStatus === 2 || emailMobileStatus === 3;
+
+  // Reference ID: first 4 chars = last 4 digits of Aadhaar number
+  const refId = f(1);
+  const last4 = refId.substring(0, 4);
+  const maskedUID = last4 ? `xxxx xxxx ${last4}` : 'xxxx xxxx xxxx';
+
+  // Gender normalisation
   const rawGender = f(4);
   const gender =
     rawGender === 'M' ? 'Male' :
     rawGender === 'F' ? 'Female' :
-    rawGender === 'T' ? 'Transgender' : rawGender || '';
+    rawGender === 'T' ? 'Transgender' : rawGender;
 
-  const uidRef = f(1).substring(0, 4); // ref id = last 4 digits
-  const maskedUID = uidRef ? `xxxx xxxx ${uidRef}` : 'xxxx xxxx xxxx';
-
-  // ── Build verification note ───────────────────────────────────────────────────
+  // Verification note
   let verificationNote: string;
   if (signatureValid === null) {
     verificationNote =
-      'ℹ️ UIDAI signature verification is not configured locally. The document data has been ' +
-      'parsed from the QR but cryptographic authenticity cannot be confirmed. To verify, ' +
-      'use the UIDAI mAadhaar app or visit myaadhaar.uidai.gov.in.';
+      'ℹ️ UIDAI digital signature could not be verified (verification key not configured). ' +
+      'Demographic data has been parsed from the QR. To verify authenticity, use the official ' +
+      'UIDAI mAadhaar app or visit myaadhaar.uidai.gov.in.';
   } else if (signatureValid) {
     verificationNote =
       '✅ UIDAI digital signature verified. This document was issued by UIDAI and has not been tampered with.';
   } else {
     verificationNote =
-      '❌ Signature verification failed. This may indicate the document was tampered with or ' +
-      'the verification key needs updating. Verify through the official UIDAI app.';
+      '❌ Signature verification failed. This may indicate tampering. ' +
+      'Verify through the official UIDAI mAadhaar app.';
   }
 
   return {
@@ -341,32 +325,32 @@ async function parseSecureFormat(data: string): Promise<AadhaarVerifyResult> {
     gender,
     address: {
       careOf: f(5),
-      house: f(8),
-      street: f(13),
-      locality: f(9),
-      vtc: f(14),
       district: f(6),
-      state: f(12),
+      house: f(8),
+      locality: f(9),
       pincode: f(10),
+      state: f(12),
+      street: f(13),
+      vtc: f(15),
     },
     mobileLinked,
     emailLinked,
-    timestamp: f(0),
+    timestamp: '',
     photoBase64,
     verificationNote,
   };
 }
 
-// ─── Main exported verifier (async) ──────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 export async function verifyAadhaarQR(rawData: string): Promise<AadhaarVerifyResult> {
   const data = rawData.trim();
 
-  // Secure Numeric QR — 50+ digit decimal string
+  // Secure Numeric QR: 50+ digit decimal string
   if (/^\d{50,}$/.test(data)) {
     return parseSecureFormat(data);
   }
 
-  // XML / Attribute QR (old format)
+  // Old XML QR
   if (
     data.includes('PrintLetterBarcodeData') ||
     data.includes('uid=') ||
@@ -377,6 +361,6 @@ export async function verifyAadhaarQR(rawData: string): Promise<AadhaarVerifyRes
 
   return errorResult(
     'SECURE_QR',
-    'Could not recognize Aadhaar QR format. Ensure you are scanning the QR code on an Aadhaar card or e-Aadhaar document.',
+    'Could not recognize the Aadhaar QR format. Ensure you are scanning the QR on an Aadhaar card or e-Aadhaar document.',
   );
 }
