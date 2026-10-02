@@ -457,8 +457,8 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
 
       const pickerResult = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
-        quality: 1.0,           // full sensor resolution — essential for dense QR
-        allowsEditing: false,   // no crop — QR must be complete
+        quality: 1.0,           // full sensor resolution
+        allowsEditing: true,    // ENABLE CROP: drastically improves dense QR detection by removing background
         exif: false,
       });
 
@@ -505,7 +505,8 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 1.0,  // Max quality — Aadhaar QR is dense, needs full res
+        quality: 1.0,           // Max quality — Aadhaar QR is dense, needs full res
+        allowsEditing: true,    // ENABLE CROP: allows zooming in on QR code
       });
       if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
 
