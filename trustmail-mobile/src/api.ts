@@ -542,6 +542,19 @@ export async function scanQrCode(file: {
   return response.json();
 }
 
+export async function decodeAadhaarQR(qrData: string): Promise<any> {
+  /** Send raw Aadhaar QR decimal string to backend for decoding.
+   *  Uses pyaadhaar-equivalent Python algorithm (stdlib zlib gzip + ISO-8859-1).
+   *  Returns parsed demographic fields. Never stores PII. */
+  const response = await apiFetch("/api/instant/aadhaar", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ qr_data: qrData }),
+  }, 20000);
+  if (!response.ok) throw new Error(`Aadhaar decode failed (HTTP ${response.status})`);
+  return response.json();
+}
+
 export async function submitScanFeedback(
   scanId: string,
   feedback: ScanFeedbackChoice,

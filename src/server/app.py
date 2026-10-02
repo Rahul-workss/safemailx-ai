@@ -1271,6 +1271,97 @@ def instant_scan_email(payload: InstantEmailScanRequest, _auth=Depends(require_a
     return inline_scan_service.scan_email(payload, _user_id(_auth))
 
 
+class AadhaarDecodeRequest(BaseModel):
+    qr_data: str
+
+
+class AadhaarAddressResponse(BaseModel):
+    careOf: str = ""
+    district: str = ""
+    house: str = ""
+    locality: str = ""
+    pincode: str = ""
+    state: str = ""
+    street: str = ""
+    vtc: str = ""
+
+
+class AadhaarDecodeResponse(BaseModel):
+    success: bool
+    name: str = ""
+    dob: str = ""
+    gender: str = ""
+    uid_last4: str = ""
+    address: AadhaarAddressResponse = AadhaarAddressResponse()
+    email_linked: bool = False
+    mobile_linked: bool = False
+    format: str = "SECURE_QR"
+    signature_valid: Optional[bool] = None
+    photo_base64: Optional[str] = None
+    error: Optional[str] = None
+
+
+@app.post("/api/instant/aadhaar", response_model=AadhaarDecodeResponse)
+async def instant_decode_aadhaar(
+    payload: AadhaarDecodeRequest,
+    _auth=Depends(require_auth)
+):
+    """
+    Decode an Aadhaar Secure QR code payload.
+
+    The frontend passes the raw decimal string returned by the device QR
+    scanner. This endpoint uses the same algorithm as pyaadhaar (stdlib
+    zlib gzip + ISO-8859-1 field decode) to extract demographic data.
+
+    Privacy: The decoded data is NEVER stored. It is computed in-memory
+    and returned immediately. No PII is written to any database or log.
+    """
+    import logging
+    _logger = logging.getLogger("AADHAAR_ENDPOINT")
+
+    qr_data = (payload.qr_data or "").strip()
+    if not qr_data:
+        return AadhaarDecodeResponse(success=False, error="qr_data is required")
+    if not qr_data.isdigit():
+        return AadhaarDecodeResponse(success=False, error="Not a numeric Aadhaar QR payload")
+    if len(qr_data) < 50:
+        return AadhaarDecodeResponse(success=False, error="Payload too short to be a valid Aadhaar Secure QR")
+
+    try:
+        from engines.aadhaar_decoder import decode_aadhaar_secure_qr
+        result = decode_aadhaar_secure_qr(qr_data)
+    except Exception as e:
+        _logger.error("[AADHAAR] Decode error: %s", e)
+        return AadhaarDecodeResponse(success=False, error=f"Decoder error: {e}")
+
+    if not result.get("success"):
+        return AadhaarDecodeResponse(success=False, error=result.get("error", "Unknown decode error"))
+
+    addr_raw = result.get("address", {})
+    return AadhaarDecodeResponse(
+        success=True,
+        name=result.get("name", ""),
+        dob=result.get("dob", ""),
+        gender=result.get("gender", ""),
+        uid_last4=result.get("uid_last4", ""),
+        address=AadhaarAddressResponse(
+            careOf=addr_raw.get("careOf", ""),
+            district=addr_raw.get("district", ""),
+            house=addr_raw.get("house", ""),
+            locality=addr_raw.get("locality", ""),
+            pincode=addr_raw.get("pincode", ""),
+            state=addr_raw.get("state", ""),
+            street=addr_raw.get("street", ""),
+            vtc=addr_raw.get("vtc", ""),
+        ),
+        email_linked=result.get("email_linked", False),
+        mobile_linked=result.get("mobile_linked", False),
+        format=result.get("format", "SECURE_QR"),
+        signature_valid=result.get("signature_valid", None),
+        photo_base64=result.get("photo_base64"),
+    )
+
+
 @app.post("/api/instant/qr", response_model=QRScanResponse)
 async def instant_scan_qr(
     file: UploadFile = File(...),
