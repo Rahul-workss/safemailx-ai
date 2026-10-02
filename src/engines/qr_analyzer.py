@@ -191,59 +191,62 @@ def _preprocess_strategies(gray):
     """
     Generate preprocessed images targeting different failure modes.
     Each is a BGR image ready for _try_all_decoders().
+    Uses a generator to keep memory usage low (only one image in RAM at a time).
     """
     if not CV2_AVAILABLE:
-        return []
+        return
 
-    strategies = []
     h, w = gray.shape[:2]
 
     # 1. Adaptive Gaussian threshold (handles uneven lighting / PVC glare)
     adapt = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
     )
-    strategies.append(cv2.cvtColor(adapt, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(adapt, cv2.COLOR_GRAY2BGR)
 
     # 2. CLAHE + Otsu (boosts low-contrast prints)
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
     _, otsu_clahe = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    strategies.append(cv2.cvtColor(otsu_clahe, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(otsu_clahe, cv2.COLOR_GRAY2BGR)
 
     # 3. Bilateral filter + Otsu (smooths noise, preserves edges)
     bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
     _, otsu_bi = cv2.threshold(bilateral, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    strategies.append(cv2.cvtColor(otsu_bi, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(otsu_bi, cv2.COLOR_GRAY2BGR)
 
-    # 4. Sharpen + adaptive threshold (slightly blurry captures)
+    # 4. Gaussian Blur + Adaptive (excellent for Moiré from screen captures)
+    gaussian = cv2.GaussianBlur(gray, (5, 5), 0)
+    adapt_gauss = cv2.adaptiveThreshold(
+        gaussian, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    yield cv2.cvtColor(adapt_gauss, cv2.COLOR_GRAY2BGR)
+
+    # 5. Median blur + adaptive threshold (removes sharp Moiré interference)
+    median = cv2.medianBlur(gray, 3)
+    adapt_median = cv2.adaptiveThreshold(
+        median, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    yield cv2.cvtColor(adapt_median, cv2.COLOR_GRAY2BGR)
+
+    # 6. Sharpen + adaptive threshold (slightly blurry captures)
     kernel_sharpen = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
     sharpened = cv2.filter2D(gray, -1, kernel_sharpen)
     adapt_sharp = cv2.adaptiveThreshold(
         sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
     )
-    strategies.append(cv2.cvtColor(adapt_sharp, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(adapt_sharp, cv2.COLOR_GRAY2BGR)
 
-    # 5. 2× upscale + adaptive (QR is small in frame)
-    up2 = cv2.resize(gray, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
-    adapt_up2 = cv2.adaptiveThreshold(
-        up2, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-    )
-    strategies.append(cv2.cvtColor(adapt_up2, cv2.COLOR_GRAY2BGR))
-
-    # 6. 2× upscale raw (no thresholding — let the decoder use its own binarizer)
+    # 7. 2× upscale raw (let decoder use its own binarizer)
     up2_raw = cv2.resize(gray, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
-    strategies.append(cv2.cvtColor(up2_raw, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(up2_raw, cv2.COLOR_GRAY2BGR)
 
-    # 7. Median blur + adaptive threshold (removes Moiré from screen captures)
-    # When scanning a QR displayed on a laptop/phone screen, the pixel grid
-    # creates interference patterns. Median blur suppresses this.
-    median = cv2.medianBlur(gray, 3)
-    adapt_median = cv2.adaptiveThreshold(
-        median, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    # 8. 2× upscale + adaptive (tiny QR code in frame)
+    adapt_up2 = cv2.adaptiveThreshold(
+        up2_raw, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
     )
-    strategies.append(cv2.cvtColor(adapt_median, cv2.COLOR_GRAY2BGR))
+    yield cv2.cvtColor(adapt_up2, cv2.COLOR_GRAY2BGR)
 
-    return strategies
 
 
 def decode_qr_codes(image_path: str) -> list[str]:
@@ -261,21 +264,10 @@ def decode_qr_codes(image_path: str) -> list[str]:
     if not os.path.isfile(image_path):
         return []
 
-    # ── Cap image size to prevent OOM on Render free tier (512MB RAM) ────────
-    # Phone cameras take 12-48MP photos. 3x upscale on a 48MP image =
-    # 432MP = ~1.3GB BGR → instant OOM crash → HTTP 502.
-    # Cap to 2000px longest edge before any processing.
-    MAX_DIM = 2000
-
-    def _cap_size(img_bgr):
-        h, w = img_bgr.shape[:2]
-        if max(h, w) <= MAX_DIM:
-            return img_bgr
-        scale = MAX_DIM / max(h, w)
-        new_w, new_h = int(w * scale), int(h * scale)
-        return cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-    # ── Phase 1: Raw image — try all decoders ────────────────────────────────
+    # ── Phase 1: Raw image — try all decoders on FULL resolution ─────────────
+    # We do NOT downscale here. zxing-cpp handles 12MP images natively and 
+    # needs the full resolution if the QR code is small (e.g., captured from a
+    # laptop screen from a distance).
     if CV2_AVAILABLE:
         try:
             img = cv2.imread(image_path)
@@ -300,13 +292,26 @@ def decode_qr_codes(image_path: str) -> list[str]:
         return list(found)
 
     # ── Phase 2: Preprocessing pipeline (only if raw failed) ─────────────────
-    # Cap image size BEFORE preprocessing to keep memory safe
+    # For Phase 2, we cap size to 3000px to prevent OpenCV adaptiveThreshold
+    # and upscaling from causing an OOM crash.
+    MAX_DIM = 3000
+
+    def _cap_size(img_bgr):
+        h, w = img_bgr.shape[:2]
+        if max(h, w) <= MAX_DIM:
+            return img_bgr
+        scale = MAX_DIM / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        return cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
     if CV2_AVAILABLE:
         try:
-            img = cv2.imread(image_path)
+            # We must re-read or use the existing img
             if img is not None:
                 img = _cap_size(img)
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                # _preprocess_strategies is now a GENERATOR (yields one by one).
+                # This prevents holding 7x 30MB images in memory simultaneously!
                 for i, processed in enumerate(_preprocess_strategies(gray)):
                     results = _try_all_decoders(processed)
                     if results:
