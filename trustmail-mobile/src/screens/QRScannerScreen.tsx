@@ -286,6 +286,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
   const [torch, setTorch] = useState(false);
+  const cameraRef = useRef<any>(null);
 
 
   useEffect(() => {
@@ -436,6 +437,54 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
     }
   }, [scanned]);
 
+  // ── Capture still photo → backend pyzbar decode ───────────────────────────
+  // The live camera barcode scanner uses video frames (~1-2 MP, lossy) which
+  // fail on Aadhaar's Version-40 QR (thousands of tiny modules).
+  // Taking a still photo uses full sensor resolution (12–48 MP on modern phones),
+  // giving pyzbar on the backend the pixel density it needs to decode.
+  const handleCapture = useCallback(async () => {
+    if (!cameraRef.current) return;
+    try {
+      setState('ANALYZING');
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 1.0,       // full quality — essential for dense QR
+        skipProcessing: true, // skip EXIF processing for speed
+      });
+
+      const res = await scanQrCode({
+        uri: photo.uri,
+        name: 'qr_capture.jpg',
+        mimeType: 'image/jpeg',
+      });
+
+      // ── Route through gov doc detector ───────────────────────────────────
+      const allPayloads = [
+        ...(res.decoded_payloads || []),
+        ...(res.non_url_payloads || []),
+      ];
+      for (const payload of allPayloads) {
+        const govDetection = detectGovDocType(payload);
+        if (govDetection.isGovDoc) {
+          setGovDocDetection(govDetection);
+          setState('GOV_DOC');
+          return;
+        }
+      }
+
+      if (res.qr_codes_found === 0) {
+        setError('No QR code found in photo. Move closer, ensure good lighting, then tap 📷 again.');
+        setState('CAMERA');
+        return;
+      }
+
+      setResult(res);
+      setState('VERDICT');
+    } catch (e: any) {
+      setError(e.message || 'Capture failed. Try gallery instead.');
+      setState('CAMERA');
+    }
+  }, []);
+
   const handleGalleryPick = useCallback(async () => {
     try {
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -557,6 +606,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
           <View style={{ flex: 1, overflow: 'hidden', borderRadius: 0 }}>
             {permission?.granted ? (
               <CameraView
+                ref={cameraRef}
                 style={{ flex: 1 }}
                 facing="back"
                 enableTorch={torch}
@@ -590,28 +640,47 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
                       📋 Scanning Aadhaar Card?
                     </Text>
                     <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, textAlign: 'center', lineHeight: 16 }}>
-                      Aadhaar QR is very dense. Hold steady 10–15cm away in good lighting.{'\n'}
-                      If camera can't detect it, use 🖼️ Gallery below.
+                      Aadhaar QR is very dense. Hold steady 10–15 cm away.{'\n'}
+                      Tap 📷 <Text style={{ color: C.cyan, fontWeight: '700' }}>Capture</Text> for best results — or use 🖼️ Gallery.
                     </Text>
                   </View>
 
-                  {/* Bottom controls */}
-                  <View style={{ flexDirection: 'row', marginTop: 40, gap: 32, zIndex: 10 }}>
+                  {/* Bottom controls — Flash | CAPTURE | Gallery */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 32, gap: 20, zIndex: 10 }}>
+
+                    {/* Flash */}
                     <TouchableOpacity
-                      style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', width: 52, height: 52, borderRadius: 26, justifyContent: 'center' }}
+                      style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', width: 50, height: 50, borderRadius: 25, justifyContent: 'center' }}
                       onPress={() => setTorch(!torch)}
                     >
                       <Ionicons name={torch ? 'flash' : 'flash-outline'} size={22} color={torch ? C.gold : '#fff'} />
                     </TouchableOpacity>
+
+                    {/* CAPTURE — prominent center button */}
                     <TouchableOpacity
-                      style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', width: 52, height: 52, borderRadius: 26, justifyContent: 'center' }}
+                      style={{
+                        alignItems: 'center', justifyContent: 'center',
+                        width: 70, height: 70, borderRadius: 35,
+                        backgroundColor: C.cyan,
+                        shadowColor: C.cyan, shadowRadius: 12, shadowOpacity: 0.6, shadowOffset: { width: 0, height: 0 },
+                        elevation: 8,
+                      }}
+                      onPress={handleCapture}
+                    >
+                      <Ionicons name="camera" size={30} color="#000" />
+                    </TouchableOpacity>
+
+                    {/* Gallery */}
+                    <TouchableOpacity
+                      style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', width: 50, height: 50, borderRadius: 25, justifyContent: 'center' }}
                       onPress={handleGalleryPick}
                     >
                       <Ionicons name="images-outline" size={22} color="#fff" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 12, zIndex: 10 }}>
-                    Tap 📷 to pick from gallery
+
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 10, zIndex: 10 }}>
+                    📷 Capture  ·  🖼️ Gallery
                   </Text>
                 </View>
               </CameraView>
