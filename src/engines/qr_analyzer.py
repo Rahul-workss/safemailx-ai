@@ -234,11 +234,14 @@ def _preprocess_strategies(gray):
     up2_raw = cv2.resize(gray, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
     strategies.append(cv2.cvtColor(up2_raw, cv2.COLOR_GRAY2BGR))
 
-    # 7. 3× upscale + CLAHE (extreme upscale for tiny QR in wide photo)
-    up3 = cv2.resize(gray, (w * 3, h * 3), interpolation=cv2.INTER_CUBIC)
-    clahe3 = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    up3_enh = clahe3.apply(up3)
-    strategies.append(cv2.cvtColor(up3_enh, cv2.COLOR_GRAY2BGR))
+    # 7. Median blur + adaptive threshold (removes Moiré from screen captures)
+    # When scanning a QR displayed on a laptop/phone screen, the pixel grid
+    # creates interference patterns. Median blur suppresses this.
+    median = cv2.medianBlur(gray, 3)
+    adapt_median = cv2.adaptiveThreshold(
+        median, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    strategies.append(cv2.cvtColor(adapt_median, cv2.COLOR_GRAY2BGR))
 
     return strategies
 
@@ -257,6 +260,20 @@ def decode_qr_codes(image_path: str) -> list[str]:
 
     if not os.path.isfile(image_path):
         return []
+
+    # ── Cap image size to prevent OOM on Render free tier (512MB RAM) ────────
+    # Phone cameras take 12-48MP photos. 3x upscale on a 48MP image =
+    # 432MP = ~1.3GB BGR → instant OOM crash → HTTP 502.
+    # Cap to 2000px longest edge before any processing.
+    MAX_DIM = 2000
+
+    def _cap_size(img_bgr):
+        h, w = img_bgr.shape[:2]
+        if max(h, w) <= MAX_DIM:
+            return img_bgr
+        scale = MAX_DIM / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        return cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
     # ── Phase 1: Raw image — try all decoders ────────────────────────────────
     if CV2_AVAILABLE:
@@ -283,10 +300,12 @@ def decode_qr_codes(image_path: str) -> list[str]:
         return list(found)
 
     # ── Phase 2: Preprocessing pipeline (only if raw failed) ─────────────────
+    # Cap image size BEFORE preprocessing to keep memory safe
     if CV2_AVAILABLE:
         try:
             img = cv2.imread(image_path)
             if img is not None:
+                img = _cap_size(img)
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 for i, processed in enumerate(_preprocess_strategies(gray)):
                     results = _try_all_decoders(processed)
