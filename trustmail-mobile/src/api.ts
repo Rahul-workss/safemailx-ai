@@ -1,6 +1,6 @@
 import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } from "./session";
 
-const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai-production.up.railway.app";
 let apiBaseUrl = configuredApiBaseUrl;
 
 let accessToken = "";
