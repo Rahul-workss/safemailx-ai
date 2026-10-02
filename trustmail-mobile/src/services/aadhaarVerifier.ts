@@ -116,6 +116,24 @@ async function decodeViaBackend(decimal: string): Promise<AadhaarVerifyResult> {
   const uid4 = (json.uid_last4 || '').trim();
   const maskedUID = uid4 ? `xxxx xxxx ${uid4}` : 'xxxx xxxx xxxx';
 
+  const signatureValid = json.signature_valid;
+  let verificationNote: string;
+  if (signatureValid === true) {
+    verificationNote =
+      '✅ UIDAI digital signature verified. The data in this QR code has been cryptographically confirmed ' +
+      'as authentic and unaltered using the official UIDAI RSA-2048 public key. This Aadhaar card is genuine.';
+  } else if (signatureValid === false) {
+    verificationNote =
+      '🚨 UIDAI signature verification FAILED. The QR data does not match the UIDAI cryptographic signature. ' +
+      'This card may be tampered, forged, or damaged. Do NOT accept this document for any official purpose. ' +
+      'Report suspected fraud at cybercrime.gov.in or call 1930.';
+  } else {
+    verificationNote =
+      '⚠️ Signature could not be verified. This typically means UIDAI has rotated their signing certificate ' +
+      'since the last public key update in our system. The data was extracted from the QR, but authenticity ' +
+      'cannot be confirmed. Verify using the official mAadhaar app or myaadhaar.uidai.gov.in.';
+  }
+
   return {
     isGenuine: json.signature_valid ?? null,
     signatureValid: json.signature_valid ?? null,
@@ -138,10 +156,7 @@ async function decodeViaBackend(decimal: string): Promise<AadhaarVerifyResult> {
     emailLinked: !!json.email_linked,
     timestamp: '',
     photoBase64: json.photo_base64 || undefined,
-    verificationNote:
-      'ℹ️ UIDAI digital signature verification is not yet configured. ' +
-      'Demographic data has been parsed from the QR code. ' +
-      'To verify authenticity, use the official UIDAI mAadhaar app.',
+    verificationNote,
   };
 }
 

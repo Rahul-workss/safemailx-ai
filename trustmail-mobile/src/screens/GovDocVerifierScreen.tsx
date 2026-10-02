@@ -59,22 +59,30 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
 }
 
 // ─── Verification Badge ───────────────────────────────────────────────────────
+// valid=true  → UIDAI RSA signature matched   (green  — SIGNATURE VALID)
+// valid=false → RSA signature mismatch         (red    — SIGNATURE INVALID)
+// valid=null  → key mismatch / cert rotation   (gold   — SIGNATURE UNVERIFIABLE)
 function VerifyBadge({ valid }: { valid: boolean | null }) {
   if (valid === null) {
     return (
       <View style={[styles.badge, { backgroundColor: 'rgba(255,170,0,0.15)', borderColor: C.gold }]}>
         <Ionicons name="help-circle-outline" size={14} color={C.gold} />
-        <Text style={[styles.badgeText, { color: C.gold }]}>CANNOT VERIFY</Text>
+        <Text style={[styles.badgeText, { color: C.gold }]}>SIGNATURE UNVERIFIABLE</Text>
       </View>
     );
   }
-  const color = valid ? C.green : C.rose;
+  if (valid) {
+    return (
+      <View style={[styles.badge, { backgroundColor: `${C.green}18`, borderColor: C.green }]}>
+        <Ionicons name="shield-checkmark" size={14} color={C.green} />
+        <Text style={[styles.badgeText, { color: C.green }]}>UIDAI SIGNATURE VALID ✓</Text>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: color }]}>
-      <Ionicons name={valid ? 'shield-checkmark' : 'shield-half'} size={14} color={color} />
-      <Text style={[styles.badgeText, { color }]}>
-        {valid ? 'UIDAI SIGNATURE VERIFIED' : 'SIGNATURE MISMATCH'}
-      </Text>
+    <View style={[styles.badge, { backgroundColor: `${C.rose}18`, borderColor: C.rose }]}>
+      <Ionicons name="shield-half" size={14} color={C.rose} />
+      <Text style={[styles.badgeText, { color: C.rose }]}>SIGNATURE INVALID ✗</Text>
     </View>
   );
 }
@@ -92,9 +100,14 @@ function AadhaarResultCard({ result }: { result: AadhaarVerifyResult }) {
   }, []);
 
   const isGenuine = result.isGenuine;
+  // Three-state: true=sig valid, false=sig invalid/tampered, null=unverifiable (cert rotation)
   const headerColor = isGenuine === true ? C.green : isGenuine === false ? C.rose : C.gold;
   const headerIcon = isGenuine === true ? 'shield-checkmark' : isGenuine === false ? 'shield-half' : 'shield-outline';
-  const headerTitle = isGenuine === true ? 'Genuine Aadhaar' : isGenuine === false ? 'Verification Failed' : 'Parsed (Unverified)';
+  const headerTitle = isGenuine === true
+    ? 'Genuine Aadhaar ✓'
+    : isGenuine === false
+    ? 'Verification Failed ✗'
+    : 'Data Extracted';
 
   return (
     <Animated.ScrollView
@@ -121,10 +134,12 @@ function AadhaarResultCard({ result }: { result: AadhaarVerifyResult }) {
             style={styles.aadhaarPhoto}
             resizeMode="cover"
           />
-          <Text style={[styles.photoCaption, { color: result.isGenuine ? C.green : C.gold }]}>
-            {result.isGenuine
-              ? '✅ Photo extracted from verified UIDAI payload'
-              : 'Photo extracted — signature unverified'}
+          <Text style={[styles.photoCaption, { color: result.isGenuine === true ? C.green : result.isGenuine === false ? C.rose : C.gold }]}>
+            {result.isGenuine === true
+              ? '✅ Photo from verified, tamper-proof UIDAI payload'
+              : result.isGenuine === false
+              ? '⚠️ Photo extracted — but signature is INVALID'
+              : '⚠️ Photo extracted — signature unverifiable'}
           </Text>
         </Card>
       ) : null}
