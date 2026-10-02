@@ -1,4 +1,5 @@
-from typing import Any, Literal
+from typing import Any, Literal, Optional
+
 
 from pydantic import BaseModel, Field
 
@@ -308,3 +309,35 @@ class QRScanResponse(BaseModel):
     summary: str = "No QR code detected"
     is_upi_payment: bool = False
     upi_details: dict | None = None
+
+
+# ─── Aadhaar QR Decode ────────────────────────────────────────────────────────
+
+class AadhaarDecodeRequest(BaseModel):
+    qr_data: str
+
+
+class AadhaarAddressResponse(BaseModel):
+    careOf: str = ""
+    district: str = ""
+    house: str = ""
+    locality: str = ""
+    pincode: str = ""
+    state: str = ""
+    street: str = ""
+    vtc: str = ""
+
+
+class AadhaarDecodeResponse(BaseModel):
+    success: bool
+    name: str = ""
+    dob: str = ""
+    gender: str = ""
+    uid_last4: str = ""
+    address: AadhaarAddressResponse = Field(default_factory=AadhaarAddressResponse)
+    email_linked: bool = False
+    mobile_linked: bool = False
+    format: str = "SECURE_QR"
+    signature_valid: Optional[bool] = None
+    photo_base64: Optional[str] = None
+    error: Optional[str] = None

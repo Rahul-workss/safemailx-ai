@@ -37,6 +37,9 @@ from server.readiness import build_readiness
 from server.repository import ScanRepository
 from server.scan_service import SCAN_STAGES, ScanService
 from server.schemas import (
+    AadhaarDecodeRequest,
+    AadhaarAddressResponse,
+    AadhaarDecodeResponse,
     DashboardResponse,
     ForgotPasswordRequest,
     GmailOAuthStartResponse,
@@ -1270,35 +1273,6 @@ def instant_scan_email(payload: InstantEmailScanRequest, _auth=Depends(require_a
     """
     return inline_scan_service.scan_email(payload, _user_id(_auth))
 
-
-class AadhaarDecodeRequest(BaseModel):
-    qr_data: str
-
-
-class AadhaarAddressResponse(BaseModel):
-    careOf: str = ""
-    district: str = ""
-    house: str = ""
-    locality: str = ""
-    pincode: str = ""
-    state: str = ""
-    street: str = ""
-    vtc: str = ""
-
-
-class AadhaarDecodeResponse(BaseModel):
-    success: bool
-    name: str = ""
-    dob: str = ""
-    gender: str = ""
-    uid_last4: str = ""
-    address: AadhaarAddressResponse = AadhaarAddressResponse()
-    email_linked: bool = False
-    mobile_linked: bool = False
-    format: str = "SECURE_QR"
-    signature_valid: Optional[bool] = None
-    photo_base64: Optional[str] = None
-    error: Optional[str] = None
 
 
 @app.post("/api/instant/aadhaar", response_model=AadhaarDecodeResponse)
