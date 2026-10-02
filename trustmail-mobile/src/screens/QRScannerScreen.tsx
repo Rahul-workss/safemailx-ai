@@ -286,7 +286,6 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
   const [torch, setTorch] = useState(false);
-  const cameraRef = useRef<any>(null);
 
 
   useEffect(() => {
@@ -438,23 +437,40 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
   }, [scanned]);
 
   // ── Capture still photo → backend pyzbar decode ───────────────────────────
-  // The live camera barcode scanner uses video frames (~1-2 MP, lossy) which
-  // fail on Aadhaar's Version-40 QR (thousands of tiny modules).
-  // Taking a still photo uses full sensor resolution (12–48 MP on modern phones),
-  // giving pyzbar on the backend the pixel density it needs to decode.
+  // WHY NOT cameraRef.takePictureAsync():
+  //   CameraView (expo-camera v17) is a class component that wires its own
+  //   internal _cameraRef. The public class ref doesn't reliably expose
+  //   takePictureAsync() in the current Expo SDK 54 build on Android.
+  //
+  // SOLUTION: ImagePicker.launchCameraAsync() — opens the native Android camera
+  //   app at full sensor resolution (12-48 MP). No internal ref needed.
+  //   The returned photo URI goes straight to scanQrCode() → backend pyzbar.
+  //   This is the same pipeline as gallery — just triggered from the camera.
   const handleCapture = useCallback(async () => {
-    if (!cameraRef.current) return;
     try {
-      setState('ANALYZING');
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 1.0,       // full quality — essential for dense QR
-        skipProcessing: true, // skip EXIF processing for speed
+      // Request camera permission if not already granted (usually already done)
+      const permResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permResult.granted) {
+        setError('Camera permission required to capture a photo.');
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 1.0,           // full sensor resolution — essential for dense QR
+        allowsEditing: false,   // no crop — QR must be complete
+        exif: false,
       });
 
+      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+
+      setState('ANALYZING');
+      const asset = pickerResult.assets[0];
+
       const res = await scanQrCode({
-        uri: photo.uri,
+        uri: asset.uri,
         name: 'qr_capture.jpg',
-        mimeType: 'image/jpeg',
+        mimeType: asset.mimeType || 'image/jpeg',
       });
 
       // ── Route through gov doc detector ───────────────────────────────────
@@ -472,7 +488,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
       }
 
       if (res.qr_codes_found === 0) {
-        setError('No QR code found in photo. Move closer, ensure good lighting, then tap 📷 again.');
+        setError('No QR code found. Hold the camera 10–15 cm from the QR, ensure good lighting, then try again.');
         setState('CAMERA');
         return;
       }
@@ -480,7 +496,7 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
       setResult(res);
       setState('VERDICT');
     } catch (e: any) {
-      setError(e.message || 'Capture failed. Try gallery instead.');
+      setError(e.message || 'Capture failed. Try the 🖼️ Gallery option instead.');
       setState('CAMERA');
     }
   }, []);
@@ -606,7 +622,6 @@ export default function QRScannerScreen({ onClose }: { onClose: () => void }) {
           <View style={{ flex: 1, overflow: 'hidden', borderRadius: 0 }}>
             {permission?.granted ? (
               <CameraView
-                ref={cameraRef}
                 style={{ flex: 1 }}
                 facing="back"
                 enableTorch={torch}
