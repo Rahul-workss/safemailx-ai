@@ -32,6 +32,7 @@ psycopg[binary]==3.3.2
 # Added for QR-code phishing (quishing) detection (Feature 1)
 # Note: also requires libzbar0 system package (see Dockerfile)
 pyzbar==0.1.9
+zxing-cpp
 
 # Feature 7: Voice/Vishing detection — OPTIONAL
 # Uncomment the lines below only when FEATURE_VISHING_DETECTION_ENABLED=true
