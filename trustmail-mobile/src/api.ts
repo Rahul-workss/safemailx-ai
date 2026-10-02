@@ -533,12 +533,14 @@ export async function scanQrCode(file: {
     name: file.name || "qr_scan.jpg",
     type: file.mimeType || "image/jpeg",
   } as any);
+  // 75s timeout — Render free tier takes 30-60s to cold-start when sleeping.
+  // The preprocessing pipeline also adds ~2-5s for PVC card images.
   const response = await apiFetch("/api/instant/qr", {
     method: "POST",
     headers: authHeaders(),
     body: form,
-  }, 30000);
-  if (!response.ok) throw new Error("QR scan failed");
+  }, 75000);
+  if (!response.ok) throw new Error(`QR scan failed (HTTP ${response.status})`);
   return response.json();
 }
 
