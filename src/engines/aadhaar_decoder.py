@@ -41,6 +41,7 @@ import zlib
 import base64
 import logging
 import math
+import io
 from typing import Optional
 
 logger = logging.getLogger("AADHAAR_DECODER")
@@ -50,6 +51,37 @@ FIELD_NAMES = [
     "careof", "district", "landmark", "house", "location",
     "pincode", "postoffice", "state", "street", "subdistrict", "vtc",
 ]
+
+
+def _convert_photo_to_jpeg_base64(photo_bytes: bytes) -> Optional[str]:
+    """
+    Convert Aadhaar photo bytes (JPEG-2000 / JP2 format) to standard JPEG
+    base64 that React Native's Image component can display.
+
+    Aadhaar Secure QR stores the face photo as JPEG-2000 (ISO 15444-1),
+    which most mobile image components cannot render natively. Pillow with
+    the OpenJPEG backend (libopenjp2 system library) can decode JP2 images.
+
+    If Pillow cannot decode the bytes (e.g., missing OpenJPEG on the server,
+    or the photo is actually a regular JPEG), this function falls back to
+    returning the raw bytes as base64 — the frontend will try to display it
+    as-is and may still succeed for regular JPEG photos.
+    """
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(photo_bytes))
+        buf = io.BytesIO()
+        # Convert to RGB (JP2 may be in other colour spaces like YCbCr)
+        img.convert("RGB").save(buf, format="JPEG", quality=90)
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as e:
+        logger.debug("[AADHAAR] JP2→JPEG conversion failed (%s), returning raw bytes", e)
+        # Fall back: return raw bytes as base64
+        # (regular JPEG photos will still display in React Native)
+        try:
+            return base64.b64encode(photo_bytes).decode("ascii")
+        except Exception:
+            return None
 
 
 def _decimal_to_bytes(decimal_str: str) -> bytes:
@@ -137,16 +169,16 @@ def decode_aadhaar_secure_qr(decimal_str: str) -> dict:
     uid_last4 = (data.get("referenceid", "") or "")[:4]
 
     # Step 7: Extract photo (bytes after last text field delimiter)
+    # The photo in Aadhaar Secure QR is stored as JPEG-2000 (JP2 format),
+    # which React Native's Image component cannot display natively.
+    # We use Pillow to convert JP2 → standard JPEG before sending to the app.
     photo_base64: Optional[str] = None
     num_text_fields = len(field_names)
     if num_text_fields < len(delimiters):
         photo_start = delimiters[num_text_fields] + 1
         photo_bytes = decompressed[photo_start:]
         if len(photo_bytes) > 100:
-            try:
-                photo_base64 = base64.b64encode(photo_bytes).decode("ascii")
-            except Exception:
-                pass
+            photo_base64 = _convert_photo_to_jpeg_base64(photo_bytes)
 
     gender_raw = data.get("gender", "")
     gender = "Male" if gender_raw == "M" else "Female" if gender_raw == "F" else "Transgender" if gender_raw == "T" else gender_raw
