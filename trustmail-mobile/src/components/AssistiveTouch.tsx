@@ -24,7 +24,6 @@ import {
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scanSms, scanUrl } from '../api';
@@ -83,9 +82,9 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
   const [onRight,    setOnRight]    = useState(true);
   const [sheet,      setSheet]      = useState<MenuAction | null>(null);
   const [linkText,   setLinkText]   = useState('');
+  const [clipText,   setClipText]   = useState('');  // paste-and-scan input
   const [verdict,    setVerdict]    = useState<ScanVerdict | null>(null);
   const [scanning,   setScanning]   = useState(false);
-  const [clipInfo,   setClipInfo]   = useState<{ text: string; type: ClipType } | null>(null);
 
   // ── Animations ──
   const bubbleScale  = useRef(new Animated.Value(1)).current;
@@ -139,7 +138,7 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       Animated.spring(bubbleScale, { toValue: 1, friction: 6,   useNativeDriver: true }),
       ...itemAnims.map(a => Animated.timing(a, { toValue: 0, duration: 110, useNativeDriver: true })),
     ]).start(() => setMenuOpen(false));
-    setVerdict(null); setClipInfo(null);
+    setVerdict(null);
   }, [itemAnims]);
 
   const dismissAll = useCallback(() => {
@@ -199,16 +198,23 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
     return { x: Math.cos(rad) * RADIUS * (onRight ? 1 : -1), y: -Math.abs(Math.sin(rad) * RADIUS) };
   }
 
-  // ── Clipboard scan ──
-  const handleClipboard = async () => {
-    closeMenu(); setScanning(true); setVerdict(null);
+  // ── Clipboard: open paste sheet (no native clipboard module needed) ──
+  const handleClipboard = () => {
+    closeMenu();
+    setClipText('');
+    setVerdict(null);
+    setSheet('clipboard');
+  };
+
+  // ── Clipboard paste scan (called from the sheet's button) ──
+  const handleClipScan = async () => {
+    if (!clipText.trim()) return;
+    Keyboard.dismiss(); setScanning(true); setVerdict(null);
     try {
-      const text = await Clipboard.getStringAsync();
-      if (!text.trim()) { setVerdict({ verdict: 'Empty Clipboard', score: 0, color: TM.frost3, detail: 'Nothing copied yet.' }); setScanning(false); return; }
+      const text = clipText.trim();
       const type = detectType(text);
-      setClipInfo({ text, type });
       if (type === 'url') {
-        const r = await scanUrl(text.trim());
+        const r = await scanUrl(text);
         const s = r.risk_score ?? 0;
         setVerdict({ verdict: s >= 70 ? 'PHISHING DETECTED' : s >= 40 ? 'SUSPICIOUS' : 'LIKELY SAFE', score: s, color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald, detail: `URL risk: ${s}/100` });
       } else if (type === 'upi') {
@@ -216,7 +222,7 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       } else if (type === 'phone') {
         setScanning(false); setSheet('whocalled'); return;
       } else {
-        const r = await scanSms(text.trim());
+        const r = await scanSms(text);
         const s = r.risk_score ?? 0;
         setVerdict({ verdict: s >= 70 ? 'SCAM TEXT' : s >= 40 ? 'SUSPICIOUS' : 'LOOKS SAFE', score: s, color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald, detail: `Scam likelihood: ${s}/100` });
       }
@@ -418,6 +424,69 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
         </View>
       )}
 
+      {/* ── Clipboard paste-and-scan sheet ── */}
+      {sheet === 'clipboard' && (
+        <View style={[S.sheetFloat, { top: sheetTop, right: sheetRight, left: sheetLeft, zIndex: 9001 }]}>
+          <View style={S.linkShell}>
+            <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 20 }]} />
+            <LinearGradient
+              colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.01)','rgba(255,255,255,0.00)','rgba(255,255,255,0.03)']}
+              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={S.linkShimmer} />
+            <View style={S.sheetHeader}>
+              <View style={[S.iconRing, { borderColor: 'rgba(0,240,255,0.5)', backgroundColor: TM.cyanDim }]}>
+                <Ionicons name="clipboard-outline" size={13} color="rgba(0,240,255,1)" />
+              </View>
+              <Text style={[S.sheetTitle, { color: 'rgba(0,240,255,1)' }]}>SCAN ANYTHING</Text>
+              <TouchableOpacity onPress={() => { setSheet(null); setVerdict(null); setClipText(''); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={18} color={TM.frost4} />
+              </TouchableOpacity>
+            </View>
+            <LinearGradient
+              colors={['transparent', TM.cyanBorder, 'transparent']}
+              start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+              style={{ height: 1, marginBottom: 8 }}
+            />
+            <Text style={{ color: TM.frost4, fontSize: 11, marginBottom: 10 }}>
+              Paste a link, UPI ID, phone number, or any suspicious text
+            </Text>
+            <View style={S.inputRow}>
+              <View style={S.inputWrap}>
+                <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFillObject} />
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.28)', borderRadius: 14 }]} />
+                <View style={S.inputShimmer} />
+                <TextInput
+                  style={S.input}
+                  placeholder="Paste here…"
+                  placeholderTextColor="rgba(242,234,253,0.25)"
+                  value={clipText}
+                  onChangeText={t => { setClipText(t); setVerdict(null); }}
+                  autoCapitalize="none"
+                  multiline={false}
+                  returnKeyType="go"
+                  onSubmitEditing={handleClipScan}
+                  autoFocus
+                />
+              </View>
+              <TouchableOpacity style={S.actionBtn} onPress={handleClipScan} activeOpacity={0.82}>
+                <LinearGradient colors={[TM.violetSoft, TM.violet, TM.ink3]} style={S.actionBtnGrad}>
+                  <Ionicons name={scanning ? 'refresh' : 'scan'} size={16} color={TM.frost} />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+            {verdict && (
+              <View style={[S.inlineResult, { borderColor: `${verdict.color}40`, backgroundColor: `${verdict.color}12` }]}>
+                <Text style={[S.inlineVerdict, { color: verdict.color }]}>{verdict.verdict}</Text>
+                <Text style={S.inlineDetail}>{verdict.detail}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
       {/* ── Who Called sheet ── */}
       {sheet === 'whocalled' && (
         <View style={[S.sheetFloat, { top: sheetTop, right: sheetRight, left: sheetLeft, zIndex: 9001 }]}>
@@ -425,7 +494,6 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
             visible={true}
             onClose={() => setSheet(null)}
             onOpenCallAnalyzer={() => { setSheet(null); onOpenCallAnalyzer(); }}
-            initialNumber={clipInfo?.type === 'phone' ? clipInfo.text : undefined}
           />
         </View>
       )}
@@ -436,7 +504,6 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
           <UpiVerifierSheet
             visible={true}
             onClose={() => setSheet(null)}
-            initialUpi={clipInfo?.type === 'upi' ? clipInfo.text : undefined}
           />
         </View>
       )}
