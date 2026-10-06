@@ -61,6 +61,7 @@ import {
 import { C, colors, verdictColor } from "./src/theme";
 import CallAnalyzerScreen from "./src/screens/CallAnalyzerScreen";
 import QRScannerScreen from "./src/screens/QRScannerScreen";
+import AssistiveTouch from "./src/components/AssistiveTouch";
 const { width: SW } = Dimensions.get("window");
 
 type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help" | "qr";
@@ -1087,6 +1088,15 @@ function App() {
       {/* ── Call Analyzer Modal ── */}
       {showCallAnalyzer && (
         <CallAnalyzerScreen onClose={() => setShowCallAnalyzer(false)} />
+      )}
+
+      {/* ── Assistive Touch Floating Button ── */}
+      {isVideoSplashFinished && !isRestoringSession && authState === "Signed in" && !showCallAnalyzer && (
+        <AssistiveTouch
+          isVisible={true}
+          onOpenCallAnalyzer={() => setShowCallAnalyzer(true)}
+          onOpenQRScanner={() => switchTab("qr")}
+        />
       )}
 
       {/* ── Video Splash Screen ── */}
