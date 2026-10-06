@@ -163,7 +163,7 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
         if (!isDragging.current) { isDragging.current = true; if (menuOpen) closeMenu(); }
       }
       if (!isDragging.current) return;
-      const minY = insets.top + 58;
+      const minY = insets.top + 110;
       const maxY = SH - insets.bottom - BUBBLE - 84;
       pan.setValue({
         x: Math.max(0, Math.min(SW - BUBBLE, posX.current + g.dx)),
@@ -177,7 +177,7 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
         menuOpen ? closeMenu() : openMenu();
         return;
       }
-      const minY = insets.top + 58;
+      const minY = insets.top + 110;
       const maxY = SH - insets.bottom - BUBBLE - 84;
       const newY = Math.max(minY, Math.min(maxY, posY.current + g.dy));
       const snapX = (posX.current + g.dx) > SW / 2 ? SW - BUBBLE - EDGE : EDGE;
@@ -189,13 +189,19 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
     },
   }), [menuOpen, openMenu, closeMenu, insets]);
 
-  // ── Fan item positions (semicircle arc upward) ──
+  // ── Fan item positions (edge-hugging 140° arc) ──
   function itemPos(i: number) {
-    const spread = 148;
-    const startAngle = onRight ? 180 + (90 - spread / 2) : -(90 - spread / 2);
-    const step = spread / (ITEMS.length - 1);
-    const rad  = ((startAngle + step * i) * Math.PI) / 180;
-    return { x: Math.cos(rad) * RADIUS * (onRight ? 1 : -1), y: -Math.abs(Math.sin(rad) * RADIUS) };
+    const spread = 140;
+    const startAngle = onRight ? 275 : 265;
+    const endAngle   = onRight ? startAngle - spread : startAngle + spread; 
+    
+    const step = (endAngle - startAngle) / (ITEMS.length - 1);
+    const rad = ((startAngle + step * i) * Math.PI) / 180;
+    
+    return {
+      x: Math.cos(rad) * RADIUS,
+      y: Math.sin(rad) * RADIUS,
+    };
   }
 
   // ── Clipboard: open paste sheet (no native clipboard module needed) ──
