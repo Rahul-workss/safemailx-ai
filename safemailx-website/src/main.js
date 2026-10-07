@@ -12,9 +12,9 @@ app.innerHTML = `
     <div class="ambient ambient-b"></div>
 
     <header class="topbar">
-      <a class="brand" href="#hero" aria-label="TrustMail AI home">
-        <img class="brand-logo-img" src="/logo.png" alt="TrustMail AI logo" width="36" height="36" />
-        <span class="brand-text">TrustMail AI</span>
+      <a class="brand" href="#hero" aria-label="SafeMailx AI home">
+        <img class="brand-logo-img" src="/logo.png" alt="SafeMailx AI logo" width="36" height="36" />
+        <span class="brand-text">SafeMailx AI</span>
       </a>
 
       <div class="topbar-actions">
@@ -69,7 +69,7 @@ app.innerHTML = `
         <div class="hero-copy">
           <p class="eyebrow">Coming soon</p>
           <h1>
-            TrustMail
+            SafeMailx
             <span>AI</span>
           </h1>
           <p class="hero-summary">
@@ -110,7 +110,7 @@ app.innerHTML = `
           <p class="eyebrow"><b>WHAT MAKES US UNIQUE</b></p>
           <h2>Designed to catch what ordinary filters can miss.</h2>
           <p>
-            Phishing can look legitimate and pass basic checks. TrustMail AI combines 
+            Phishing can look legitimate and pass basic checks. SafeMailx AI combines 
             three distinct local intelligence layers to find what others overlook.
           </p>
         </div>
@@ -129,7 +129,7 @@ app.innerHTML = `
             <span class="story-index">02</span>
             <h3>Attachment Forensics</h3>
             <p>
-              We don't just scan text. TrustMail AI dissects suspicious PDFs 
+              We don't just scan text. SafeMailx AI dissects suspicious PDFs 
               and Office documents, identifying hidden scripts and malicious macros.
             </p>
           </article>
@@ -139,7 +139,7 @@ app.innerHTML = `
             <h3>Zero Data Retention</h3>
             <p>
               Built for total sovereignty. All analysis happens locally. 
-              Your private communications never leave your machine or hit a TrustMail cloud.
+              Your private communications never leave your machine or hit a SafeMailx cloud.
             </p>
           </article>
 
@@ -147,7 +147,7 @@ app.innerHTML = `
             <span class="story-index">04</span>
             <h3>Evidence-Based Forensic Reports</h3>
             <p>
-              We don't just give an opinion. TrustMail AI generates a comprehensive 
+              We don't just give an opinion. SafeMailx AI generates a comprehensive 
               forensic report that breaks down every red flag, so you can see 
               exactly why an email was flagged.
             </p>
@@ -160,9 +160,9 @@ app.innerHTML = `
       <section class="waitlist-section" id="waitlist">
         <div class="waitlist-card">
           <p class="eyebrow">Join the waitlist</p>
-          <h2>Get the launch note when TrustMail AI is ready.</h2>
+          <h2>Get the launch note when SafeMailx AI is ready.</h2>
           <p class="waitlist-copy">
-            Join early access for TrustMail AI launch updates and private testing access.
+            Join early access for SafeMailx AI launch updates and private testing access.
           </p>
 
           <form class="waitlist-form" id="waitlist-form" method="POST">
@@ -201,7 +201,7 @@ app.innerHTML = `
         </div>
       </section>
       <footer class="site-footer" style="padding: 2rem; text-align: center; color: rgba(255,255,255,0.4); font-size: 0.9rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 4rem;">
-        <p>&copy; 2026 TrustMail AI. All rights reserved.</p>
+        <p>&copy; 2026 SafeMailx AI. All rights reserved.</p>
         <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 1.5rem;">
           <a href="/privacy.html" style="color: rgba(255,255,255,0.6); text-decoration: none;">Privacy Policy</a>
           <a href="/terms.html" style="color: rgba(255,255,255,0.6); text-decoration: none;">Terms of Service</a>

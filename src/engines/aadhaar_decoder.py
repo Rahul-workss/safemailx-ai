@@ -60,29 +60,11 @@ logger = logging.getLogger("AADHAAR_DECODER")
 # UIDAI verification tools. Verified SHA-256 fingerprint:
 # This certificate is valid for QR codes generated before UIDAI rotates their key.
 # Cards signed after the next key rotation will return signature_valid=None.
-_UIDAI_PUBLIC_KEY_PEM = b"""-----BEGIN CERTIFICATE-----
-MIIEjTCCAvWgAwIBAgIJALGfWhF0gVvUMA0GCSqGSIb3DQEBCwUAMF0xCzAJBgNV
-BAYTAklOMQswCQYDVQQIDAJERUwxDTALBgNVBAcMBE5FV0QxDTALBgNVBAoMBFVJ
-REEXDTALBGCXUDQMBFVJREEXGDAWBGNVBAMMDZV1aWRhaS5nb3YuaW4wHhcNMjEw
-MjI2MDYzMjQ4WhcNMjIwMjI2MDYzMjQ4WjBdMQswCQYDVQQGEwJJTjELMAkGA1UE
-CAwCREUxDTALBgNVBAcMBE5FV0QxDTALBgNVBAoMBFVJREExDTALBgNVBAsMBFVJ
-REEXGDAWBGNVBAMMDZV1aWRhaS5nb3YuaW4wggEiMA0GCSqGSIb3DQEBAQUAA4IB
-DwAwggEKAoIBAQCGFPAMPn+1zTDNMikXVS5iSRRpkJMK8RTQ2v0KTwFGJHWGDIeO
-0O3jlvdTKXGH0lJRsR5VxJuH8qNEirpbwt5l15yj4GwT3KWjCVMkGKKNE7lJCjP7
-dA+YM9/r7GgJL5W3K8vK5+UVdBYlzM4F5Y6n9e9bN9b8kEkWaV2YXKV5BPRD
-eObZWnKq1pD5JmqIW6mRGfr7WqHuGP4uEfQoWlGKJpW5BWa3GN4HiDJXSXlCJhGS
-m1oiI09qNEXr9NM/vvGkwG3S0VkMb3c7n4L5fHQM3UZ3X1z6K4N8W9P7b5OQV
-wPaHnE8LrJwHrDyV7SN1Q6LAgMBAAGjgZcwgZQwHQYDVR0OBBYEFNqDZ5BPRD
-1a3BNzHMp9G7TCKZPMB8GA1UdIwQYMBaAFNqDZ5BPRD1a3BNzHMp9G7TCKZPMDc
-GA1UdHwQwMC4wLKAqoCiGJmh0dHA6Ly9wa2kudWlkYWkuZ292LmluL0NSTHMvdWlk
-YWkuY3JsMA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgGGMA0GCSqGSIb3DQEB
-CwUAA4IBCwAEggEH7T9QK02EXsM1v8BVVXH1e7ItaYVa7LpSa0MH0HJQY7Ns5jtD
-p4UwCEZ5SfHy5WVGHhiR8CMKQY7cNKYgXfWlMXRjS7Q5lHn1SWK9p3A7g0oVpMl2
-VH1MNjzV5fL9aZMBLZFoP+0mSJm2w/T4JFUgH5z3wRGZnR9Xe8vk4E6y/L+H2vA0
-o1Nf5KZTMX7jrJjPdDMCIJ1qXyU5/gXhSaYO5VeJlbkIbCgUB9wJGfJ2TBuI9nSS
-Q+3g5Wy2IA9e65YJaD3/e4pBV9JK7SbCpJX2xCMUVS2RHcq7UbBxmJ8bxT5P3k8k
-yBR/XFcnKKFgaBOqBRUuMqBhvvgb
------END CERTIFICATE-----"""
+# ─── Official UIDAI Offline Public Key ─────────────────────────────────────────
+# We currently do not have the real UIDAI public key certificate.
+# The previous certificate placed here was invalid/hallucinated.
+# We extract the signature bytes but cannot verify them without the real key.
+_UIDAI_PUBLIC_KEY_PEM = None
 
 # RSA-2048 signature length in bytes
 _RSA_SIGNATURE_LENGTH = 256
@@ -91,42 +73,10 @@ _RSA_SIGNATURE_LENGTH = 256
 def _verify_uidai_signature(signed_data: bytes, signature: bytes) -> Optional[bool]:
     """
     Verify an Aadhaar QR RSA-2048 signature using the official UIDAI offline cert.
-
-    Returns:
-      True   — signature verified ✓ (card is cryptographically genuine)
-      False  — signature verification FAILED (tampered or fake card)
-      None   — cannot verify (cryptography library unavailable, or cert key
-               does not match this card's signing cert — likely newer UIDAI
-               key rotation; do NOT label as fake)
+    Currently returns None because the real public key is not available.
     """
-    try:
-        from cryptography import x509
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import padding
-        from cryptography.exceptions import InvalidSignature
-    except ImportError:
-        logger.warning("[AADHAAR] cryptography library not available — signature check skipped")
-        return None
-
-    try:
-        cert = x509.load_pem_x509_certificate(_UIDAI_PUBLIC_KEY_PEM)
-        public_key = cert.public_key()
-        public_key.verify(
-            signature,
-            signed_data,
-            padding.PKCS1v15(),
-            hashes.SHA256(),
-        )
-        logger.info("[AADHAAR] ✓ UIDAI RSA signature verified — card is genuine")
-        return True
-    except InvalidSignature:
-        logger.warning("[AADHAAR] ✗ UIDAI signature mismatch — card may be tampered/fake")
-        return False
-    except Exception as e:
-        # Key mismatch (wrong certificate version), cert parse error, etc.
-        # This is NOT a fake card — it likely means UIDAI rotated their key.
-        logger.debug("[AADHAAR] Signature check inconclusive (%s)", e)
-        return None
+    logger.debug("[AADHAAR] Real UIDAI public key not configured — signature check skipped")
+    return None
 
 
 FIELD_NAMES = [
