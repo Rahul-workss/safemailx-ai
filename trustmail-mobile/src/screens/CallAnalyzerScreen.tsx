@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Animated, BackHandler, Linking, Dimensions, Platform, Image,
-  TextInput, KeyboardAvoidingView, PermissionsAndroid, Alert,
+  TextInput, KeyboardAvoidingView, PermissionsAndroid, Alert, ActivityIndicator, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice/voice';
-import { analyzeCall, CallAnalysisResult } from '../api';
+import { analyzeCall, CallAnalysisResult, translateText } from '../api';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -1309,6 +1309,47 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
   const slideUp  = useRef(new Animated.Value(40)).current;
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const [displayScore, setDisplayScore] = useState(0);
+  
+  // Minimal UI & Translation state
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [showLangSheet, setShowLangSheet] = useState(false);
+  const [translatedMeans, setTranslatedMeans] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const SUPPORTED_LANGS = [
+    { code: 'en', name: 'English' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'bn', name: 'Bengali' },
+    { code: 'te', name: 'Telugu' },
+    { code: 'mr', name: 'Marathi' },
+    { code: 'ta', name: 'Tamil' },
+    { code: 'ur', name: 'Urdu' },
+    { code: 'gu', name: 'Gujarati' },
+    { code: 'kn', name: 'Kannada' },
+    { code: 'ml', name: 'Malayalam' },
+    { code: 'pa', name: 'Punjabi' },
+    { code: 'or', name: 'Odia' }
+  ];
+
+  const handleTranslate = async (langCode: string) => {
+    setShowLangSheet(false);
+    if (langCode === 'en') {
+      setTranslatedMeans(null); // revert to original
+      return;
+    }
+    if (!result.means_for_you) return;
+    
+    setIsTranslating(true);
+    try {
+      const translated = await translateText(result.means_for_you, langCode);
+      setTranslatedMeans(translated);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Translation failed', 'Could not translate text.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const isHighRisk = result.risk_band === 'HIGH RISK';
   const isCritical = result.risk_band === 'CRITICAL';
@@ -1358,32 +1399,6 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
           </View>
         </View>
 
-        {/* Why flagged */}
-        {result.why_flagged.length > 0 && (
-          <GlassCard accentColor={color} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
-              <Ionicons name="alert-circle" size={15} color={color} style={{ marginRight: 8 }} />
-              <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Why Flagged</Text>
-            </View>
-            {result.why_flagged.map((f, i) => (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 10, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: color }}>
-                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1, fontStyle: 'italic' }}>{f}</Text>
-              </View>
-            ))}
-          </GlassCard>
-        )}
-
-        {/* Recommended action */}
-        {result.recommended_action ? (
-          <GlassCard accentColor={C.cyan} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Ionicons name="checkmark-circle" size={15} color={C.cyan} style={{ marginRight: 8 }} />
-              <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Action</Text>
-            </View>
-            <Text style={{ color: '#fff', fontSize: 14, lineHeight: 21 }}>{result.recommended_action}</Text>
-          </GlassCard>
-        ) : null}
-
 
         {/* Analysis Summary — always shown (Qwen3-enhanced when live, deterministic fallback otherwise) */}
         {(result.plain_english || result.deterministic_explanation) ? (
@@ -1417,97 +1432,130 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
         {/* What This Means For You */}
         {result.means_for_you ? (
           <GlassCard accentColor={color} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Ionicons name="person" size={15} color={color} style={{ marginRight: 8 }} />
-              <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What This Means For You</Text>
-            </View>
-            <Text style={{ color: '#fff', fontSize: 14, lineHeight: 22 }}>
-              {result.means_for_you}
-            </Text>
-          </GlassCard>
-        ) : null}
-
-        {/* What They Might Do Next */}
-        {result.next_tactics && result.next_tactics.length > 0 && (
-          <GlassCard accentColor={C.rose} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Ionicons name="trending-up" size={15} color={C.rose} style={{ marginRight: 8 }} />
-              <Text style={{ color: C.rose, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What They Might Do Next</Text>
-            </View>
-            {result.next_tactics.map((tactic, i) => (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
-                <Text style={{ color: C.rose, marginRight: 8, fontSize: 14, marginTop: 1 }}>!</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{tactic}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="person" size={15} color={color} style={{ marginRight: 8 }} />
+                <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What This Means For You</Text>
               </View>
-            ))}
-          </GlassCard>
-        )}
-
-        {/* How To Verify Safely */}
-        {result.how_to_verify && result.how_to_verify.length > 0 && (
-          <GlassCard accentColor={C.green} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Ionicons name="shield-checkmark" size={15} color={C.green} style={{ marginRight: 8 }} />
-              <Text style={{ color: C.green, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>How To Verify Safely</Text>
-            </View>
-            {result.how_to_verify.map((step, i) => (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
-                <Text style={{ color: C.green, marginRight: 8, fontWeight: '700', fontSize: 14, minWidth: 18 }}>{i + 1}.</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{step}</Text>
-              </View>
-            ))}
-          </GlassCard>
-        )}
-
-        {/* Live Policy Fact-Check */}
-        {result.live_policy_check?.checked && (
-          <GlassCard
-            accentColor={result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold}
-            style={{ marginBottom: 16 }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Ionicons name="globe-outline" size={15} color={C.cyan} style={{ marginRight: 8 }} />
-              <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Live Web Verification</Text>
-              <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,212,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700' }}>TAVILY AI</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <View style={{
-                paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-                backgroundColor: result.live_policy_check.policy_allows === false ? 'rgba(255,61,113,0.15)' : result.live_policy_check.policy_allows === true ? 'rgba(52,199,89,0.15)' : 'rgba(255,170,0,0.15)',
-              }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold }}>
-                  {result.live_policy_check.policy_allows === false ? '⛔ POLICY PROHIBITS THIS' : result.live_policy_check.policy_allows === true ? '✅ POLICY ALLOWS THIS' : '⚠️ POLICY UNCLEAR'}
-                </Text>
-              </View>
-              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 8 }}>
-                {Math.round((result.live_policy_check.confidence || 0) * 100)}% conf
-              </Text>
-            </View>
-            {result.live_policy_check.verdict_text ? (
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>{result.live_policy_check.verdict_text}</Text>
-            ) : null}
-            {result.live_policy_check.source_url ? (
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} onPress={() => Linking.openURL(result.live_policy_check!.source_url!)}>
-                <Ionicons name="link-outline" size={13} color={C.cyan} style={{ marginRight: 5 }} />
-                <Text style={{ color: C.cyan, fontSize: 12, textDecorationLine: 'underline', flex: 1 }} numberOfLines={1}>
-                  {result.live_policy_check.source_label || result.live_policy_check.source_url}
-                </Text>
-                <Ionicons name="open-outline" size={13} color={C.cyan} style={{ marginLeft: 4 }} />
+              <TouchableOpacity onPress={() => setShowLangSheet(true)} style={{ padding: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12 }}>
+                <Ionicons name="language" size={16} color="#fff" />
               </TouchableOpacity>
-            ) : null}
-          </GlassCard>
-        )}
-
-        {/* Official callback */}
-        {result.official_callback_number ? (
-          <GlassCard accentColor={C.cyan} style={{ marginBottom: 24 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>Official Helpline</Text>
-            <Text style={{ color: C.cyan, fontSize: 20, fontWeight: '700' }}>{result.official_callback_number}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>Call this number to verify — not the number they gave you.</Text>
+            </View>
+            {isTranslating ? (
+              <ActivityIndicator size="small" color={color} style={{ marginVertical: 10 }} />
+            ) : (
+              <Text style={{ color: '#fff', fontSize: 14, lineHeight: 22 }}>
+                {translatedMeans || result.means_for_you}
+              </Text>
+            )}
           </GlassCard>
         ) : null}
+
+        <TouchableOpacity 
+          onPress={() => setShowMoreDetails(!showMoreDetails)}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, marginBottom: 16 }}
+        >
+          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600', marginRight: 6 }}>
+            {showMoreDetails ? 'Hide Details' : 'More Details'}
+          </Text>
+          <Ionicons name={showMoreDetails ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
+
+        {showMoreDetails && (
+          <View>
+            {/* Why flagged */}
+            {result.why_flagged.length > 0 && (
+              <GlassCard accentColor={color} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                  <Ionicons name="alert-circle" size={15} color={color} style={{ marginRight: 8 }} />
+                  <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Why Flagged</Text>
+                </View>
+                {result.why_flagged.map((f, i) => (
+                  <View key={i} style={{ flexDirection: 'row', marginBottom: 10, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: color }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1, fontStyle: 'italic' }}>{f}</Text>
+                  </View>
+                ))}
+              </GlassCard>
+            )}
+
+            {/* What They Might Do Next */}
+            {result.next_tactics && result.next_tactics.length > 0 && (
+              <GlassCard accentColor={C.rose} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <Ionicons name="trending-up" size={15} color={C.rose} style={{ marginRight: 8 }} />
+                  <Text style={{ color: C.rose, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What They Might Do Next</Text>
+                </View>
+                {result.next_tactics.map((tactic, i) => (
+                  <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+                    <Text style={{ color: C.rose, marginRight: 8, fontSize: 14, marginTop: 1 }}>!</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{tactic}</Text>
+                  </View>
+                ))}
+              </GlassCard>
+            )}
+
+            {/* Recommended action */}
+            {result.recommended_action ? (
+              <GlassCard accentColor={C.cyan} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <Ionicons name="checkmark-circle" size={15} color={C.cyan} style={{ marginRight: 8 }} />
+                  <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Recommended Action</Text>
+                </View>
+                <Text style={{ color: '#fff', fontSize: 14, lineHeight: 21 }}>{result.recommended_action}</Text>
+              </GlassCard>
+            ) : null}
+
+            {/* Live Policy Fact-Check */}
+            {result.live_policy_check?.checked && (
+              <GlassCard
+                accentColor={result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold}
+                style={{ marginBottom: 16 }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <Ionicons name="globe-outline" size={15} color={C.cyan} style={{ marginRight: 8 }} />
+                  <Text style={{ color: C.cyan, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Live Web Verification</Text>
+                  <View style={{ marginLeft: 'auto', backgroundColor: 'rgba(0,212,255,0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                    <Text style={{ color: C.cyan, fontSize: 9, fontWeight: '700' }}>TAVILY AI</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{
+                    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+                    backgroundColor: result.live_policy_check.policy_allows === false ? 'rgba(255,61,113,0.15)' : result.live_policy_check.policy_allows === true ? 'rgba(52,199,89,0.15)' : 'rgba(255,170,0,0.15)',
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: result.live_policy_check.policy_allows === false ? C.rose : result.live_policy_check.policy_allows === true ? C.green : C.gold }}>
+                      {result.live_policy_check.policy_allows === false ? '⛔ POLICY PROHIBITS THIS' : result.live_policy_check.policy_allows === true ? '✅ POLICY ALLOWS THIS' : '⚠️ POLICY UNCLEAR'}
+                    </Text>
+                  </View>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginLeft: 8 }}>
+                    {Math.round((result.live_policy_check.confidence || 0) * 100)}% conf
+                  </Text>
+                </View>
+                {result.live_policy_check.verdict_text ? (
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>{result.live_policy_check.verdict_text}</Text>
+                ) : null}
+                {result.live_policy_check.source_url ? (
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }} onPress={() => Linking.openURL(result.live_policy_check!.source_url!)}>
+                    <Ionicons name="link-outline" size={13} color={C.cyan} style={{ marginRight: 5 }} />
+                    <Text style={{ color: C.cyan, fontSize: 12, textDecorationLine: 'underline', flex: 1 }} numberOfLines={1}>
+                      {result.live_policy_check.source_label || result.live_policy_check.source_url}
+                    </Text>
+                    <Ionicons name="open-outline" size={13} color={C.cyan} style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                ) : null}
+              </GlassCard>
+            )}
+
+            {/* Official callback */}
+            {result.official_callback_number ? (
+              <GlassCard accentColor={C.cyan} style={{ marginBottom: 24 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>Official Helpline</Text>
+                <Text style={{ color: C.cyan, fontSize: 20, fontWeight: '700' }}>{result.official_callback_number}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>Call this number to verify — not the number they gave you.</Text>
+              </GlassCard>
+            ) : null}
+          </View>
+        )}
 
         {/* CTAs */}
         {isCritical && (
@@ -1522,6 +1570,32 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
           <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15 }}>Close</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Language Picker Modal */}
+      <Modal visible={showLangSheet} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: '#1a1d26', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: SCREEN_HEIGHT * 0.7 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>Select Language</Text>
+              <TouchableOpacity onPress={() => setShowLangSheet(false)}>
+                <Ionicons name="close" size={24} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {SUPPORTED_LANGS.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  onPress={() => handleTranslate(lang.code)}
+                  style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16 }}>{lang.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </Animated.View>
   );
 }

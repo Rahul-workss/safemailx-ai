@@ -799,3 +799,23 @@ export async function analyzeCall(params: {
   return response.json();
 }
 
+
+export async function translateText(text: string, targetLang: string): Promise<string> {
+  const url = `${apiBaseUrl}/api/translate`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ text, target_lang: targetLang }),
+    });
+    if (!response.ok) throw new Error('Translation request failed');
+    const data = await response.json();
+    return data.translated_text || text;
+  } catch (error) {
+    console.error('Translation error:', error);
+    return text;
+  }
+}

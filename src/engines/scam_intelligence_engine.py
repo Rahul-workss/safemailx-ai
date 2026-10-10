@@ -152,10 +152,9 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
 
     if is_bank and asked_otp:
         means = (
-            f"Your bank generates the OTP and sends it to YOU — which means they already know "
-            f"what it is. Any call asking you to read back the OTP is mathematically proven to "
-            f"NOT be your bank. This is someone who has initiated a fraudulent transaction and "
-            f"needs your OTP to complete it. Once they have it, the money is gone."
+            f"Your bank already knows your secret OTP code because they are the ones who sent it to you. "
+            f"If someone calls and asks you to tell them the OTP, they are a thief trying to steal your money. "
+            f"Never tell anyone your OTP."
         )
         tactics = [
             "They have already initiated a transaction on your account and are waiting for your OTP to authorise it.",
@@ -164,10 +163,8 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
         ]
     elif is_govt:
         means = (
-            f"Government agencies like {org or 'this authority'} do not call citizens. "
-            f"They communicate via registered post and official portals. "
-            f"Every single phone call claiming to be from a government authority is fraudulent by definition — "
-            f"regardless of how official they sound, what ID they claim to have, or how urgent they say it is."
+            f"Real police or government offices like {org or 'this one'} will never call you on the phone to scare you or ask for money. "
+            f"If someone calls and says you are in trouble or need to pay a fine, they are lying. They just want to scare you into giving them money."
         )
         tactics = [
             "They will escalate to threats of arrest, account freeze, or legal cases to create panic.",
@@ -176,10 +173,8 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
         ]
     elif asked_money:
         means = (
-            f"No legitimate company asks you to transfer money on a phone call. "
-            f"This is the 'safe account' scam — the caller will direct you to move your own savings "
-            f"to an account they control, claiming it is for your protection. "
-            f"Once transferred, the money is irretrievable."
+            f"A real company will never ask you to send money to a 'safe account' over a phone call. "
+            f"If you send the money, it goes straight to the thief and you cannot get it back."
         )
         tactics = [
             "They will give you a bank account number to transfer to, claiming it is a 'safe' or 'secure' RBI account.",
@@ -188,9 +183,8 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
         ]
     elif asked_app:
         means = (
-            f"Installing an app at a caller's request gives them full real-time view of your phone screen. "
-            f"They can watch you open your banking app, capture your credentials, and initiate transfers "
-            f"while pretending to 'fix a problem' — all without you knowing."
+            f"If you install the app they are asking you to, the caller will be able to see everything on your phone screen. "
+            f"They will watch you open your bank app and steal your passwords."
         )
         tactics = [
             "They will guide you to open your banking app while watching your screen in real time.",
@@ -199,9 +193,8 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
         ]
     elif asked_card:
         means = (
-            f"Sharing full card details (number, expiry, CVV) over a phone call gives the caller "
-            f"everything they need to make fraudulent online purchases or transfers from your account. "
-            f"No bank or payment company ever needs your card details over a call — they already have them."
+            f"Your bank already has your card details. If a caller asks for your card number or CVV, "
+            f"they are trying to use your card to buy things online. Do not tell them."
         )
         tactics = [
             "They will use your card details immediately to make online purchases or transfer funds.",
@@ -209,9 +202,8 @@ def _build_contextual_advice(org, actions, warnings) -> dict:
         ]
     else:
         means = (
-            f"Legitimate callers from real organisations never pressure you on a call. "
-            f"You can always hang up and call back using the official number from the "
-            f"organisation's own website or the back of your card — not the number they gave you."
+            f"Real companies will not force you to stay on the phone. "
+            f"It is always safer to hang up. You can call the real company back using the number on their official website."
         )
         tactics = [
             "They may call repeatedly to wear down your resistance if you do not comply immediately.",

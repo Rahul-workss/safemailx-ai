@@ -1544,6 +1544,43 @@ async def analyze_call_description(
     return CallAnalysisResponse(**result)
 
 
+@app.post("/api/translate")
+async def translate_text(request: Request):
+    """
+    Translates English text to a supported local language.
+    Body format: {"text": "...", "target_lang": "hi"}
+    """
+    try:
+        from deep_translator import GoogleTranslator, MyMemoryTranslator
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Translator library not installed on server.")
+
+    try:
+        data = await request.json()
+        text = data.get("text", "").strip()
+        target_lang = data.get("target_lang", "hi")
+        
+        if not text or target_lang == 'en':
+            return {"translated_text": text}
+            
+        try:
+            translated = GoogleTranslator(source='en', target=target_lang).translate(text)
+        except Exception as e:
+            # Fallback to MyMemory
+            try:
+                # MyMemory expects e.g., 'hi-IN' for Hindi
+                mm_lang = target_lang + "-IN" if target_lang in ["hi", "bn", "te", "mr", "ta", "ur", "gu", "kn", "ml", "pa", "or"] else target_lang
+                translated = MyMemoryTranslator(source='en', target=mm_lang).translate(text)
+            except Exception as e2:
+                raise e # raise original google error if fallback fails
+                
+        return {"translated_text": translated}
+    except Exception as e:
+        import logging
+        logging.getLogger("APP").error(f"Translation failed: {e}")
+        raise HTTPException(status_code=500, detail="Translation failed")
+
+
 
 import urllib.request
 import xml.etree.ElementTree as ET

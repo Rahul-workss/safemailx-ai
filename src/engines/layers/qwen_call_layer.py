@@ -48,7 +48,7 @@ Use exactly one of: "SAFE" | "SUSPICIOUS" | "HIGH RISK" | "CRITICAL"
 
 == PERSONALISATION RULES ==
 - In plain_english: Quote or reference SPECIFIC things from the transcript (e.g. "You mentioned the caller said 'your account will be frozen' — this is the classic fear-induction tactic used in bank impersonation scams to create panic.")
-- In means_for_you: Use the ACTUAL org name claimed + ACTUAL action requested. Explain concretely why THIS specific request from THIS specific caller is dangerous (not generic advice).
+- In means_for_you: Write this in extremely simple, non-technical language. Explain the danger as if you are speaking to a child or an elderly person with no tech knowledge. No jargon. Use the ACTUAL org name claimed.
 - In next_tactics: Be specific to the detected tactic. If it is OTP harvesting: "They have already initiated a transaction and are waiting for your OTP to authorise the transfer." If digital arrest: "They will escalate to a fake senior officer or 'court video call' to increase panic."
 
 == OUTPUT FORMAT ==
