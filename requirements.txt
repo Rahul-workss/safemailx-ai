@@ -43,3 +43,4 @@ zxing-cpp
 # ffmpeg-python==0.2.0  # also needs system ffmpeg (see Dockerfile comment)
 tavily-python>=0.5.0
 lxml>=5.0.0
+deep-translator
