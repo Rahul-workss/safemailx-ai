@@ -6,7 +6,7 @@
 
 **AI-Powered Phishing, Scam & Identity Threat Detection Platform**
 
-A production-grade, multi-layer cybersecurity platform that detects phishing, smishing, vishing, malicious QR codes, scam calls, and identity fraud — across email, SMS, calls, files, QR codes, and web. Powered by a hybrid AI pipeline of rule-based heuristics, TF-IDF/ML scoring, Whisper audio transcription, and a locally-hosted Qwen 2.5 LLM.
+A production-grade, multi-layer cybersecurity platform that detects phishing, smishing, vishing, malicious QR codes, scam calls, and identity fraud — across email, SMS, calls, files, QR codes, and web. Powered by a hybrid AI pipeline of rule-based heuristics, TF-IDF/ML scoring, Whisper audio transcription, and a locally-hosted **Qwen3-8B** LLM with thinking mode.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -109,17 +109,18 @@ The platform has evolved from a phishing email detector into a comprehensive **m
 │          │  │  Layer 2: TF-IDF + ML Model         │   │             │
 │          │  │  (scikit-learn logistic regression) │   │             │
 │          │  ├─────────────────────────────────────┤   │             │
-│          │  │  Layer 3: LLM (Qwen 2.5 7B)         │   │             │
+│          │  │  Layer 3: LLM (Qwen3-8B)           │   │             │
 │          │  │  via LM Studio / OpenAI-compat API  │   │             │
+│          │  │  + Thinking Mode (±0.20 score guard) │   │             │
 │          │  ├─────────────────────────────────────┤   │             │
-│          │  │  Ensemble Scoring + Smart Veto       │   │             │
+│          │  │  Ensemble Scoring + Dynamic Weights  │   │             │
 │          │  └─────────────────────────────────────┘   │             │
 │          └────────────────────────────────────────────┘             │
 │                                                                       │
 │  ┌──────────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
 │  │  QR Analyzer     │  │ Vishing Analyzer│  │ Scam Intelligence   │  │
-│  │  (ZXing+pyzbar+  │  │ (Whisper STT + │  │ (Call + SMS fraud   │  │
-│  │   OpenCV+ZBar)   │  │  LLM scoring)  │  │  pattern matching)  │  │
+│  │  (ZXing+pyzbar+  │  │ (Whisper STT + │  │ (7-layer call engine│  │
+│  │   OpenCV+ZBar)   │  │  Qwen3 scoring) │  │  + Tavily live web) │  │
 │  └──────────────────┘  └────────────────┘  └─────────────────────┘  │
 │                                                                       │
 │  ┌────────────────┐  ┌───────────┐  ┌────────────────────────────┐  │
@@ -130,7 +131,7 @@ The platform has evolved from a phishing email detector into a comprehensive **m
                            │
             ┌──────────────▼──────────────┐
             │   LM Studio (local/tunnel)   │
-            │   Qwen 2.5 7B Instruct 1M   │
+            │   Qwen3-8B (thinking mode)   │
             │   OpenAI-compatible API      │
             └─────────────────────────────┘
 ```
@@ -166,12 +167,12 @@ Input Content
       │
       ▼
 ┌─────────────────────────────────────┐
-│  LAYER 3 — LLM Analysis (Qwen 2.5) │
-│  • Forensic 3-phase reasoning       │
-│  • Intent classification            │
+│  LAYER 3 — LLM Analysis (Qwen3-8B)  │
+│  • Thinking mode deep reasoning     │
+│  • Personalised vishing analysis    │
 │  • Social engineering tactic ID     │
-│  • Urgency / legitimacy scoring     │
-│  Score: 0.0 – 1.0                  │
+│  • ELI5 non-technical explanations  │
+│  Score: 0.0 – 1.0 (±0.20 guard)    │
 │  Fallback: graceful (if offline)    │
 └─────────────────────────────────────┘
       │
@@ -242,13 +243,14 @@ Camera / Uploaded Image
 
 ### Backend Engines
 
-- **Hybrid AI Detection** — 3-layer pipeline (Rules → TF-IDF ML → Qwen 2.5 LLM) with ensemble scoring
+- **Hybrid AI Detection** — 3-layer pipeline (Rules → TF-IDF ML → Qwen3-8B LLM with thinking mode) with ensemble scoring and dynamic weights per input mode
 - **Instant Scan Endpoints** — synchronous SMS, URL, email, and file scans with sub-second response
 - **Async Queue Processing** — Redis-backed worker for heavy Gmail and manual text scans
 - **QR Code Analysis Engine** — multi-decoder (ZXing + pyzbar + OpenCV), multi-strategy preprocessing, handles PVC card photos taken by phone camera
 - **Aadhaar Secure QR Decoder** — parses UIDAI's big-integer gzip QR format; extracts name, DOB, gender, address, masked UID, email/mobile link status, and JPEG photo; all offline, no PII stored
-- **Scam Intelligence Engine** — classifies calls and messages against Indian cybercrime archetypes (CBI/digital-arrest, OTP scam, KYC freeze, lottery/prize, fake tech support, etc.)
-- **Vishing / Audio Analyzer** — Whisper-powered audio transcription; threat-scores call recordings or typed call descriptions using LLM
+- **Scam Intelligence Engine (7-Layer)** — classifies calls and messages across 7 detection layers (Policy Verification, Manipulation Detection, Script Matching, Isolation Signal, Qwen3-8B Thinking, Live Web Search via Tavily, Parallel Coordination) with dynamic risk bands (SAFE/SUSPICIOUS/HIGH RISK/CRITICAL)
+- **Vishing / Audio Analyzer** — Whisper-powered audio transcription; threat-scores call recordings or typed call descriptions using Qwen3-8B. Includes Tavily live policy fact-checking
+- **Translation API** — `POST /api/translate` endpoint powered by `deep-translator` (Google Translate + MyMemory fallback) for translating call analysis explanations into 12 major Indian languages
 - **URL Analysis** — full redirect chain resolution, domain age (RDAP), entropy, typosquatting (Levenshtein), punycode/homograph detection, IP-based URL detection
 - **External Threat Intel** — optional Google Safe Browsing, VirusTotal, IPQualityScore integration
 - **OCR Support** — Tesseract-powered image/screenshot analysis for visual phishing detection
@@ -378,7 +380,15 @@ safemailx-ai/
 ├── src/                              # Python backend source
 │   ├── engines/                      # Detection engine modules
 │   │   ├── hybrid_engine.py          # 3-layer pipeline orchestrator
-│   │   ├── llm_analyzer.py           # Qwen 2.5 / LM Studio integration
+│   │   ├── llm_analyzer.py           # Qwen3-8B / LM Studio integration (email/SMS)
+│   │   ├── scam_intelligence_engine.py # 7-layer call scoring + dynamic weights
+│   │   ├── layers/                   # Call analyzer sub-layers
+│   │   │   ├── qwen_call_layer.py    # Qwen3-8B vishing analysis + ELI5 output
+│   │   │   ├── policy_verification.py # Org legitimacy + action-based scoring
+│   │   │   ├── manipulation_detector.py # Fear/urgency tactic detection
+│   │   │   ├── script_matcher.py     # Known scam script pattern matching
+│   │   │   ├── isolation_detector.py # "Don't tell anyone" isolation signals
+│   │   │   └── live_policy_agent.py  # Tavily live web policy fact-checking
 │   │   ├── instant_scan_engine.py    # Fast sync scan engine (SMS, URL, file, QR)
 │   │   ├── rule_engine.py            # Heuristic rule evaluation
 │   │   ├── url_analyzer.py           # URL reputation + redirect analysis
@@ -388,7 +398,6 @@ safemailx-ai/
 │   │   ├── qr_analyzer.py            # QR multi-decoder + preprocessing pipeline
 │   │   ├── aadhaar_decoder.py        # UIDAI Secure QR offline parser
 │   │   ├── vishing_analyzer.py       # Whisper audio transcription + call scoring
-│   │   ├── scam_intelligence_engine.py # Indian cybercrime pattern classifier
 │   │   ├── domain_trust_arbiter.py   # Domain reputation system
 │   │   ├── adaptive_trust_engine.py  # Per-sender behavioral baseline
 │   │   ├── campaign_correlator.py    # Cross-scan campaign linkage
@@ -410,7 +419,7 @@ safemailx-ai/
 │   │   ├── scan_service.py           # Scan orchestration service
 │   │   ├── inline_scan_service.py    # Sync instant scan service
 │   │   ├── repository.py             # Database access layer
-│   │   ├── schemas.py                # Pydantic request/response models
+│   │   ├── schemas.py                # Pydantic models (incl. CallAnalysisResponse with confidence, ELI5 fields)
 │   │   ├── auth.py                   # JWT authentication
 │   │   ├── gmail_oauth.py            # Gmail OAuth 2.0 flow
 │   │   ├── gmail_watcher.py          # Gmail label poll watcher
@@ -421,6 +430,9 @@ safemailx-ai/
 │   │   ├── queue.py                  # Redis queue interface
 │   │   ├── health.py                 # /health endpoint
 │   │   └── settings.py               # Server configuration
+│   │
+│   ├── test_call_engine.py           # Standalone call engine regression tests (6 scenarios)
+│   └── test_qwen3_live.py            # Qwen3 live integration test
 │   │
 │   └── utils/
 │       └── config.py                 # Centralized env config
@@ -573,10 +585,10 @@ SAFEMAILX_REQUIRE_AUTH=true
 SAFEMAILX_ADMIN_EMAIL=admin@yourdomain.com
 SAFEMAILX_ADMIN_PASSWORD=strong-password-here
 
-# ─── LLM (Qwen 2.5 via LM Studio) ───────────────────────────
+# ─── LLM (Qwen3-8B via LM Studio) ───────────────────────────
 LLM_BASE_URL=http://host.docker.internal:1234/v1/chat/completions
 LLM_PROVIDER=openai
-LLM_MODEL=qwen2.5-7b-instruct-1m
+LLM_MODEL=qwen3-8b
 LLM_TIMEOUT=300
 
 # ─── OCR ──────────────────────────────────────────────────────
@@ -620,18 +632,21 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 ## LLM Integration
 
-SafeMail X AI uses **Qwen 2.5 7B Instruct** as its deep reasoning layer via an OpenAI-compatible API.
+SafeMail X AI uses **Qwen3-8B** as its deep reasoning layer via an OpenAI-compatible API served by LM Studio. Qwen3 runs with **thinking mode enabled** for deeper, more accurate threat analysis.
 
 ### Setup with LM Studio (Local)
 
 1. Download [LM Studio](https://lmstudio.ai/)
-2. Load the `qwen2.5-7b-instruct-1m` model
-3. Start the local server on port `1234`
-4. Set in `.env`:
+2. Load the `qwen3-8b` model (search "Qwen3 8B" in the Discover tab)
+3. Enable **"Thinking mode"** in the model settings for best results
+4. Start the local server on port `1234`
+5. Set in `.env`:
    ```env
    LLM_BASE_URL=http://127.0.0.1:1234/v1/chat/completions
-   LLM_MODEL=qwen2.5-7b-instruct-1m
+   LLM_MODEL=qwen3-8b
    ```
+
+> **Note:** Qwen3 thinking mode requires `max_tokens=3000` minimum and a timeout of at least 120 seconds. The Call Analyzer is pre-configured for this.
 
 ### Setup for Cloud Deployment (Railway, Render, etc.)
 
@@ -662,6 +677,7 @@ If LLM is offline:
 - Scan completes and returns results
 - Response includes `"llm_available": false`
 - Mobile UI shows `Qwen –` indicator
+- Call Analyzer uses deterministic ELI5 templates (still fully personalised via transcript scanning)
 
 ---
 
@@ -709,6 +725,7 @@ Full interactive docs available at `/docs` (Swagger UI) when running.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/voice/analyze-call` | Analyze call description or audio transcript for vishing/scam |
+| `POST` | `/api/translate` | Translate text into any of 12 Indian languages (Google/MyMemory fallback) |
 
 ### Full Scans (Async Queue)
 | Method | Endpoint | Description |
@@ -799,6 +816,12 @@ python -m compileall src tests
 
 # Quick smoke test
 curl -s http://localhost:8080/api/health | python -m json.tool
+
+# Call Analyzer regression tests (6 scenarios — no server needed)
+python src/test_call_engine.py
+
+# Qwen3 live integration test (requires LM Studio running)
+python src/test_qwen3_live.py
 ```
 
 ### Mobile Tests
@@ -821,10 +844,13 @@ npx tsc --noEmit
 - [ ] Connect Gmail and run label scan
 - [ ] Download a PDF report
 - [ ] Register push notification token
-- [ ] Verify LLM shows `"llm_available": true`
+- [ ] Verify LLM shows `"llm_available": true` (Qwen3 via LM Studio)
 - [ ] Scan a QR code via the QR Scanner (Scan QR mode)
 - [ ] Scan an Aadhaar QR code (Verify Document mode)
-- [ ] Describe a suspicious call in the Call Analyzer
+- [ ] Describe a suspicious call in the Call Analyzer (structured chips)
+- [ ] Voice transcript call analysis (speak or type a scenario)
+- [ ] Tap globe icon and translate "What This Means For You" to Hindi
+- [ ] Expand "More Details" toggle on call analysis result
 - [ ] Verify smart cross-mode QR routing modal
 
 ---
@@ -870,7 +896,7 @@ Scopes: engine, api, mobile, auth, llm, ui, qr, call
 
 ## License
 
-[MIT](LICENSE) © 2025 SafeMail X AI Contributors
+[MIT](LICENSE) © 2026 SafeMail X AI Contributors
 
 ---
 
