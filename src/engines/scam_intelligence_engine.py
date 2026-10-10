@@ -342,7 +342,7 @@ def analyze(input_data: dict) -> dict:
             rule_results=layer_results,
             rule_final_score=final_score,
             hard_floors_triggered=hard_floors_triggered,
-            timeout=55,
+            timeout=120,
         )
 
     def _run_live_policy():
@@ -358,7 +358,7 @@ def analyze(input_data: dict) -> dict:
         f_qwen   = ex.submit(_run_qwen)
         f_policy = ex.submit(_run_live_policy)
         try:
-            qwen_result        = f_qwen.result(timeout=62)
+            qwen_result        = f_qwen.result(timeout=130)
         except Exception as e:
             logger.warning("[SCAM_INTEL] Qwen3 stage error: %s", e)
         try:

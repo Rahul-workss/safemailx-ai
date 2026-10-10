@@ -73,20 +73,20 @@ def _get_llm_cfg():
             "base_url": cfg.get("base_url", "http://127.0.0.1:1234/v1/chat/completions"),
             "model":    cfg.get("model", "qwen3-8b"),
             "thinking": cfg.get("thinking", True),
-            "max_tokens": min(cfg.get("max_tokens", 3200), 2000),
+            "max_tokens": min(cfg.get("max_tokens", 4000), 3000),  # enough for thinking + expanded JSON
         }
     except Exception:
         pass
     try:
         from utils.config import LLM_BASE_URL, LLM_MODEL, LLM_ENABLE_THINKING
         return {"base_url": LLM_BASE_URL, "model": LLM_MODEL,
-                "thinking": LLM_ENABLE_THINKING, "max_tokens": 1800}
+                "thinking": LLM_ENABLE_THINKING, "max_tokens": 2500}
     except Exception:
         return {"base_url": "http://127.0.0.1:1234/v1/chat/completions",
-                "model": "qwen3-8b", "thinking": True, "max_tokens": 1800}
+                "model": "qwen3-8b", "thinking": True, "max_tokens": 2500}
 
 
-def _call_qwen3(user_message, timeout=55):
+def _call_qwen3(user_message, timeout=120):
     cfg = _get_llm_cfg()
     payload = {
         "model":       cfg["model"],
@@ -145,7 +145,7 @@ def _parse_json(content):
 
 def analyze_with_qwen(transcript, org_claimed, actions_requested, warning_phrases,
                       rule_results, rule_final_score, hard_floors_triggered,
-                      timeout=55):
+                      timeout=120):
     layers_lines = []
     for name, res in rule_results.items():
         score = res.get("score", 0.0)
