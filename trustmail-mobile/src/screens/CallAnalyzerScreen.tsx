@@ -1310,10 +1310,12 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
   const scoreAnim = useRef(new Animated.Value(0)).current;
   const [displayScore, setDisplayScore] = useState(0);
 
+  const isHighRisk = result.risk_band === 'HIGH RISK';
   const isCritical = result.risk_band === 'CRITICAL';
   const isSafe     = result.risk_band === 'SAFE';
-  const color      = isCritical ? C.rose : (isSafe ? C.green : C.gold);
-  const label      = isCritical ? '🔴 CRITICAL — SCAM' : (isSafe ? '🟢 SAFE' : '🟡 SUSPICIOUS');
+  const ORANGE     = '#FF6B00';
+  const color      = isCritical ? C.rose : isHighRisk ? ORANGE : isSafe ? C.green : C.gold;
+  const label      = isCritical ? '🔴 CRITICAL — SCAM' : isHighRisk ? '🟠 HIGH RISK' : isSafe ? '🟢 SAFE' : '🟡 SUSPICIOUS';
 
   useEffect(() => {
     Animated.parallel([
@@ -1329,18 +1331,31 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
     <Animated.View style={{ flex: 1, opacity: fadeIn, transform: [{ translateY: slideUp }] }}>
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
-        {/* Score ring */}
+        {/* Score ring + confidence bar */}
         <View style={{ alignItems: 'center', marginBottom: 28 }}>
           <View style={{
             width: 130, height: 130, borderRadius: 65,
             backgroundColor: `${color}18`, borderWidth: 2.5, borderColor: color,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: color, shadowRadius: 28, shadowOpacity: 0.6, marginBottom: 16,
+            shadowColor: color, shadowRadius: 28, shadowOpacity: 0.6, marginBottom: 14,
           }}>
-            <Text style={{ fontSize: 38, fontWeight: '800', color }}>{displayScore}</Text>
-            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5 }}>RISK SCORE</Text>
+            <Text style={{ fontSize: 42, fontWeight: '900', color }}>{displayScore}</Text>
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.5 }}>RISK SCORE</Text>
           </View>
-          <Text style={{ fontSize: 20, fontWeight: '800', color, letterSpacing: 0.5 }}>{label}</Text>
+          <Text style={{ fontSize: 20, fontWeight: '800', color, letterSpacing: 0.5, marginBottom: 14 }}>{label}</Text>
+          {/* Confidence bar */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', width: '82%', gap: 10 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.38)', fontSize: 11, width: 74 }}>Confidence</Text>
+            <View style={{ flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3 }}>
+              <View style={{
+                width: `${Math.round((result.confidence_score || 0) * 100)}%` as any,
+                height: 5, backgroundColor: color, borderRadius: 3,
+              }} />
+            </View>
+            <Text style={{ color, fontSize: 12, fontWeight: '700', width: 36, textAlign: 'right' }}>
+              {Math.round((result.confidence_score || 0) * 100)}%
+            </Text>
+          </View>
         </View>
 
         {/* Why flagged */}
@@ -1369,20 +1384,23 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
           </GlassCard>
         ) : null}
 
-        {/* Qwen3 AI Explanation */}
-        {result.plain_english ? (
+
+        {/* Analysis Summary — always shown (Qwen3-enhanced when live, deterministic fallback otherwise) */}
+        {(result.plain_english || result.deterministic_explanation) ? (
           <GlassCard accentColor={C.violet} style={{ marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
               <Ionicons name="hardware-chip" size={15} color={C.violet} style={{ marginRight: 8 }} />
-              <Text style={{ color: C.violet, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>AI Analysis</Text>
+              <Text style={{ color: C.violet, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Analysis Summary</Text>
               {result.qwen_available && (
                 <View style={{ marginLeft: 8, backgroundColor: 'rgba(140,82,255,0.15)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                  <Text style={{ color: C.violet, fontSize: 9, fontWeight: '700' }}>QWEN3 THINKING</Text>
+                  <Text style={{ color: C.violet, fontSize: 9, fontWeight: '700' }}>AI ENHANCED</Text>
                 </View>
               )}
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 21 }}>{result.plain_english}</Text>
-            {result.tactics_detected && result.tactics_detected.length > 0 && (
+            <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 13, lineHeight: 21 }}>
+              {result.plain_english || result.deterministic_explanation}
+            </Text>
+            {result.tactics_detected && result.tactics_detected.filter(t => t !== 'none_detected').length > 0 && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 6 }}>
                 {result.tactics_detected.filter(t => t !== 'none_detected').map((tactic, i) => (
                   <View key={i} style={{ backgroundColor: 'rgba(255,61,113,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,61,113,0.3)' }}>
@@ -1395,6 +1413,51 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
             )}
           </GlassCard>
         ) : null}
+
+        {/* What This Means For You */}
+        {result.means_for_you ? (
+          <GlassCard accentColor={color} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="person" size={15} color={color} style={{ marginRight: 8 }} />
+              <Text style={{ color, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What This Means For You</Text>
+            </View>
+            <Text style={{ color: '#fff', fontSize: 14, lineHeight: 22 }}>
+              {result.means_for_you}
+            </Text>
+          </GlassCard>
+        ) : null}
+
+        {/* What They Might Do Next */}
+        {result.next_tactics && result.next_tactics.length > 0 && (
+          <GlassCard accentColor={C.rose} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="trending-up" size={15} color={C.rose} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.rose, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>What They Might Do Next</Text>
+            </View>
+            {result.next_tactics.map((tactic, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+                <Text style={{ color: C.rose, marginRight: 8, fontSize: 14, marginTop: 1 }}>!</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{tactic}</Text>
+              </View>
+            ))}
+          </GlassCard>
+        )}
+
+        {/* How To Verify Safely */}
+        {result.how_to_verify && result.how_to_verify.length > 0 && (
+          <GlassCard accentColor={C.green} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="shield-checkmark" size={15} color={C.green} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.green, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>How To Verify Safely</Text>
+            </View>
+            {result.how_to_verify.map((step, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+                <Text style={{ color: C.green, marginRight: 8, fontWeight: '700', fontSize: 14, minWidth: 18 }}>{i + 1}.</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{step}</Text>
+              </View>
+            ))}
+          </GlassCard>
+        )}
 
         {/* Live Policy Fact-Check */}
         {result.live_policy_check?.checked && (

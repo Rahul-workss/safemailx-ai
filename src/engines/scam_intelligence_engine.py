@@ -1,7 +1,7 @@
 """
 SafeMailX — Scam Intelligence Engine
 Coordinates the 7-layer rule pipeline + Qwen3 arbiter + Live Policy Agent.
-Used by the Hold + Describe feature.
+Used by the Hold + Describe feature. ISOLATED from the email/SMS scan pipeline.
 """
 import logging
 import concurrent.futures
@@ -17,7 +17,7 @@ from engines.layers import (
     conversation_dynamics,
 )
 
-# Stage 3: Qwen3 thinking-mode arbiter (grey-zone only)
+# Stage 3: Qwen3 thinking-mode arbiter
 try:
     from engines.layers.qwen_call_layer import analyze_with_qwen
     _QWEN_AVAILABLE = True
@@ -25,7 +25,7 @@ except ImportError:
     _QWEN_AVAILABLE = False
     def analyze_with_qwen(*a, **kw): return None  # type: ignore
 
-# Stage 4: Live policy fact-checker (web search + scrape + Qwen3)
+# Stage 4: Live policy fact-checker
 try:
     from engines.layers import live_policy_agent
     _LIVE_POLICY_AVAILABLE = True
@@ -35,8 +35,21 @@ except ImportError:
 
 logger = logging.getLogger("SCAM_INTELLIGENCE")
 
-# Layer weights (must sum to 1.0)
-LAYER_WEIGHTS = {
+# ── Dynamic layer weights ─────────────────────────────────────────────────────
+# Structured (chip-only) input: knowledge_profiler and conversation_dynamics
+# cannot operate without a real transcript — skip them, redistribute weight.
+STRUCTURED_WEIGHTS = {
+    "policy_verification":    0.35,
+    "information_asymmetry":  0.30,
+    "isolation_signal":       0.18,
+    "manipulation_sequence":  0.12,
+    "script_library":         0.05,
+    "knowledge_profiler":     0.00,
+    "conversation_dynamics":  0.00,
+}
+
+# Voice/transcript input: all 7 layers contribute meaningfully.
+VOICE_WEIGHTS = {
     "policy_verification":    0.22,
     "information_asymmetry":  0.20,
     "isolation_signal":       0.18,
@@ -48,7 +61,7 @@ LAYER_WEIGHTS = {
 
 
 def _build_transcript(claims: dict) -> str:
-    """For Path B (structured), build a synthetic transcript from checkbox data."""
+    """For structured input, build a synthetic transcript from checkbox data."""
     parts = []
     org = claims.get("org_claimed", "")
     if org:
@@ -62,49 +75,198 @@ def _build_transcript(claims: dict) -> str:
     return " ".join(parts)
 
 
+def _compute_engine_confidence(layer_results, input_mode, layers_above_threshold,
+                                final_score, hard_floors_triggered) -> float:
+    """Compute engine confidence when Qwen3 is unavailable."""
+    base = 0.50
+    # More independent signals = more confidence
+    base += min(0.25, layers_above_threshold * 0.07)
+    # Hard floor = certainty signal
+    if hard_floors_triggered:
+        base += 0.18
+    # Voice transcript gives richer signal than chip-only
+    if input_mode in ("voice", "transcript"):
+        base += 0.08
+    # Very low or very high scores = engine is more certain
+    if final_score < 0.15 or final_score > 0.85:
+        base += 0.06
+    return round(min(0.99, base), 2)
+
+
 def _get_recommended_action(risk_band: str, org_callback: str = "") -> str:
     if risk_band == "CRITICAL":
         return "Hang up immediately. Do not share any information. Report at cybercrime.gov.in or call 1930."
+    elif risk_band == "HIGH RISK":
+        callback_str = f" Call {org_callback} to verify." if org_callback else ""
+        return f"Do not share any OTP, card details, or personal credentials. Hang up and call the organisation's official number directly.{callback_str}"
     elif risk_band == "SUSPICIOUS":
         callback_str = f" Call {org_callback} to verify." if org_callback else ""
-        return f"Be very cautious. Do not share OTP, passwords, or card details. Hang up and call the organization's official number directly.{callback_str}"
+        return f"Be very cautious. Do not share sensitive information on this call. Hang up and call the organisation's official number yourself.{callback_str}"
     else:
         return "Call appears relatively safe. Stay alert — never share OTPs or passwords regardless of who is calling."
+
+
+def _build_deterministic_explanation(org, actions, warnings, top_layer_result, band) -> str:
+    """Always-present explanation. Works without any LLM."""
+    org_display = org or "an unknown caller"
+    action_str  = " and ".join(actions[:2]) if actions else "sensitive information"
+
+    personal = f"You received a call from someone claiming to be {org_display}."
+    if actions:
+        personal += f" They asked you to provide your {action_str}."
+    if warnings:
+        personal += f" They also said: \"{warnings[0]}\"."
+
+    consequence = {
+        "CRITICAL":   (
+            "This is almost certainly a scam. Sharing what they asked for could result in "
+            "immediate financial loss or identity theft. Hang up now."
+        ),
+        "HIGH RISK":  (
+            "This call has strong scam indicators. Do not share any financial details, "
+            "OTPs, or personal credentials. Verify directly by calling the official number."
+        ),
+        "SUSPICIOUS": (
+            "This call has some warning signs. Proceed with caution — legitimate organisations "
+            "never pressure you on a call or ask you to act urgently."
+        ),
+        "SAFE":       (
+            "This call appears relatively low-risk based on what you described. "
+            "Stay alert — never share OTPs or passwords regardless of who is calling."
+        ),
+    }.get(band, "")
+
+    finding_text = (top_layer_result or {}).get("plain_english", "").strip()
+    return "\n\n".join(filter(None, [personal, consequence, finding_text]))
+
+
+def _build_contextual_advice(org, actions, warnings) -> dict:
+    """Deterministic fallback for means_for_you, next_tactics, how_to_verify."""
+    org_lower   = (org or "").lower()
+    is_bank     = any(k in org_lower for k in ["bank", "hdfc", "sbi", "icici", "axis", "kotak", "rbi", "yes bank", "pnb", "canara", "idfc"])
+    is_govt     = any(k in org_lower for k in ["uidai", "aadhaar", "police", "cbi", "income tax", "customs", "trai", "enforcement", "cyber crime"])
+    asked_otp   = any("otp" in a.lower() or "pin" in a.lower() or "password" in a.lower() for a in actions)
+    asked_money = any("transfer" in a.lower() or "money" in a.lower() for a in actions)
+    asked_app   = any("install" in a.lower() or "app" in a.lower() or "screen" in a.lower() for a in actions)
+    asked_card  = any("cvv" in a.lower() or "card" in a.lower() for a in actions)
+
+    if is_bank and asked_otp:
+        means = (
+            f"Your bank generates the OTP and sends it to YOU — which means they already know "
+            f"what it is. Any call asking you to read back the OTP is mathematically proven to "
+            f"NOT be your bank. This is someone who has initiated a fraudulent transaction and "
+            f"needs your OTP to complete it. Once they have it, the money is gone."
+        )
+        tactics = [
+            "They have already initiated a transaction on your account and are waiting for your OTP to authorise it.",
+            "If you hang up, they may call back as the 'fraud department' offering to reverse the transaction.",
+            "They may ask you to install a 'security app' to 'protect' your account — giving them remote access.",
+        ]
+    elif is_govt:
+        means = (
+            f"Government agencies like {org or 'this authority'} do not call citizens. "
+            f"They communicate via registered post and official portals. "
+            f"Every single phone call claiming to be from a government authority is fraudulent by definition — "
+            f"regardless of how official they sound, what ID they claim to have, or how urgent they say it is."
+        )
+        tactics = [
+            "They will escalate to threats of arrest, account freeze, or legal cases to create panic.",
+            "They may loop in a fake 'senior officer' or play audio of court proceedings to increase pressure.",
+            "They will demand you transfer money to a 'safe account' they control to avoid the fabricated consequence.",
+        ]
+    elif asked_money:
+        means = (
+            f"No legitimate company asks you to transfer money on a phone call. "
+            f"This is the 'safe account' scam — the caller will direct you to move your own savings "
+            f"to an account they control, claiming it is for your protection. "
+            f"Once transferred, the money is irretrievable."
+        )
+        tactics = [
+            "They will give you a bank account number to transfer to, claiming it is a 'safe' or 'secure' RBI account.",
+            "They may stay on the line the entire time to prevent you from calling anyone for advice.",
+            "After you transfer, they will become unreachable and the account will be emptied immediately.",
+        ]
+    elif asked_app:
+        means = (
+            f"Installing an app at a caller's request gives them full real-time view of your phone screen. "
+            f"They can watch you open your banking app, capture your credentials, and initiate transfers "
+            f"while pretending to 'fix a problem' — all without you knowing."
+        )
+        tactics = [
+            "They will guide you to open your banking app while watching your screen in real time.",
+            "They may silently initiate a transfer while keeping you distracted with conversation.",
+            "They may lock your device remotely and demand payment to unlock it.",
+        ]
+    elif asked_card:
+        means = (
+            f"Sharing full card details (number, expiry, CVV) over a phone call gives the caller "
+            f"everything they need to make fraudulent online purchases or transfers from your account. "
+            f"No bank or payment company ever needs your card details over a call — they already have them."
+        )
+        tactics = [
+            "They will use your card details immediately to make online purchases or transfer funds.",
+            "They may call back as a 'fraud alert' to extract the OTP sent to verify the transaction.",
+        ]
+    else:
+        means = (
+            f"Legitimate callers from real organisations never pressure you on a call. "
+            f"You can always hang up and call back using the official number from the "
+            f"organisation's own website or the back of your card — not the number they gave you."
+        )
+        tactics = [
+            "They may call repeatedly to wear down your resistance if you do not comply immediately.",
+            "They may use personal information from social media to sound legitimate and build trust.",
+        ]
+
+    how_to_verify = [
+        "Hang up immediately. Do NOT call back the number they gave you.",
+        f"Find the official number for {org or 'the organisation'} from their official website or the back of your card.",
+        "Call that number yourself and ask if they actually called you today.",
+        "If they claimed to be a government agency, visit the physical office in person — never respond over phone.",
+    ]
+
+    return {
+        "means_for_you": means,
+        "next_tactics":  tactics,
+        "how_to_verify": how_to_verify,
+    }
 
 
 def analyze(input_data: dict) -> dict:
     """
     Main entry point for call scam analysis.
-    
-    input_data keys:
-        transcript      : str  — voice description or synthetic
-        org_claimed     : str
-        actions_requested: list[str]
-        warning_phrases : list[str]
-        input_mode      : str  — 'voice' | 'structured'
-    """
-    input_mode = input_data.get("input_mode", "structured")
-    transcript = input_data.get("transcript", "")
-    org_claimed = input_data.get("org_claimed", "")
-    actions_requested = input_data.get("actions_requested", [])
-    warning_phrases = input_data.get("warning_phrases", [])
 
-    # Build synthetic transcript for structured input
+    input_data keys:
+        transcript       : str  — voice description or synthetic
+        org_claimed      : str
+        actions_requested: list[str]
+        warning_phrases  : list[str]
+        input_mode       : str  — 'voice' | 'transcript' | 'structured'
+    """
+    input_mode        = input_data.get("input_mode", "structured")
+    transcript        = input_data.get("transcript", "")
+    org_claimed       = input_data.get("org_claimed", "")
+    actions_requested = input_data.get("actions_requested", [])
+    warning_phrases   = input_data.get("warning_phrases", [])
+
     claims = {
-        "org_claimed": org_claimed,
+        "org_claimed":       org_claimed,
         "actions_requested": actions_requested,
-        "warning_phrases": warning_phrases,
+        "warning_phrases":   warning_phrases,
     }
 
+    # Build synthetic transcript for structured input
     if input_mode == "structured" or not transcript.strip():
         transcript = _build_transcript(claims)
-        # Also append warning phrases to transcript for keyword detection
         transcript += " " + " ".join(warning_phrases)
 
-    logger.info("[SCAM_INTEL] Analyzing call. mode=%s org='%s' transcript_len=%d",
+    logger.info("[SCAM_INTEL] Analyzing. mode=%s org='%s' transcript_len=%d",
                 input_mode, org_claimed, len(transcript))
 
-    # Run all 7 layers
+    # ── Select dynamic weights based on input mode ────────────────────────────
+    weights = VOICE_WEIGHTS if input_mode in ("voice", "transcript") else STRUCTURED_WEIGHTS
+
+    # ── Run all 7 layers ──────────────────────────────────────────────────────
     layer_results = {
         "policy_verification":   policy_verification.analyze(transcript, claims),
         "information_asymmetry": information_asymmetry.analyze(transcript, claims),
@@ -115,56 +277,62 @@ def analyze(input_data: dict) -> dict:
         "conversation_dynamics": conversation_dynamics.analyze(transcript, claims),
     }
 
-    # Find hard floors
+    # ── Hard floors ───────────────────────────────────────────────────────────
     hard_floors_triggered = []
-    floor_score = 0.0
-    official_callback = ""
+    floor_score           = 0.0
+    official_callback     = ""
 
     for layer_name, result in layer_results.items():
         hf = result.get("hard_floor")
         if hf and hf > floor_score:
             floor_score = hf
             hard_floors_triggered.append(f"{layer_name}: {hf}")
-        # Collect official callback number
         if result.get("official_callback"):
             official_callback = result["official_callback"]
 
-    # Also from policy result
     if layer_results["policy_verification"].get("official_callback"):
         official_callback = layer_results["policy_verification"]["official_callback"]
 
-    # Calculate weighted composite score
+    # ── Weighted composite score (dynamic weights) ────────────────────────────
     composite_score = sum(
         layer_results[layer_name]["score"] * weight
-        for layer_name, weight in LAYER_WEIGHTS.items()
-        if layer_name in layer_results
+        for layer_name, weight in weights.items()
+        if layer_name in layer_results and weight > 0
     )
 
-    # Find the maximum score returned by any single layer
-    max_layer_score = max((res.get("score", 0.0) for res in layer_results.values()), default=0.0)
+    max_layer_score = max(
+        (res.get("score", 0.0) for res in layer_results.values()), default=0.0
+    )
 
-    # Final score = max of composite, floor, and max_layer_score
-    # This ensures if one rule is 95% confident, the final score is at least 95%
-    final_score = max(composite_score, floor_score, max_layer_score)
+    # ── 2-layer override rule ─────────────────────────────────────────────────
+    # max_layer_score can override composite only if ≥2 layers fired above 0.50.
+    # Prevents a single outlier rule from dominating on sparse input.
+    layers_above_threshold = sum(
+        1 for res in layer_results.values() if res.get("score", 0) >= 0.50
+    )
+    if layers_above_threshold >= 2:
+        final_score = max(composite_score, floor_score, max_layer_score)
+    else:
+        final_score = max(composite_score, floor_score)
+
     final_score = round(min(1.0, final_score), 3)
 
-    # Risk band from rules
-    if final_score > 0.70:
-        rule_band = "CRITICAL"
-    elif final_score >= 0.30:
-        rule_band = "SUSPICIOUS"
-    else:
-        rule_band = "SAFE"
+    # ── 4-band risk classification ────────────────────────────────────────────
+    if final_score > 0.85:    rule_band = "CRITICAL"
+    elif final_score > 0.65:  rule_band = "HIGH RISK"
+    elif final_score >= 0.25: rule_band = "SUSPICIOUS"
+    else:                     rule_band = "SAFE"
 
-    # ── Stage 3 + 4 run in parallel (only if score is in grey zone) ──────────
-    GREY_ZONE = 0.20 <= final_score <= 0.85
-    qwen_result = None
+    # ── Decide whether to run Qwen3 ───────────────────────────────────────────
+    is_rich_input  = input_mode in ("voice", "transcript")
+    in_grey_zone   = 0.25 <= final_score <= 0.85
+    should_run_qwen = is_rich_input or in_grey_zone
+
+    qwen_result        = None
     live_policy_result = None
 
     def _run_qwen():
-        # Always run Qwen3 for unstructured voice transcripts to parse nuance.
-        # For structured (checkbox) input, only run if score is in the grey zone.
-        if not GREY_ZONE and input_mode != "transcript" and input_mode != "voice":
+        if not should_run_qwen:
             return None
         return analyze_with_qwen(
             transcript=transcript,
@@ -190,53 +358,77 @@ def analyze(input_data: dict) -> dict:
         f_qwen   = ex.submit(_run_qwen)
         f_policy = ex.submit(_run_live_policy)
         try:
-            qwen_result        = f_qwen.result(timeout=60)
+            qwen_result        = f_qwen.result(timeout=62)
         except Exception as e:
             logger.warning("[SCAM_INTEL] Qwen3 stage error: %s", e)
         try:
-            live_policy_result = f_policy.result(timeout=60)
+            live_policy_result = f_policy.result(timeout=55)
         except Exception as e:
             logger.warning("[SCAM_INTEL] Live policy stage error: %s", e)
 
     # ── Merge Qwen3 verdict ───────────────────────────────────────────────────
     if qwen_result:
-        final_score  = qwen_result["threat_probability"]
-        risk_band    = qwen_result["final_verdict"]
-        qwen_plain   = qwen_result["plain_english"]
-        tactics      = qwen_result["tactics_detected"]
-        qwen_conf    = qwen_result["confidence"]
-        qwen_avail   = True
-        logger.info("[SCAM_INTEL] Qwen3 override: %s (prob=%.3f)", risk_band, final_score)
+        final_score   = qwen_result["threat_probability"]  # already ±0.20 guarded
+        risk_band     = qwen_result["final_verdict"]
+        qwen_plain    = qwen_result["plain_english"]
+        tactics       = qwen_result["tactics_detected"]
+        qwen_conf     = qwen_result["confidence"]           # shown directly to user
+        qwen_means    = qwen_result.get("means_for_you", "")
+        qwen_next     = qwen_result.get("next_tactics", [])
+        qwen_avail    = True
+        logger.info("[SCAM_INTEL] Qwen3 override: %s (prob=%.3f conf=%.2f)", risk_band, final_score, qwen_conf)
     else:
-        risk_band    = rule_band
-        qwen_plain   = ""
-        tactics      = []
-        qwen_conf    = None
-        qwen_avail   = False
+        risk_band  = rule_band
+        qwen_plain = ""
+        tactics    = []
+        qwen_conf  = None
+        qwen_means = ""
+        qwen_next  = []
+        qwen_avail = False
 
     score_display = round(final_score * 100)
 
-    # Signals fired
+    # ── Confidence score ──────────────────────────────────────────────────────
+    if qwen_avail and qwen_conf is not None:
+        confidence_score = qwen_conf   # Qwen3 has seen everything — trust it directly
+    else:
+        confidence_score = _compute_engine_confidence(
+            layer_results, input_mode, layers_above_threshold, final_score, hard_floors_triggered
+        )
+
+    # ── Build signals + why_flagged ───────────────────────────────────────────
     signals_fired = [
         name for name, result in layer_results.items()
         if result.get("score", 0) > 0.30
     ]
-
-    # Build top 3 why_flagged bullets
     sorted_layers = sorted(
         [(name, res) for name, res in layer_results.items() if res.get("score", 0) > 0.30],
         key=lambda x: x[1]["score"],
-        reverse=True
+        reverse=True,
     )
     why_flagged = [res["plain_english"] for _, res in sorted_layers[:3]]
 
-    # Full explanation — prefer Qwen3's human explanation if available
+    # ── Deterministic explanation (always present) ────────────────────────────
+    top_layer_result = sorted_layers[0][1] if sorted_layers else None
+    deterministic_explanation = _build_deterministic_explanation(
+        org_claimed, actions_requested, warning_phrases, top_layer_result, risk_band
+    )
+
+    # ── Contextual advice sections ────────────────────────────────────────────
+    # If Qwen3 is live and returned personalised content, use it.
+    # Otherwise fall back to deterministic templates.
+    advice = _build_contextual_advice(org_claimed, actions_requested, warning_phrases)
+    means_for_you = qwen_means  if qwen_means  else advice["means_for_you"]
+    next_tactics  = qwen_next   if qwen_next   else advice["next_tactics"]
+    how_to_verify = advice["how_to_verify"]   # always templated
+
+    # ── Full explanation ──────────────────────────────────────────────────────
     org_display = org_claimed or "Unknown Organization"
     explanation_parts = [f"Caller claimed to be from: {org_display}."]
     if qwen_plain:
         explanation_parts.append(qwen_plain)
     elif why_flagged:
-        explanation_parts.append("Why SafeMail X flagged this call:")
+        explanation_parts.append("Why SafeMailX flagged this call:")
         for bullet in why_flagged:
             explanation_parts.append(f"• {bullet}")
     full_explanation = "\n".join(explanation_parts)
@@ -244,42 +436,46 @@ def analyze(input_data: dict) -> dict:
     recommended_action = _get_recommended_action(risk_band, official_callback)
 
     result = {
-        "final_score":             final_score,
-        "risk_band":               risk_band,
-        "score_display":           score_display,
-        "org_claimed":             org_claimed,
-        "purpose_detected":        ", ".join(actions_requested) if actions_requested else "Unknown",
+        "final_score":              final_score,
+        "risk_band":                risk_band,
+        "score_display":            score_display,
+        "org_claimed":              org_claimed,
+        "purpose_detected":         ", ".join(actions_requested) if actions_requested else "Unknown",
         "layer_results": {
             name: {
-                "score":       round(res["score"], 3),
-                "finding":     res["finding"],
-                "plain_english": res["plain_english"]
+                "score":         round(res["score"], 3),
+                "finding":       res["finding"],
+                "plain_english": res["plain_english"],
             }
             for name, res in layer_results.items()
         },
-        "signals_fired":           signals_fired,
-        "hard_floors_triggered":   hard_floors_triggered,
-        "composite_score":         round(composite_score, 3),
-        "floor_score":             round(floor_score, 3),
-        "full_explanation":        full_explanation,
-        "why_flagged":             why_flagged,
-        "recommended_action":      recommended_action,
+        "signals_fired":            signals_fired,
+        "hard_floors_triggered":    hard_floors_triggered,
+        "composite_score":          round(composite_score, 3),
+        "floor_score":              round(floor_score, 3),
+        "full_explanation":         full_explanation,
+        "why_flagged":              why_flagged,
+        "recommended_action":       recommended_action,
         "official_callback_number": official_callback,
-        "report_url":              "cybercrime.gov.in | Helpline: 1930",
+        "report_url":               "cybercrime.gov.in | Helpline: 1930",
         # Qwen3 fields
-        "qwen_available":          qwen_avail,
-        "qwen_confidence":         qwen_conf,
-        "tactics_detected":        tactics,
-        "plain_english":           qwen_plain,
+        "qwen_available":           qwen_avail,
+        "qwen_confidence":          qwen_conf,
+        "tactics_detected":         tactics,
+        "plain_english":            qwen_plain,
+        # New personalisation fields
+        "confidence_score":         confidence_score,
+        "deterministic_explanation": deterministic_explanation,
+        "means_for_you":            means_for_you,
+        "next_tactics":             next_tactics,
+        "how_to_verify":            how_to_verify,
         # Live policy fact-check
-        "live_policy_check":       live_policy_result,
+        "live_policy_check":        live_policy_result,
     }
 
     logger.info(
-        "[SCAM_INTEL] Final: score=%.3f band=%s qwen=%s policy_checked=%s floors=%s",
-        final_score, risk_band, qwen_avail,
-        bool(live_policy_result and live_policy_result.get("checked")),
-        hard_floors_triggered
+        "[SCAM_INTEL] Final: score=%.3f band=%s conf=%.2f qwen=%s layers_fired=%d floors=%s",
+        final_score, risk_band, confidence_score, qwen_avail, layers_above_threshold,
+        hard_floors_triggered,
     )
     return result
-

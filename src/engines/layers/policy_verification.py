@@ -127,12 +127,47 @@ def analyze(transcript: str, claims: Optional[dict] = None) -> dict:
     org_entry = _find_org(org_claimed)
 
     if not org_entry:
+        # Unknown org — score entirely from what was REQUESTED, not who they claim to be.
+        # Universal forbidden actions apply regardless of org identity.
+        ALWAYS_FORBIDDEN_ACTIONS = {
+            "otp":            ("OTP",           0.90, "No organisation ever asks for an OTP over a phone call — OTPs are secret codes only you should know."),
+            "pin":            ("PIN/password",  0.90, "No legitimate caller should ever ask for your PIN, password, or MPIN."),
+            "cvv":            ("CVV",           0.88, "CVV is printed on your card for online security — sharing it over a phone call exposes your card to fraud."),
+            "transfer money": ("money transfer",0.85, "Legitimate organisations never instruct you to transfer money on a phone call."),
+            "install":        ("app install",   0.83, "Asking you to install an app gives the caller remote access to your device."),
+            "share screen":   ("screen share",  0.82, "Screen sharing gives the caller real-time access to your banking apps and credentials."),
+            "aadhaar":        ("Aadhaar number",0.80, "Your Aadhaar number should never be shared with an unverified caller."),
+            "card details":   ("card details",  0.87, "Full card details over a phone call is a hallmark of card fraud."),
+            "card number":    ("card number",   0.87, "Never share your full card number over a phone call."),
+        }
+        actions_combined = " ".join(actions_requested).lower() + " " + transcript.lower()
+        for key, (label, score, reason) in ALWAYS_FORBIDDEN_ACTIONS.items():
+            if key in actions_combined:
+                logger.info("[POLICY] Unknown org '%s' but forbidden action '%s' detected → score=%.2f",
+                            org_claimed, label, score)
+                return {
+                    "score":         score,
+                    "finding":       "unknown_org_forbidden_action",
+                    "plain_english": (
+                        f"Even though we cannot verify the official policies for '{org_claimed}', "
+                        f"the action requested ({label}) is universally forbidden by every legitimate organisation. "
+                        f"{reason}"
+                    ),
+                    "evidence":      {"org_claimed": org_claimed, "forbidden_action": label},
+                    "hard_floor":    round(score - 0.05, 2),
+                    "official_callback": ""
+                }
+        # Unknown org + no red-flag action = cautious neutral
         return {
-            "score": 0.52,
-            "finding": "org_not_in_database",
-            "plain_english": f"Cannot verify official policies for '{org_claimed}'. We have no record of this organization. Treat the call with caution and call the organization's official number from their website to verify.",
-            "evidence": {"org_claimed": org_claimed},
-            "hard_floor": None,
+            "score":         0.30,
+            "finding":       "unknown_org_no_red_flags",
+            "plain_english": (
+                f"We have no policy record for '{org_claimed}'. The actions described are not "
+                f"inherently suspicious, but always verify by calling the official number from "
+                f"the organisation's own website — not the number the caller gave you."
+            ),
+            "evidence":      {"org_claimed": org_claimed},
+            "hard_floor":    None,
             "official_callback": ""
         }
 

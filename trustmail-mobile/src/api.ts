@@ -722,7 +722,7 @@ export type LivePolicyCheck = {
 
 export type CallAnalysisResult = {
   final_score: number;
-  risk_band: 'SAFE' | 'SUSPICIOUS' | 'CRITICAL';
+  risk_band: 'SAFE' | 'SUSPICIOUS' | 'HIGH RISK' | 'CRITICAL';  // 4-band
   score_display: number;
   org_claimed: string;
   purpose_detected: string;
@@ -743,6 +743,12 @@ export type CallAnalysisResult = {
   tactics_detected: string[];
   // Live policy fact-check
   live_policy_check: LivePolicyCheck | null;
+  // New personalisation & accuracy fields
+  confidence_score: number;
+  deterministic_explanation: string;
+  means_for_you: string;
+  next_tactics: string[];
+  how_to_verify: string[];
 };
 
 export async function analyzeCall(params: {

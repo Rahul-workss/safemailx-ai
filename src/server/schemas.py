@@ -289,6 +289,12 @@ class CallAnalysisResponse(BaseModel):
     tactics_detected: list[str] = []
     # Live policy fact-check
     live_policy_check: dict | None = None
+    # ── New personalisation & accuracy fields ──────────────────────────────────
+    confidence_score: float = 0.0              # Engine or Qwen3 confidence (0.0-1.0)
+    deterministic_explanation: str = ""        # Always-present explanation (no LLM needed)
+    means_for_you: str = ""                    # Personalised danger explanation
+    next_tactics: list[str] = []               # What the scammer will likely do next
+    how_to_verify: list[str] = []              # Safe verification steps
 
 
 # ── QR Scan (Quishing Detection) ──────────────────────────────────────────────
