@@ -75,15 +75,10 @@ results.append(run(
     "T6: Voice transcript — rich personalisation with Qwen3",
     {
         "input_mode": "transcript",
-        "transcript": (
-            "Someone called me claiming to be from SBI Bank fraud department. "
-            "They said my account shows suspicious activity and will be blocked in 2 hours. "
-            "They asked me to share the OTP that was just sent to my phone to verify my identity. "
-            "They also said I should not hang up or tell anyone about this call."
-        ),
-        "org_claimed": "SBI Bank",
-        "actions_requested": ["OTP or PIN"],
-        "warning_phrases": ["Don't tell anyone", "Stay on the line"],
+        "transcript": "i got call from sbi and asked by employee that they are asking for cvv details of the card",
+        "org_claimed": "",
+        "actions_requested": [],
+        "warning_phrases": [],
     },
     expect_band="CRITICAL", expect_min=85,
 ))

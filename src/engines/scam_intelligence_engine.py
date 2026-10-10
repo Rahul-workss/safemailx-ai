@@ -140,15 +140,20 @@ def _build_deterministic_explanation(org, actions, warnings, top_layer_result, b
     return "\n\n".join(filter(None, [personal, consequence, finding_text]))
 
 
-def _build_contextual_advice(org, actions, warnings) -> dict:
+def _build_contextual_advice(org, actions, warnings, transcript="") -> dict:
     """Deterministic fallback for means_for_you, next_tactics, how_to_verify."""
     org_lower   = (org or "").lower()
-    is_bank     = any(k in org_lower for k in ["bank", "hdfc", "sbi", "icici", "axis", "kotak", "rbi", "yes bank", "pnb", "canara", "idfc"])
-    is_govt     = any(k in org_lower for k in ["uidai", "aadhaar", "police", "cbi", "income tax", "customs", "trai", "enforcement", "cyber crime"])
-    asked_otp   = any("otp" in a.lower() or "pin" in a.lower() or "password" in a.lower() for a in actions)
-    asked_money = any("transfer" in a.lower() or "money" in a.lower() for a in actions)
-    asked_app   = any("install" in a.lower() or "app" in a.lower() or "screen" in a.lower() for a in actions)
-    asked_card  = any("cvv" in a.lower() or "card" in a.lower() for a in actions)
+    transcript_lower = (transcript or "").lower()
+    
+    # Check both structured org and raw transcript
+    is_bank     = any(k in org_lower or k in transcript_lower for k in ["bank", "hdfc", "sbi", "icici", "axis", "kotak", "rbi", "yes bank", "pnb", "canara", "idfc"])
+    is_govt     = any(k in org_lower or k in transcript_lower for k in ["uidai", "aadhaar", "police", "cbi", "income tax", "customs", "trai", "enforcement", "cyber crime"])
+    
+    # Check both structured actions and raw transcript
+    asked_otp   = any("otp" in a.lower() or "pin" in a.lower() or "password" in a.lower() for a in actions) or any(k in transcript_lower for k in ["otp", "pin", "password"])
+    asked_money = any("transfer" in a.lower() or "money" in a.lower() for a in actions) or any(k in transcript_lower for k in ["transfer", "money", "pay"])
+    asked_app   = any("install" in a.lower() or "app" in a.lower() or "screen" in a.lower() for a in actions) or any(k in transcript_lower for k in ["install", "app", "apk", "anydesk", "teamviewer"])
+    asked_card  = any("cvv" in a.lower() or "card" in a.lower() for a in actions) or any(k in transcript_lower for k in ["cvv", "card number", "credit card", "debit card"])
 
     if is_bank and asked_otp:
         means = (
@@ -409,7 +414,7 @@ def analyze(input_data: dict) -> dict:
     # ── Contextual advice sections ────────────────────────────────────────────
     # If Qwen3 is live and returned personalised content, use it.
     # Otherwise fall back to deterministic templates.
-    advice = _build_contextual_advice(org_claimed, actions_requested, warning_phrases)
+    advice = _build_contextual_advice(org_claimed, actions_requested, warning_phrases, transcript=transcript)
     means_for_you = qwen_means  if qwen_means  else advice["means_for_you"]
     next_tactics  = qwen_next   if qwen_next   else advice["next_tactics"]
     how_to_verify = advice["how_to_verify"]   # always templated

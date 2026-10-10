@@ -1451,6 +1451,22 @@ function VerdictView({ result, onClose, onRetry }: { result: CallAnalysisResult;
           </GlassCard>
         ) : null}
 
+        {/* How To Verify Safely */}
+        {result.how_to_verify && result.how_to_verify.length > 0 && (
+          <GlassCard accentColor={C.green} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Ionicons name="shield-checkmark" size={15} color={C.green} style={{ marginRight: 8 }} />
+              <Text style={{ color: C.green, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>How To Verify Safely</Text>
+            </View>
+            {result.how_to_verify.map((step, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+                <Text style={{ color: C.green, marginRight: 8, fontWeight: '700', fontSize: 14, minWidth: 18 }}>{i + 1}.</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, lineHeight: 20, flex: 1 }}>{step}</Text>
+              </View>
+            ))}
+          </GlassCard>
+        )}
+
         <TouchableOpacity 
           onPress={() => setShowMoreDetails(!showMoreDetails)}
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, marginBottom: 16 }}
