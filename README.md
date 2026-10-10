@@ -285,27 +285,26 @@ The app uses a **Liquid Glass / Glassmorphism** design system (`theme.ts`) — d
 
 ---
 
-### Call Analyzer — Vishing Detection
+### Call Analyzer — Vishing Intelligence
 
-The Call Analyzer is a dedicated screen for detecting **phone scams and vishing attacks** in real time.
+The Call Analyzer is a dedicated screen for detecting **phone scams and vishing attacks** in real time. It is powered by a Qwen3 LLM heavily tuned for Indian vishing threat patterns (e.g., Digital Arrest, OTP harvesting), and a robust deterministic offline rule engine.
 
-**Two input modes:**
-1. **Describe the Call** — tap chips or fill a structured form describing what the caller claimed, what they asked you to do (OTP, card CVV, Aadhaar number, install an app, share screen, transfer money), and the caller's organization
-2. **Record / Upload Audio** — record the call live or upload an audio file; Whisper transcribes it automatically and feeds the transcript to the LLM
+**Two Input Modes:**
+1. **Describe the Call** — Type what happened or use structured chips (Org claimed, Actions requested like OTP, CVV, Screen Share). The engine intelligently scans free-text transcripts for keywords (CVV, transfer, install) even without structured inputs.
+2. **Record / Upload Audio** — Record the call live or upload an audio file; Whisper transcribes it and feeds the transcript to the vishing engine.
 
-**What it analyzes:**
-- Caller's claimed organization and legitimacy
-- Requested actions (especially dangerous ones: OTP, install app, screen share)
-- Urgency and fear tactics (fake arrest warrants, account suspension, etc.)
-- Match against known Indian cybercrime patterns (CBI/ED impersonation, digital arrest, KYC freeze, lottery, etc.)
-- LLM reasoning about social engineering tactics used
+**Minimalist UI & ELI5 Explanations:**
+To prevent overwhelming non-technical users in high-stress situations, the UI is hyper-minimalist:
+- **Score Ring & Confidence Bar**: Instantly see Risk Score (0-100) and AI Confidence.
+- **Explain-Like-I'm-5 (ELI5) Text**: The core analysis is written in extreme layperson terms (e.g., "Your bank already knows your secret OTP code... if someone asks for it, they are a thief.").
+- **Language Translation (12 Indian Languages)**: Tap the globe icon to instantly translate the explanation into Hindi, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam, Punjabi, or Odia (powered by `deep-translator` with Google/MyMemory fallback).
+- **"More Details" Toggle**: Deep technical analysis (Why Flagged, What They Might Do Next, Live Policy Check, Official Helpline) is hidden behind a toggle to reduce cognitive load.
 
 **Output:**
-- **Risk band**: CRITICAL / HIGH / MEDIUM / LOW
-- **Scam archetype**: e.g., "Digital Arrest Scam (CBI Impersonation)"
-- **Danger signals** list with plain-language explanations of why each element is suspicious
-- **Recommended action**: e.g., "Hang up immediately. Do NOT comply. Report on cybercrime.gov.in"
-- **Safe callback number** from official government directory (when applicable)
+- **Risk Band**: SAFE / SUSPICIOUS / HIGH RISK / CRITICAL
+- **Analysis Summary**: The Qwen3 personalized summary referencing exact transcript quotes.
+- **What This Means For You**: Localized, ELI5, actionable explanation.
+- **How To Verify Safely**: Steps to safely check with the official organization.
 
 **Backend endpoint:** `POST /api/voice/analyze-call`
 
