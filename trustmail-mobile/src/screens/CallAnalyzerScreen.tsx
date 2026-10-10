@@ -514,6 +514,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
 
   // Path B — Structured
   const [orgClaimed, setOrgClaimed] = useState('');
+  const [customOrg, setCustomOrg]   = useState('');   // free-text "other" org
   const [actions, setActions] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -568,8 +569,13 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
   const submitStructured = async () => {
     setAnalyzing(true);
     setScreenState('ANALYZING');
+    // Merge chip selection + free-text — custom takes over if no chip selected,
+    // or gets appended to chip label so the engine sees the full context.
+    const effectiveOrg = orgClaimed
+      ? (customOrg.trim() ? `${orgClaimed} (${customOrg.trim()})` : orgClaimed)
+      : customOrg.trim();
     try {
-      const res = await analyzeCall({ inputMode: 'structured', orgClaimed, actionsRequested: actions, warningPhrases: warnings });
+      const res = await analyzeCall({ inputMode: 'structured', orgClaimed: effectiveOrg, actionsRequested: actions, warningPhrases: warnings });
       setResult(res);
       setScreenState('VERDICT');
     } catch (e: any) {
@@ -584,7 +590,7 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
     setList(list.includes(item) ? list.filter(i => i !== item) : [...list, item]);
   };
 
-  const canSubmit = orgClaimed.length > 0 || actions.length > 0 || warnings.length > 0;
+  const canSubmit = orgClaimed.length > 0 || customOrg.trim().length > 0 || actions.length > 0 || warnings.length > 0;
 
   // ── Render content per state ───────────────────────────────────────────────
   const renderContent = () => {
@@ -858,7 +864,8 @@ export default function CallAnalyzerScreen({ onClose }: { onClose: () => void })
               </View>
 
               <StructuredForm
-                orgClaimed={orgClaimed} setOrgClaimed={setOrgClaimed}
+                orgClaimed={orgClaimed} setOrgClaimed={(v: string) => { setOrgClaimed(v); if (v) setCustomOrg(''); }}
+                customOrg={customOrg}   setCustomOrg={(v: string) => { setCustomOrg(v); if (v) setOrgClaimed(''); }}
                 actions={actions} setActions={setActions}
                 warnings={warnings} setWarnings={setWarnings}
                 onToggle={toggleItem}
@@ -1120,8 +1127,8 @@ function ChoiceCard({ icon, iconColor, title, subtitle, badge, badgeColor, onPre
 }
 
 // ─── Structured Form ──────────────────────────────────────────────────────────
-function StructuredForm({ orgClaimed, setOrgClaimed, actions, setActions, warnings, setWarnings, onToggle }: any) {
-  const ORGS = ['SBI Bank', 'HDFC', 'ICICI', 'UIDAI', 'Police/CBI', 'Customs', 'Income Tax'];
+function StructuredForm({ orgClaimed, setOrgClaimed, customOrg, setCustomOrg, actions, setActions, warnings, setWarnings, onToggle }: any) {
+  const ORGS = ['SBI Bank', 'HDFC', 'ICICI', 'Axis Bank', 'UIDAI', 'Police/CBI', 'Customs', 'Income Tax', 'TRAI', 'RBI'];
   const ACTIONS = ['OTP or PIN', 'Card details / CVV', 'Aadhaar number', 'Transfer money', 'Install an app', 'Share screen'];
   const WARNINGS = ['Account will be blocked', 'Arrest warrant / FIR', "Don't tell anyone", 'Stay on the line'];
 
@@ -1134,6 +1141,59 @@ function StructuredForm({ orgClaimed, setOrgClaimed, actions, setActions, warnin
             onPress={() => setOrgClaimed(org === orgClaimed ? '' : org)} />
         ))}
       </View>
+
+      {/* ── Custom "other" org free-text input ── */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center',
+        marginBottom: 4, marginTop: 2,
+      }}>
+        <View style={{
+          flex: 1,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: customOrg.trim().length > 0
+            ? `${C.cyan}80`
+            : 'rgba(255,255,255,0.10)',
+          backgroundColor: customOrg.trim().length > 0
+            ? 'rgba(0,212,255,0.07)'
+            : 'rgba(255,255,255,0.04)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          paddingVertical: 9,
+        }}>
+          <Ionicons
+            name="create-outline"
+            size={14}
+            color={customOrg.trim().length > 0 ? C.cyan : 'rgba(255,255,255,0.30)'}
+            style={{ marginRight: 8 }}
+          />
+          <TextInput
+            style={{
+              flex: 1,
+              color: C.frost,
+              fontSize: 13,
+              fontWeight: '500',
+              padding: 0,
+            }}
+            placeholder="Other organisation… (e.g. Axis Bank, Amazon, IRCTC)"
+            placeholderTextColor="rgba(242,234,253,0.28)"
+            value={customOrg}
+            onChangeText={setCustomOrg}
+            autoCapitalize="words"
+            returnKeyType="done"
+            maxLength={80}
+          />
+          {customOrg.trim().length > 0 && (
+            <TouchableOpacity onPress={() => setCustomOrg('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.35)" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, marginBottom: 12, marginLeft: 4 }}>
+        Tap a chip above  or  type below — only one applies
+      </Text>
 
       <SectionHeader label="What did they ask for?" color={C.rose} icon="alert-circle" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
