@@ -177,7 +177,7 @@ class GmailLabelsResponse(BaseModel):
 
 
 class UrlScanRequest(BaseModel):
-    url: str = Field(..., min_length=8, max_length=2048)
+    url: str = Field(..., min_length=3, max_length=2048)
     scan_mode: ScanMode = "balanced"
 
 

@@ -1306,8 +1306,12 @@ def instant_scan_sms(payload: InstantSmsScanRequest, _auth=Depends(require_auth)
 
 @app.post("/api/instant/url", response_model=InstantScanResult)
 def instant_scan_url(payload: InstantUrlScanRequest, _auth=Depends(require_auth)):
-    if not is_safe_external_url(str(payload.url)):
+    url_str = str(payload.url).strip()
+    if not url_str.startswith(("http://", "https://")):
+        url_str = "https://" + url_str
+    if not is_safe_external_url(url_str):
         raise HTTPException(status_code=400, detail="Only safe public HTTP(S) URLs can be scanned")
+    payload.url = url_str
     return inline_scan_service.scan_url(payload, _user_id(_auth))
 
 @app.post("/api/instant/file", response_model=InstantScanResult)

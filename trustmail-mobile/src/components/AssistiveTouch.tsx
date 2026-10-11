@@ -220,32 +220,70 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       const text = clipText.trim();
       const type = detectType(text);
       if (type === 'url') {
-        const r = await scanUrl(text);
-        const s = r.risk_score ?? 0;
-        setVerdict({ verdict: s >= 70 ? 'PHISHING DETECTED' : s >= 40 ? 'SUSPICIOUS' : 'LIKELY SAFE', score: s, color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald, detail: `URL risk: ${s}/100` });
+        const clean = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+        const r = await scanUrl(clean);
+        const s = Math.round(r.risk_score ?? 0);
+        const isPhish = r.verdict === 'phishing' || s >= 70;
+        const isSusp = r.verdict === 'suspicious' || s >= 40;
+        setVerdict({
+          verdict: isPhish ? 'PHISHING DETECTED' : isSusp ? 'SUSPICIOUS' : 'LIKELY SAFE',
+          score: s,
+          color: isPhish ? TM.rose : isSusp ? TM.gold : TM.emerald,
+          detail: `URL risk: ${s}/100`
+        });
       } else if (type === 'upi') {
         setScanning(false); setSheet('upi'); return;
       } else if (type === 'phone') {
         setScanning(false); setSheet('whocalled'); return;
       } else {
         const r = await scanSms(text);
-        const s = r.risk_score ?? 0;
-        setVerdict({ verdict: s >= 70 ? 'SCAM TEXT' : s >= 40 ? 'SUSPICIOUS' : 'LOOKS SAFE', score: s, color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald, detail: `Scam likelihood: ${s}/100` });
+        const s = Math.round(r.risk_score ?? 0);
+        setVerdict({
+          verdict: s >= 70 ? 'SCAM TEXT' : s >= 40 ? 'SUSPICIOUS' : 'LOOKS SAFE',
+          score: s,
+          color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald,
+          detail: `Scam likelihood: ${s}/100`
+        });
       }
-    } catch { setVerdict({ verdict: 'Scan Failed', score: 0, color: TM.gold, detail: 'Check your connection.' }); }
-    setScanning(false);
+    } catch (e: any) {
+      setVerdict({
+        verdict: 'Scan Failed',
+        score: 0,
+        color: TM.gold,
+        detail: e?.message?.includes('timed out') ? 'Analysis timed out. Please try again.' : 'Check connection or URL format.'
+      });
+    } finally {
+      setScanning(false);
+    }
   };
 
   // ── Link check ──
   const handleLinkCheck = async () => {
-    if (!linkText.trim()) return;
+    const raw = linkText.trim();
+    if (!raw) return;
+    const clean = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     Keyboard.dismiss(); setScanning(true); setVerdict(null);
     try {
-      const r = await scanUrl(linkText.trim());
-      const s = r.risk_score ?? 0;
-      setVerdict({ verdict: s >= 70 ? 'PHISHING' : s >= 40 ? 'SUSPICIOUS' : 'LIKELY SAFE', score: s, color: s >= 70 ? TM.rose : s >= 40 ? TM.gold : TM.emerald, detail: `Risk: ${s}/100 · ${r.verdict.toUpperCase()}` });
-    } catch { setVerdict({ verdict: 'Failed', score: 0, color: TM.gold, detail: 'Network error.' }); }
-    setScanning(false);
+      const r = await scanUrl(clean);
+      const s = Math.round(r.risk_score ?? 0);
+      const isPhish = r.verdict === 'phishing' || s >= 70;
+      const isSusp = r.verdict === 'suspicious' || s >= 40;
+      setVerdict({
+        verdict: isPhish ? 'PHISHING' : isSusp ? 'SUSPICIOUS' : 'LIKELY SAFE',
+        score: s,
+        color: isPhish ? TM.rose : isSusp ? TM.gold : TM.emerald,
+        detail: `Risk: ${s}/100 · ${(r.summary || r.verdict || 'Scanned').toUpperCase()}`
+      });
+    } catch (e: any) {
+      setVerdict({
+        verdict: 'Scan Failed',
+        score: 0,
+        color: TM.gold,
+        detail: e?.message?.includes('timed out') ? 'Analysis timed out. Please try again.' : 'Check connection or URL format.'
+      });
+    } finally {
+      setScanning(false);
+    }
   };
 
   const handleAction = (action: MenuAction) => {
@@ -420,7 +458,14 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
               </TouchableOpacity>
             </View>
 
-            {verdict && (
+            {scanning && (
+              <View style={[S.inlineResult, { borderColor: `${TM.violetGlow}40`, backgroundColor: 'rgba(138,143,240,0.12)' }]}>
+                <Text style={[S.inlineVerdict, { color: TM.violetGlow }]}>ANALYZING LINK…</Text>
+                <Text style={S.inlineDetail}>Inspecting domain, redirects & threat signals</Text>
+              </View>
+            )}
+
+            {verdict && !scanning && (
               <View style={[S.inlineResult, { borderColor: `${verdict.color}40`, backgroundColor: `${verdict.color}12` }]}>
                 <Text style={[S.inlineVerdict, { color: verdict.color }]}>{verdict.verdict}</Text>
                 <Text style={S.inlineDetail}>{verdict.detail}</Text>

@@ -187,7 +187,10 @@ TARGET_BRANDS = ["paypal.com", "microsoft.com", "apple.com", "amazon.com", "goog
 def is_safe_external_url(url: str) -> bool:
     """Allow only HTTP(S) destinations that do not resolve to local networks."""
     try:
-        parsed = urlparse(url)
+        url_clean = (url or "").strip()
+        if not url_clean.startswith(("http://", "https://")):
+            url_clean = "https://" + url_clean
+        parsed = urlparse(url_clean)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
             return False
         host = parsed.hostname.rstrip(".")

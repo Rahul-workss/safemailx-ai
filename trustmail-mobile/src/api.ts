@@ -489,11 +489,13 @@ export async function scanInstantFile(file: {
 }
 
 export async function scanUrl(url: string): Promise<InstantScanResult> {
+  const trimmed = (url || "").trim();
+  const cleanUrl = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const response = await apiFetch("/api/instant/url", {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ url, scan_mode: "balanced" })
-  }, 20000);
+    body: JSON.stringify({ url: cleanUrl, scan_mode: "balanced" })
+  }, 45000);
   if (!response.ok) throw new Error("URL scan failed");
   return response.json();
 }
