@@ -88,7 +88,7 @@ def enqueue_unread_forwarded_messages(
                 "image_count": len(parsed.get("images", [])),
             },
         )
-        scan_queue.enqueue({
+        fwd_job = {
             "type": "manual_text",
             "source": "web_forwarding",
             "scan_id": scan_id,
@@ -99,7 +99,25 @@ def enqueue_unread_forwarded_messages(
             "sender": sender,
             "body": forwarded_text,
             "scan_mode": "balanced",
-        })
+        }
+        enqueued_to_redis = False
+        try:
+            scan_queue.enqueue(fwd_job)
+            enqueued_to_redis = True
+        except Exception as q_exc:
+            print(f"[GMAIL WATCHER] Redis unavailable for forwarded scan ({q_exc}); running in background thread")
+
+        if not enqueued_to_redis:
+            import threading
+            from server.worker import process_scan_job
+            threading.Thread(
+                target=process_scan_job,
+                args=(fwd_job,),
+                daemon=True,
+                name=f"fwd-worker-{scan_id[:8]}",
+            ).start()
+            print(f"[GMAIL WATCHER] Started in-process thread for forwarded scan {scan_id}")
+
         _mark_read(service, message_id)
         enqueued += 1
         print(f"[GMAIL WATCHER] Enqueued Gmail scan {scan_id} for message {message_id}")
@@ -119,12 +137,58 @@ def enqueue_labeled_gmail_messages(
     scan_queue = scan_queue or ScanQueue()
     label_ids = ensure_safemailx_label_ids(service)
 
-    results = service.users().messages().list(
-        userId="me",
-        labelIds=[label_ids["scan"]],
-        maxResults=limit,
-    ).execute()
-    messages = results.get("messages", [])
+    # 1. Search for messages with the active scan label
+    messages: list[dict[str, Any]] = []
+    seen_message_ids: set[str] = set()
+
+    try:
+        results = service.users().messages().list(
+            userId="me",
+            labelIds=[label_ids["scan"]],
+            maxResults=limit,
+        ).execute()
+        for m in results.get("messages", []):
+            if m["id"] not in seen_message_ids:
+                messages.append(m)
+                seen_message_ids.add(m["id"])
+    except Exception as exc:
+        print(f"[GMAIL WATCHER] Could not list messages for scan label: {exc}")
+
+    # 2. Rescue check: also look for messages that have the 'queued' label
+    # but were never resolved to a final verdict (e.g. from an interrupted worker run)
+    queued_lbl_id = label_ids.get("queued")
+    if queued_lbl_id and len(messages) < limit:
+        try:
+            q_results = service.users().messages().list(
+                userId="me",
+                labelIds=[queued_lbl_id],
+                maxResults=limit - len(messages),
+            ).execute()
+            for m in q_results.get("messages", []):
+                if m["id"] not in seen_message_ids:
+                    messages.append(m)
+                    seen_message_ids.add(m["id"])
+        except Exception as exc:
+            print(f"[GMAIL WATCHER] Could not check queued label: {exc}")
+
+    # 3. Check legacy label names ('TrustMail Scan', 'TrustMail Queued')
+    if len(messages) < limit:
+        try:
+            from server.gmail_labels import list_gmail_labels
+            for lbl in list_gmail_labels(service):
+                lname = (lbl.get("name") or "").lower()
+                if lname in {"trustmail scan", "trustmail queued"} and lbl.get("id"):
+                    legacy_res = service.users().messages().list(
+                        userId="me",
+                        labelIds=[lbl["id"]],
+                        maxResults=limit - len(messages),
+                    ).execute()
+                    for lm in legacy_res.get("messages", []):
+                        if lm["id"] not in seen_message_ids:
+                            messages.append(lm)
+                            seen_message_ids.add(lm["id"])
+        except Exception as exc:
+            print(f"[GMAIL WATCHER] Could not check legacy labels: {exc}")
 
     if not messages:
         print("[GMAIL WATCHER] No SafeMail X-labeled messages found.")
@@ -132,6 +196,14 @@ def enqueue_labeled_gmail_messages(
 
     enqueued = 0
     processed_threads = set()
+
+    # Known terminal result label IDs
+    result_label_ids = {
+        label_ids.get("safe"),
+        label_ids.get("suspicious"),
+        label_ids.get("phishing"),
+        label_ids.get("failed"),
+    } - {None}
 
     for msg in messages:
         thread_id = msg.get("threadId")
@@ -153,6 +225,25 @@ def enqueue_labeled_gmail_messages(
                 if thread_messages:
                     message_id = thread_messages[0]["id"]
 
+            # Check if this message already has a final verdict label applied
+            msg_meta = service.users().messages().get(
+                userId="me",
+                id=message_id,
+                format="minimal",
+            ).execute()
+            current_labels = set(msg_meta.get("labelIds", []))
+            if current_labels & result_label_ids:
+                # Already analyzed and labeled with a final verdict; remove queued/scan tags
+                try:
+                    to_remove = [l for l in [label_ids.get("scan"), label_ids.get("queued")] if l and l in current_labels]
+                    if to_remove:
+                        service.users().messages().modify(
+                            userId="me", id=message_id, body={"removeLabelIds": to_remove}
+                        ).execute()
+                except Exception:
+                    pass
+                continue
+
             scan_id = repository.create_queued_scan(
                 subject="Gmail label scan",
                 sender="gmail_label_app",
@@ -167,13 +258,33 @@ def enqueue_labeled_gmail_messages(
                 },
             )
 
-            scan_queue.enqueue({
+            job = {
                 "type": "gmail_label_message",
                 "source": "gmail_label_app",
                 "scan_id": scan_id,
                 "user_id": user_id,
                 "gmail_message_id": message_id,
-            })
+            }
+
+            enqueued_to_redis = False
+            try:
+                scan_queue.enqueue(job)
+                enqueued_to_redis = True
+            except Exception as q_exc:
+                print(f"[GMAIL WATCHER] Redis enqueue unavailable ({q_exc}); running in background thread")
+
+            # CRITICAL FALLBACK: If Redis is offline (e.g. Railway) or enqueue failed,
+            # execute in a background daemon thread right now so the scan never gets stuck!
+            if not enqueued_to_redis:
+                import threading
+                from server.worker import process_scan_job
+                threading.Thread(
+                    target=process_scan_job,
+                    args=(job,),
+                    daemon=True,
+                    name=f"gmail-worker-{scan_id[:8]}",
+                ).start()
+                print(f"[GMAIL WATCHER] Started in-process background worker for scan {scan_id}")
 
             if thread_messages:
                 for t_msg in thread_messages:

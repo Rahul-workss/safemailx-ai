@@ -60,11 +60,11 @@ echo.
 :: API: --reload-dir src watches ALL of src/ for changes (engines/, utils/, server/)
 start "TrustMail API" cmd /k "set PYTHONPATH=src && venv\Scripts\activate && uvicorn server.app:app --host 0.0.0.0 --port 8080 --reload --reload-dir src"
 
-:: Worker: watchmedo auto-restarts on any .py or .env change in src/
-start "TrustMail Worker" cmd /k "set PYTHONPATH=src && venv\Scripts\activate && watchmedo auto-restart --patterns=*.py;.env --recursive --directory=src python -- -m server.worker"
+:: Worker: background queue processor
+start "SafeMail X Worker" cmd /k "set PYTHONPATH=src && venv\Scripts\activate && python -m server.worker"
 
-:: Gmail Watcher: same auto-restart behaviour
-start "TrustMail Gmail Watcher" cmd /k "set PYTHONPATH=src && venv\Scripts\activate && watchmedo auto-restart --patterns=*.py;.env --recursive --directory=src python -- -m server.gmail_watcher"
+:: Gmail Watcher: background forwarded email processor
+start "SafeMail X Gmail Watcher" cmd /k "set PYTHONPATH=src && venv\Scripts\activate && python -m server.gmail_watcher"
 
 echo.
 echo ============================================================

@@ -58,27 +58,15 @@ def get_gmail_service():
     creds = _load_token()
 
     if not creds or not creds.valid:
-
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
-            except RefreshError:
+                _save_token(creds)
+            except RefreshError as exc:
                 GMAIL_TOKEN_PATH.unlink(missing_ok=True)
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    str(GMAIL_CREDENTIALS_PATH),
-                    SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-
+                raise RuntimeError("Gmail token expired and refresh failed.") from exc
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                str(GMAIL_CREDENTIALS_PATH),
-                SCOPES
-            )
-
-            creds = flow.run_local_server(port=0)
-
-        _save_token(creds)
+            raise RuntimeError("Gmail token is not available or valid. Please authenticate via OAuth.")
 
     service = build("gmail", "v1", credentials=creds)
 

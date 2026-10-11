@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlencode, urlparse
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -509,7 +509,7 @@ def manual_scan(payload: ManualScanRequest, _auth=Depends(require_auth)):
 
 
 @app.post("/api/scans/manual/queue", response_model=ScanDetail, status_code=202)
-def queue_manual_scan(payload: ManualScanRequest, _auth=Depends(require_auth)):
+def queue_manual_scan(payload: ManualScanRequest, background_tasks: BackgroundTasks, _auth=Depends(require_auth)):
     user_id = _user_id(_auth)
     scan_id = repository.create_queued_scan(
         subject=payload.subject,
@@ -521,19 +521,25 @@ def queue_manual_scan(payload: ManualScanRequest, _auth=Depends(require_auth)):
             "source": "manual_text",
         },
     )
+    job = {
+        "type": "manual_text",
+        "scan_id": scan_id,
+        "user_id": user_id,
+        "subject": payload.subject,
+        "sender": payload.sender,
+        "body": payload.body,
+        "scan_mode": payload.scan_mode,
+    }
+    enqueued = False
     try:
-        scan_queue.enqueue({
-            "type": "manual_text",
-            "scan_id": scan_id,
-            "user_id": user_id,
-            "subject": payload.subject,
-            "sender": payload.sender,
-            "body": payload.body,
-            "scan_mode": payload.scan_mode,
-        })
+        scan_queue.enqueue(job)
+        enqueued = True
     except QueueUnavailable as exc:
-        repository.fail_scan(scan_id, f"Redis queue unavailable: {exc}")
-        raise HTTPException(status_code=503, detail="Scan queue unavailable") from exc
+        print(f"[APP] Redis queue unavailable ({exc}); running scan via background task")
+
+    if not enqueued:
+        from server.worker import process_scan_job
+        background_tasks.add_task(process_scan_job, job)
 
     scan = repository.get_scan(scan_id, user_id=user_id)
     if scan is None:
@@ -743,7 +749,8 @@ def gmail_run_once(_auth=Depends(require_auth)):
             user_id=user_id,
         )
     except QueueUnavailable as exc:
-        raise HTTPException(status_code=503, detail="Scan queue unavailable") from exc
+        print(f"[APP] Redis queue unavailable ({exc}); jobs processed in background thread")
+        count = 0
     except RefreshError as exc:
         repository.delete_gmail_token(user_id)
         raise HTTPException(status_code=401, detail="Gmail connection expired. Please reconnect.") from exc

@@ -87,6 +87,34 @@ def exchange_code_for_token(code: str, state: str, redirect_uri: str | None = No
     return flow.credentials
 
 
-def build_gmail_service_from_blob(blob: str):
+def build_gmail_service_from_blob(blob: str, *, repository=None, user_id: str | None = None):
+    """Build a Gmail API service from a stored OAuth credentials blob.
+
+    Automatically refreshes the access token if it is expired.
+    If *repository* and *user_id* are provided, the refreshed token is
+    persisted back to the database so the next call doesn't need to refresh again.
+    """
+    from google.auth.transport.requests import Request
+    from google.auth.exceptions import RefreshError
+
     creds = decode_credentials(blob)
+
+    # Refresh token if expired
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            # Persist refreshed token if we have a repository reference
+            if repository is not None and user_id is not None:
+                try:
+                    repository.store_gmail_token(user_id, encode_credentials(creds))
+                except Exception:
+                    pass  # Not critical — service will still work for this call
+
+        except RefreshError as exc:
+            raise RuntimeError(
+                f"Gmail OAuth token expired and could not be refreshed. "
+                f"Please reconnect Gmail in the app. Error: {exc}"
+            ) from exc
+
     return build("gmail", "v1", credentials=creds)
+

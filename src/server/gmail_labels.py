@@ -23,6 +23,7 @@ _OLD_LABEL_NAMES = {
 
 RESULT_LABEL_BY_VERDICT = {
     "legitimate": "safe",
+    "safe": "safe",          # alias so final_label="safe" doesn't fall through to "failed"
     "suspicious": "suspicious",
     "phishing": "phishing",
     "failed": "failed",

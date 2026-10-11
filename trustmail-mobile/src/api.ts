@@ -387,18 +387,19 @@ export async function createManualScan(body: string): Promise<ScanSummary> {
     scan_mode: "balanced"
   };
 
-  let response = await apiFetch("/api/scans/manual/queue", {
+  // Try direct synchronous scan first so user gets instant Qwen3 analysis without getting stuck in queued
+  let response = await apiFetch("/api/scans/manual", {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(payload)
-  }, 15000);
+  }, 45000);
 
-  if (response.status === 503) {
-    response = await apiFetch("/api/scans/manual", {
+  if (!response.ok) {
+    response = await apiFetch("/api/scans/manual/queue", {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload)
-    }, 45000);
+    }, 15000);
   }
 
   if (!response.ok) throw new Error("Manual scan failed");
