@@ -812,11 +812,10 @@ export async function translateText(text: string, targetLang: string): Promise<s
       },
       body: JSON.stringify({ text, target_lang: targetLang }),
     });
-    if (!response.ok) throw new Error('Translation request failed');
+    if (!response.ok) return text;
     const data = await response.json();
     return data.translated_text || text;
   } catch (error) {
-    console.error('Translation error:', error);
     return text;
   }
 }

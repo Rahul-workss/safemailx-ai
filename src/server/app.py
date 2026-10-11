@@ -1615,42 +1615,62 @@ async def analyze_call_description(
     return CallAnalysisResponse(**result)
 
 
+MYMEMORY_LANG_MAP = {
+    "hi": "hi-IN",
+    "bn": "bn-IN",
+    "te": "te-IN",
+    "mr": "mr-IN",
+    "ta": "ta-IN",
+    "ur": "ur-PK",
+    "gu": "gu-IN",
+    "kn": "kn-IN",
+    "ml": "ml-IN",
+    "pa": "pa-IN",
+    "or": "or-IN",
+}
+
+
 @app.post("/api/translate")
 async def translate_text(request: Request):
     """
     Translates English text to a supported local language.
     Body format: {"text": "...", "target_lang": "hi"}
     """
-    try:
-        from deep_translator import GoogleTranslator, MyMemoryTranslator
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Translator library not installed on server.")
-
+    data = {}
     try:
         data = await request.json()
-        text = data.get("text", "").strip()
-        target_lang = data.get("target_lang", "hi")
-        
-        if not text or target_lang == 'en':
-            return {"translated_text": text}
-            
-        try:
-            translated = GoogleTranslator(source='en', target=target_lang).translate(text)
-        except Exception as e:
-            # Fallback to MyMemory
-            try:
-                # MyMemory expects e.g., 'hi-IN' for Hindi
-                mm_lang = target_lang + "-IN" if target_lang in ["hi", "bn", "te", "mr", "ta", "ur", "gu", "kn", "ml", "pa", "or"] else target_lang
-                translated = MyMemoryTranslator(source='en', target=mm_lang).translate(text)
-            except Exception as e2:
-                raise e # raise original google error if fallback fails
-                
-        return {"translated_text": translated}
-    except Exception as e:
-        import logging
-        logging.getLogger("APP").error(f"Translation failed: {e}")
-        raise HTTPException(status_code=500, detail="Translation failed")
+    except Exception:
+        pass
 
+    text = data.get("text", "").strip() if isinstance(data, dict) else ""
+    target_lang = data.get("target_lang", "hi").lower().strip() if isinstance(data, dict) else "hi"
+
+    if not text or target_lang == "en":
+        return {"translated_text": text}
+
+    # 1. Primary: MyMemory with correct source ('en-US') and regional Indian codes
+    mm_target = MYMEMORY_LANG_MAP.get(target_lang, f"{target_lang}-{target_lang.upper()}")
+    try:
+        from deep_translator import MyMemoryTranslator
+        translated = MyMemoryTranslator(source="en-US", target=mm_target).translate(text)
+        if translated and isinstance(translated, str) and not translated.startswith("MYMEMORY WARNING"):
+            return {"translated_text": translated}
+    except Exception as mm_err:
+        import logging
+        logging.getLogger("APP").warning(f"MyMemory translation failed for {target_lang}: {mm_err}")
+
+    # 2. Secondary fallback: GoogleTranslator
+    try:
+        from deep_translator import GoogleTranslator
+        translated = GoogleTranslator(source="en", target=target_lang).translate(text)
+        if translated and isinstance(translated, str):
+            return {"translated_text": translated}
+    except Exception as g_err:
+        import logging
+        logging.getLogger("APP").warning(f"GoogleTranslator fallback failed for {target_lang}: {g_err}")
+
+    # 3. Graceful fallback: return original text with 200 OK (never crash client with 500)
+    return {"translated_text": text}
 
 
 import urllib.request
