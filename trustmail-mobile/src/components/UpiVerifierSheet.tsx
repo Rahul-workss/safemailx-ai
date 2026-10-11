@@ -345,8 +345,8 @@ export default function UpiVerifierSheet({ visible, onClose }: Props) {
 
   return (
     <Animated.View style={[S.shell, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-      <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.48)' }]} />
+      <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814' }]} />
       <LinearGradient
         colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.00)', 'rgba(255,255,255,0.03)']}
         start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -554,16 +554,17 @@ export default function UpiVerifierSheet({ visible, onClose }: Props) {
 const S = StyleSheet.create({
   shell: {
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: `${TM.emerald}45`,
+    borderWidth: 1.2,
+    borderColor: `${TM.emerald}50`,
+    backgroundColor: '#070814',
     padding: 16,
     width: 324,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.85,
-    shadowRadius: 22,
-    elevation: 12,
+    shadowOpacity: 0.95,
+    shadowRadius: 24,
+    elevation: 16,
   },
   shimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.35)' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
@@ -574,14 +575,20 @@ const S = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,61,113,0.12)',
+    backgroundColor: 'rgba(255,61,113,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,61,113,0.35)',
+    borderColor: 'rgba(255,61,113,0.45)',
     borderRadius: 12,
     padding: 10,
   },
   errorText: { color: TM.rose, fontSize: 11, flex: 1 },
-  primaryScanBtn: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  primaryScanBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#0f1126',
+  },
   scanBtnGrad: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   actionIconCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   scanBtnTitle: { color: TM.frost, fontSize: 13, fontWeight: '700' },
@@ -590,9 +597,9 @@ const S = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    backgroundColor: 'rgba(111,217,184,0.06)',
+    backgroundColor: 'rgba(111,217,184,0.09)',
     borderWidth: 1,
-    borderColor: 'rgba(111,217,184,0.22)',
+    borderColor: 'rgba(111,217,184,0.26)',
     borderRadius: 12,
     padding: 10,
     marginTop: 4,
@@ -614,7 +621,7 @@ const S = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.5,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -633,9 +640,9 @@ const S = StyleSheet.create({
   verdictTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
   riskScoreBadge: { color: TM.frost3, fontSize: 11, fontWeight: '700' },
   debitTrapAlert: {
-    backgroundColor: 'rgba(255,61,113,0.14)',
+    backgroundColor: 'rgba(255,61,113,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,61,113,0.45)',
+    borderColor: 'rgba(255,61,113,0.50)',
     borderRadius: 12,
     padding: 10,
     marginBottom: 10,
@@ -643,10 +650,10 @@ const S = StyleSheet.create({
   debitTrapHeading: { color: TM.rose, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   debitTrapBody: { color: TM.frost2, fontSize: 11, lineHeight: 15 },
   infoGrid: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: '#0c0e22',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.08)',
     padding: 12,
     gap: 10,
     marginBottom: 10,
@@ -655,10 +662,10 @@ const S = StyleSheet.create({
   infoLabel: { color: TM.frost4, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.5 },
   infoValue: { color: TM.frost, fontSize: 12, fontWeight: '600' },
   signalsCard: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: '#0c0e22',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.06)',
     padding: 10,
     gap: 6,
     marginBottom: 12,

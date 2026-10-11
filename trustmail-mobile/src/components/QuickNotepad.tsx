@@ -91,8 +91,8 @@ export default function QuickNotepad({ onClose, visible }: Props) {
   return (
     <Animated.View style={[S.shell, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
       {/* Liquid glass layers */}
-      <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.40)' }]} />
+      <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814' }]} />
       <LinearGradient
         colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.01)','rgba(255,255,255,0.00)','rgba(255,255,255,0.03)']}
         start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -158,11 +158,12 @@ export default function QuickNotepad({ onClose, visible }: Props) {
 
 const S = StyleSheet.create({
   shell: {
-    borderRadius: 20, borderWidth: 1,
-    borderColor: 'rgba(232,168,76,0.28)',
+    borderRadius: 20, borderWidth: 1.2,
+    borderColor: 'rgba(232,168,76,0.35)',
+    backgroundColor: '#070814',
     padding: 16, width: 300, overflow: 'hidden',
-    shadowColor: '#e8a84c', shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.35, shadowRadius: 20, elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.95, shadowRadius: 24, elevation: 16,
   },
   shimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.35)' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
@@ -182,7 +183,7 @@ const S = StyleSheet.create({
   noteChip: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
     borderRadius: 12, padding: 10, marginBottom: 6, overflow: 'hidden',
-    borderWidth: 1, borderColor: TM.line2,
+    borderWidth: 1, borderColor: TM.line2, backgroundColor: '#0f1126',
   },
   noteText: { color: TM.frost2, fontSize: 12, lineHeight: 17 },
   noteTime: { color: TM.frost4, fontSize: 10, marginTop: 3 },

@@ -117,12 +117,20 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
     return () => clearTimeout(t);
   }, [isVisible]);
 
+  // ── Synchronize Backdrop Opacity ──
+  useEffect(() => {
+    if (menuOpen || sheet !== null) {
+      Animated.timing(backdropOp, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    } else {
+      Animated.timing(backdropOp, { toValue: 0, duration: 140, useNativeDriver: true }).start();
+    }
+  }, [menuOpen, sheet]);
+
   // ── Open fan ──
   const openMenu = useCallback(() => {
     setMenuOpen(true);
     Animated.parallel([
       Animated.timing(menuOpacity,  { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(backdropOp,   { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.spring(bubbleScale,  { toValue: 1.12, friction: 5, useNativeDriver: true }),
       ...itemAnims.map((a, i) =>
         Animated.spring(a, { toValue: 1, delay: i * 48, tension: 90, friction: 9, useNativeDriver: true })
@@ -134,7 +142,6 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
   const closeMenu = useCallback(() => {
     Animated.parallel([
       Animated.timing(menuOpacity, { toValue: 0, duration: 140, useNativeDriver: true }),
-      Animated.timing(backdropOp,  { toValue: 0, duration: 140, useNativeDriver: true }),
       Animated.spring(bubbleScale, { toValue: 1, friction: 6,   useNativeDriver: true }),
       ...itemAnims.map(a => Animated.timing(a, { toValue: 0, duration: 110, useNativeDriver: true })),
     ]).start(() => setMenuOpen(false));
@@ -304,7 +311,7 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       {/* ── Backdrop ── */}
       {(menuOpen || sheet !== null) && (
         <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: backdropOp, backgroundColor: 'rgba(1,1,4,0.55)', zIndex: 8998 }]}
+          style={[StyleSheet.absoluteFill, { opacity: backdropOp, backgroundColor: 'rgba(1,1,4,0.72)', zIndex: 8998 }]}
           pointerEvents="auto"
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={dismissAll} />
@@ -380,10 +387,10 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       {(verdict || scanning) && sheet === null && (
         <View style={[S.verdictFloat, { top: sheetTop + 260, right: sheetRight, left: sheetLeft, zIndex: 9001 }]}>
           <View style={S.verdictCard}>
-            <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 18 }]} />
+            <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814', borderRadius: 18 }]} />
             <LinearGradient
-              colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.00)','rgba(255,255,255,0.03)']}
+              colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.00)','rgba(0,0,0,0.35)']}
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
@@ -407,8 +414,8 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       {sheet === 'link' && (
         <View style={[S.sheetFloat, { top: sheetTop, right: sheetRight, left: sheetLeft, zIndex: 9001 }]}>
           <View style={S.linkShell}>
-            <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 20 }]} />
+            <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814', borderRadius: 20 }]} />
             <LinearGradient
               colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.01)','rgba(255,255,255,0.00)','rgba(255,255,255,0.03)']}
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -479,8 +486,8 @@ export default function AssistiveTouch({ onOpenCallAnalyzer, onOpenQRScanner, is
       {sheet === 'clipboard' && (
         <View style={[S.sheetFloat, { top: sheetTop, right: sheetRight, left: sheetLeft, zIndex: 9001 }]}>
           <View style={S.linkShell}>
-            <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 20 }]} />
+            <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814', borderRadius: 20 }]} />
             <LinearGradient
               colors={['rgba(255,255,255,0.08)','rgba(255,255,255,0.01)','rgba(255,255,255,0.00)','rgba(255,255,255,0.03)']}
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -621,12 +628,13 @@ const S = StyleSheet.create({
 
   // ── Inline verdict ──
   verdictCard: {
-    borderRadius: 18, borderWidth: 1,
+    borderRadius: 18, borderWidth: 1.2,
     borderColor: TM.cyanBorder,
+    backgroundColor: '#070814',
     padding: 14, minWidth: 220, maxWidth: 290,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.7, shadowRadius: 16, elevation: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.9, shadowRadius: 20, elevation: 12,
   },
   verdictShimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.35)' },
   scanningText: { color: TM.frost4, fontSize: 13, textAlign: 'center' },
@@ -636,18 +644,19 @@ const S = StyleSheet.create({
 
   // ── Link check sheet ──
   linkShell: {
-    borderRadius: 20, borderWidth: 1,
-    borderColor: `${TM.violetGlow}40`,
+    borderRadius: 20, borderWidth: 1.2,
+    borderColor: `${TM.violetGlow}45`,
+    backgroundColor: '#070814',
     padding: 16, width: 300, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.8, shadowRadius: 20, elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.95, shadowRadius: 24, elevation: 14,
   },
   linkShimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.35)' },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   iconRing: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sheetTitle: { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
   inputRow: { flexDirection: 'row', gap: 8 },
-  inputWrap: { flex: 1, height: 44, borderRadius: 14, borderWidth: 1, borderColor: TM.line2, overflow: 'hidden' },
+  inputWrap: { flex: 1, height: 44, borderRadius: 14, borderWidth: 1, borderColor: TM.line2, backgroundColor: '#0c0e22', overflow: 'hidden' },
   inputShimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' },
   input: { flex: 1, color: TM.frost, fontSize: 13, paddingHorizontal: 14, height: 44 },
   actionBtn: { width: 44, height: 44, borderRadius: 14, overflow: 'hidden' },

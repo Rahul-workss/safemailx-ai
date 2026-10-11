@@ -348,8 +348,8 @@ export default function WhoCalledSheet({ visible, onClose, onOpenCallAnalyzer, i
 
   return (
     <Animated.View style={[S.shell, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-      <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.48)' }]} />
+      <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#070814' }]} />
       <LinearGradient
         colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.00)', 'rgba(255,255,255,0.03)']}
         start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -530,16 +530,17 @@ export default function WhoCalledSheet({ visible, onClose, onOpenCallAnalyzer, i
 const S = StyleSheet.create({
   shell: {
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: TM.cyanBorder,
+    borderWidth: 1.2,
+    borderColor: 'rgba(0,240,255,0.35)',
+    backgroundColor: '#070814',
     padding: 16,
     width: 324,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.85,
-    shadowRadius: 22,
-    elevation: 12,
+    shadowOpacity: 0.95,
+    shadowRadius: 24,
+    elevation: 16,
   },
   shimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.35)' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
@@ -548,19 +549,19 @@ const S = StyleSheet.create({
   clipboardBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,240,255,0.08)',
+    backgroundColor: 'rgba(0,240,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(0,240,255,0.3)',
+    borderColor: 'rgba(0,240,255,0.35)',
     borderRadius: 12,
     padding: 9,
     marginBottom: 10,
     gap: 8,
   },
   clipboardText: { color: TM.frost3, fontSize: 11, flex: 1 },
-  analyzePill: { backgroundColor: 'rgba(0,240,255,0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  analyzePill: { backgroundColor: 'rgba(0,240,255,0.25)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   analyzePillText: { color: 'rgba(0,240,255,1)', fontSize: 10.5, fontWeight: '700' },
   inputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  inputWrap: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: TM.line2, overflow: 'hidden', height: 44 },
+  inputWrap: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: TM.line2, backgroundColor: '#0c0e22', overflow: 'hidden', height: 44 },
   inputShimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' },
   input: { flex: 1, color: TM.frost, fontSize: 13.5, paddingHorizontal: 14, height: 44 },
   checkBtn: { width: 44, height: 44, borderRadius: 14, overflow: 'hidden' },
@@ -570,11 +571,11 @@ const S = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: '#0f1126',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   screenshotPickText: { color: TM.frost4, fontSize: 11, fontWeight: '600' },
   verdictBanner: {
@@ -601,19 +602,19 @@ const S = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: 'rgba(255,61,113,0.14)',
+    backgroundColor: 'rgba(255,61,113,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(255,61,113,0.45)',
+    borderColor: 'rgba(255,61,113,0.50)',
     borderRadius: 12,
     padding: 10,
   },
   intlScamHeading: { color: TM.rose, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   intlScamBody: { color: TM.frost2, fontSize: 11, lineHeight: 15, marginTop: 2 },
   infoGrid: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: '#0c0e22',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.08)',
     padding: 12,
     gap: 10,
   },
@@ -621,10 +622,10 @@ const S = StyleSheet.create({
   infoLabel: { color: TM.frost4, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.5 },
   infoValue: { color: TM.frost, fontSize: 12, fontWeight: '600' },
   signalsCard: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: '#0c0e22',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.06)',
     padding: 10,
     gap: 6,
   },
