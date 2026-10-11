@@ -1736,7 +1736,7 @@ function BottomNavBar({ active, onSwitch, bottomInset }: { active: Tab; onSwitch
       </View>
 
       {/* Right items */}
-      <NavItem label="Reports" icon="document-text-outline" active={active === "reports"} onPress={() => onSwitch("reports")} />
+      <NavItem label="QR Scan" icon="qr-code-outline" active={active === "qr"} onPress={() => onSwitch("qr")} />
       <NavItem label="Settings" icon="settings-outline" active={active === "settings"} onPress={() => onSwitch("settings")} />
     </LinearGradient>
   );
