@@ -44,7 +44,7 @@ type MenuAction = 'clipboard' | 'link' | 'upi' | 'whocalled' | 'note';
 const ITEMS: { id: MenuAction; icon: keyof typeof Ionicons.glyphMap; label: string; color: string; glow: string }[] = [
   { id: 'clipboard', icon: 'clipboard-outline',      label: 'Clipboard',  color: 'rgba(0,240,255,1)',  glow: 'rgba(0,240,255,0.5)' },
   { id: 'link',      icon: 'link-outline',            label: 'Link Check', color: TM.violetGlow,        glow: 'rgba(138,143,240,0.5)' },
-  { id: 'upi',       icon: 'cash-outline',            label: 'UPI Check',  color: TM.emerald,           glow: 'rgba(111,217,184,0.5)' },
+  { id: 'upi',       icon: 'qr-code-outline',         label: 'UPI QR',     color: TM.emerald,           glow: 'rgba(111,217,184,0.5)' },
   { id: 'whocalled', icon: 'call-outline',            label: 'Who Called?',color: TM.gold,              glow: 'rgba(232,168,76,0.5)' },
   { id: 'note',      icon: 'document-text-outline',   label: 'Note',       color: TM.rose,              glow: 'rgba(224,138,174,0.5)' },
 ];
