@@ -965,7 +965,7 @@ function App() {
                 />
               </View>
               <View style={{ display: activeTab === "scans" ? "flex" : "none" }}>
-                <ScansScreen scans={scans} />
+                <ScansScreen scans={scans} onOpenReport={openReport} />
               </View>
               <View style={{ display: activeTab === "new" ? "flex" : "none" }}>
                 <UnifiedScanScreen
@@ -980,6 +980,7 @@ function App() {
                   refreshApp={refresh}
                   scrollViewRef={scrollViewRef}
                   onShowToast={showToast}
+                  onOpenReport={openReport}
                 />
               </View>
               <View style={{ display: activeTab === "reports" ? "flex" : "none" }}>
@@ -1735,7 +1736,7 @@ function BottomNavBar({ active, onSwitch, bottomInset }: { active: Tab; onSwitch
       </View>
 
       {/* Right items */}
-      <NavItem label="QR Scan" icon="qr-code-outline" active={active === "qr"} onPress={() => onSwitch("qr")} />
+      <NavItem label="Reports" icon="document-text-outline" active={active === "reports"} onPress={() => onSwitch("reports")} />
       <NavItem label="Settings" icon="settings-outline" active={active === "settings"} onPress={() => onSwitch("settings")} />
     </LinearGradient>
   );
@@ -2129,7 +2130,7 @@ function IntakeRow({ scan, index }: { scan: any; index: number }) {
 
 
 // ─── Scans list screen ────────────────────────────────────────────────────────
-function ScansScreen({ scans }: { scans: ScanSummary[] }) {
+function ScansScreen({ scans, onOpenReport }: { scans: ScanSummary[]; onOpenReport: (id: string, kind: "pdf" | "json") => void }) {
   if (scans.length === 0) {
     return (
       <TmCard style={{ alignItems: "center", padding: 30 }}>
@@ -2140,14 +2141,15 @@ function ScansScreen({ scans }: { scans: ScanSummary[] }) {
   }
   return (
     <View style={{ gap: 10 }}>
-      {scans.map(s => <ScanCard key={s.id} scan={s} />)}
+      {scans.map(s => <ScanCard key={s.id} scan={s} onOpenReport={onOpenReport} />)}
     </View>
   );
 }
 
 // ─── Scan card ────────────────────────────────────────────────────────────────
-function ScanCard({ scan }: { scan: ScanSummary }) {
+function ScanCard({ scan, onOpenReport }: { scan: ScanSummary; onOpenReport: (id: string, kind: "pdf" | "json") => void }) {
   const col = verdictColor(scan.final_label);
+  const hasReport = !!(scan.report_pdf || scan.report_json);
   return (
     <TmCard>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -2173,9 +2175,50 @@ function ScanCard({ scan }: { scan: ScanSummary }) {
       <Text style={[S.muted, { marginTop: 6 }]}>
         {Math.round(scan.final_score * 100)}/100 · Qwen {scan.llm_used ? "✓" : "–"}
       </Text>
+
+      {/* Forensic report buttons — only shown when report exists */}
+      {hasReport && (
+        <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 8 }}>
+            <Ionicons name="document-text-outline" size={11} color={C.violetGlow} />
+            <Text style={{ color: C.violetGlow, fontSize: 10, fontWeight: "700", letterSpacing: 0.5 }}>FORENSIC REPORT</Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {scan.report_pdf && (
+              <Pressable
+                onPress={() => onOpenReport(scan.id, "pdf")}
+                style={{
+                  flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                  gap: 6, paddingVertical: 9, borderRadius: 10,
+                  backgroundColor: "rgba(59,65,191,0.12)",
+                  borderWidth: 1, borderColor: "rgba(138,143,240,0.35)",
+                }}
+              >
+                <Ionicons name="document-text" size={13} color={C.violetGlow} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: C.violetGlow }}>PDF</Text>
+              </Pressable>
+            )}
+            {scan.report_json && (
+              <Pressable
+                onPress={() => onOpenReport(scan.id, "json")}
+                style={{
+                  flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                  gap: 6, paddingVertical: 9, borderRadius: 10,
+                  backgroundColor: "rgba(59,65,191,0.06)",
+                  borderWidth: 1, borderColor: "rgba(138,143,240,0.2)",
+                }}
+              >
+                <Ionicons name="code-slash" size={13} color={C.frost3} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: C.frost3 }}>JSON</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
     </TmCard>
   );
 }
+
 
 function SecurityBulletin() {
   const [items, setItems] = useState<{ title: string; link: string }[]>([]);
@@ -2225,7 +2268,7 @@ function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
-  manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast
+  manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
 }: {
   gmailState: string; busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
@@ -2238,6 +2281,7 @@ function UnifiedScanScreen({
   refreshApp: () => Promise<void>;
   scrollViewRef: React.RefObject<ScrollView | null>;
   onShowToast: (msg: string, type?: "error" | "success") => void;
+  onOpenReport: (id: string, kind: "pdf" | "json") => void;
 }) {
   const [mode, setMode] = useState<"email" | "sms" | "text" | "url">("email");
   const [showInfo, setShowInfo] = useState(false);
@@ -2627,9 +2671,51 @@ function UnifiedScanScreen({
              </View>
            </View>
            <Text style={{ color: "#fff", fontSize: 13, marginTop: 14, fontWeight: "600" }}>{inlineResult.recommended_action}</Text>
+
+           {/* ── Forensic Report Download ── */}
+           {!!inlineResult.scan_id && (
+             <View style={{ marginTop: 16, paddingTop: 14, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" }}>
+               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                 <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(138,143,240,0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(138,143,240,0.3)" }}>
+                   <Ionicons name="document-text" size={11} color={C.violetGlow} />
+                 </View>
+                 <Text style={{ color: C.violetGlow, fontSize: 11, fontWeight: "700", letterSpacing: 0.5 }}>FORENSIC REPORT</Text>
+               </View>
+               <Text style={{ color: C.frost4, fontSize: 11, lineHeight: 16, marginBottom: 12 }}>
+                 Full detailed forensic analysis — why we flagged this, evidence chain, signal breakdown, and AI reasoning in a shareable file.
+               </Text>
+               <View style={{ flexDirection: "row", gap: 10 }}>
+                 <Pressable
+                   onPress={() => onOpenReport(inlineResult.scan_id, "pdf")}
+                   style={{
+                     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                     gap: 7, paddingVertical: 11, borderRadius: 12,
+                     backgroundColor: "rgba(59,65,191,0.12)",
+                     borderWidth: 1, borderColor: "rgba(138,143,240,0.35)",
+                   }}
+                 >
+                   <Ionicons name="document-text" size={15} color={C.violetGlow} />
+                   <Text style={{ fontSize: 13, fontWeight: "700", color: C.violetGlow }}>PDF Report</Text>
+                 </Pressable>
+                 <Pressable
+                   onPress={() => onOpenReport(inlineResult.scan_id, "json")}
+                   style={{
+                     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                     gap: 7, paddingVertical: 11, borderRadius: 12,
+                     backgroundColor: "rgba(59,65,191,0.06)",
+                     borderWidth: 1, borderColor: "rgba(138,143,240,0.2)",
+                   }}
+                 >
+                   <Ionicons name="code-slash" size={15} color={C.frost3} />
+                   <Text style={{ fontSize: 13, fontWeight: "700", color: C.frost3 }}>JSON Data</Text>
+                 </Pressable>
+               </View>
+             </View>
+           )}
         </TmCard>
         </View>
       )}
+
 
     </View>
   );
