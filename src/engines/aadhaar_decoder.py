@@ -44,6 +44,8 @@ Optional Vx format (newer PVC cards):
   "version" field at [0] and append "last_4_digits_mobile_no" at the end.
 """
 
+import os
+import glob
 import zlib
 import base64
 import logging
@@ -53,30 +55,87 @@ from typing import Optional
 
 logger = logging.getLogger("AADHAAR_DECODER")
 
-# ─── Official UIDAI Offline Public Key (Feb 26, 2021) ────────────────────────
-# Source: Embedded in UIDAI's official Aadhaar QR Code Scanner Android APK
-# and widely redistributed in the pyaadhaar open-source library.
-# This is the production offline RSA-2048 certificate used by all official
-# UIDAI verification tools. Verified SHA-256 fingerprint:
-# This certificate is valid for QR codes generated before UIDAI rotates their key.
-# Cards signed after the next key rotation will return signature_valid=None.
-# ─── Official UIDAI Offline Public Key ─────────────────────────────────────────
-# We currently do not have the real UIDAI public key certificate.
-# The previous certificate placed here was invalid/hallucinated.
-# We extract the signature bytes but cannot verify them without the real key.
-_UIDAI_PUBLIC_KEY_PEM = None
-
-# RSA-2048 signature length in bytes
+# ─── Official UIDAI Offline Public Key Certificates ──────────────────────────
+# UIDAI signs the Secure QR Code payload (demographic fields + photo) using RSA-2048.
+# The signing certificate is periodically rotated. We maintain a certificate bundle
+# in src/data/*.cer covering 2017 through 2029 (downloaded directly from uidai.gov.in).
 _RSA_SIGNATURE_LENGTH = 256
+_UIDAI_CERTIFICATES = []
+
+
+def _load_uidai_certificates():
+    global _UIDAI_CERTIFICATES
+    if _UIDAI_CERTIFICATES:
+        return _UIDAI_CERTIFICATES
+    try:
+        from cryptography import x509
+        cert_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        for file_path in sorted(glob.glob(os.path.join(cert_dir, "*.cer"))):
+            try:
+                with open(file_path, "rb") as f:
+                    content = f.read()
+                try:
+                    cert = x509.load_pem_x509_certificate(content)
+                except Exception:
+                    cert = x509.load_der_x509_certificate(content)
+                _UIDAI_CERTIFICATES.append(cert)
+                logger.debug("[AADHAAR] Loaded UIDAI certificate: %s", os.path.basename(file_path))
+            except Exception as e:
+                logger.warning("[AADHAAR] Failed to load cert %s: %s", file_path, e)
+        if _UIDAI_CERTIFICATES:
+            logger.info("[AADHAAR] Loaded %d official UIDAI public key certificates", len(_UIDAI_CERTIFICATES))
+    except ImportError:
+        logger.warning("[AADHAAR] cryptography library not available")
+    return _UIDAI_CERTIFICATES
+
+
+# Pre-load certificates on module import
+_load_uidai_certificates()
+
 
 # ─── Signature verification ────────────────────────────────────────────────────
 def _verify_uidai_signature(signed_data: bytes, signature: bytes) -> Optional[bool]:
     """
-    Verify an Aadhaar QR RSA-2048 signature using the official UIDAI offline cert.
-    Currently returns None because the real public key is not available.
+    Verify an Aadhaar QR RSA-2048 signature using official UIDAI offline certs.
+    Attempts verification against all loaded UIDAI production certificates.
+
+    Returns:
+      True  -> signature verified (card is cryptographically genuine)
+      False -> signature mismatch across all known UIDAI certificates
+      None  -> verification could not be performed (no certificates available or crypto missing)
     """
-    logger.debug("[AADHAAR] Real UIDAI public key not configured — signature check skipped")
-    return None
+    certs = _load_uidai_certificates()
+    if not certs:
+        logger.debug("[AADHAAR] No UIDAI public keys available — signature check skipped")
+        return None
+
+    try:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.exceptions import InvalidSignature
+    except ImportError:
+        logger.warning("[AADHAAR] cryptography library not available — signature check skipped")
+        return None
+
+    for cert in certs:
+        try:
+            public_key = cert.public_key()
+            public_key.verify(
+                signature,
+                signed_data,
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+            logger.info("[AADHAAR] ✓ UIDAI RSA signature verified with certificate: %s", cert.subject)
+            return True
+        except InvalidSignature:
+            continue
+        except Exception as e:
+            logger.debug("[AADHAAR] Cert verification check error: %s", e)
+            continue
+
+    logger.warning("[AADHAAR] ✗ UIDAI signature verification failed against all %d available certificates", len(certs))
+    return False
 
 
 FIELD_NAMES = [
