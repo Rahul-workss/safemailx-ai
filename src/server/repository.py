@@ -347,6 +347,32 @@ class ScanRepository:
                 "update_scan_verdict failed for %s: %s", scan_id, exc
             )
 
+    def update_report_paths(self, scan_id: str, report_pdf: str | None = None, report_json: str | None = None) -> None:
+        """Update report_pdf and/or report_json file paths for a scan."""
+        placeholder = "%s" if self.is_postgres else "?"
+        updates = []
+        params = []
+        if report_pdf is not None:
+            updates.append(f"report_pdf = {placeholder}")
+            params.append(report_pdf)
+        if report_json is not None:
+            updates.append(f"report_json = {placeholder}")
+            params.append(report_json)
+        if not updates:
+            return
+        params.append(scan_id)
+        try:
+            with self._db() as conn:
+                conn.execute(
+                    f"UPDATE scans SET {', '.join(updates)} WHERE id = {placeholder}",
+                    tuple(params),
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger("REPOSITORY").warning(
+                "update_report_paths failed for %s: %s", scan_id, exc
+            )
+
     def update_evidence(self, scan_id: str, evidence: dict) -> None:
         """Overwrite evidence_json for an existing scan."""
         placeholder = "%s" if self.is_postgres else "?"

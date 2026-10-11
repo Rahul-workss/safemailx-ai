@@ -149,6 +149,66 @@ def _status_badge(c, x, y, status: str):
     c.drawCentredString(x + 33, y + 2, s)
 
 
+def normalize_evidence_for_report(evidence: dict) -> dict:
+    evidence = dict(evidence or {})
+    final_score = evidence.get("final_score")
+    if final_score is None:
+        final_score = (evidence.get("hybrid_decision") or {}).get("final_score", 0.0)
+    final_label = evidence.get("final_label")
+    if not final_label:
+        final_label = (evidence.get("hybrid_decision") or {}).get("final_label") or evidence.get("verdict", "suspicious")
+
+    if "hybrid_decision" not in evidence or not isinstance(evidence["hybrid_decision"], dict):
+        evidence["hybrid_decision"] = {
+            "final_score": float(final_score),
+            "final_label": str(final_label),
+        }
+    else:
+        evidence["hybrid_decision"].setdefault("final_score", float(final_score))
+        evidence["hybrid_decision"].setdefault("final_label", str(final_label))
+
+    if "email_metadata" not in evidence or not isinstance(evidence["email_metadata"], dict):
+        evidence["email_metadata"] = {
+            "subject": evidence.get("subject", "Forensic Scan"),
+            "sender": evidence.get("sender", "unknown"),
+            "body_length": len(str(evidence.get("scan_input", {}).get("body_text", "") or evidence.get("summary", ""))),
+        }
+
+    if "rule_analysis" not in evidence or not isinstance(evidence["rule_analysis"], dict):
+        evidence["rule_analysis"] = {
+            "rule_score": evidence.get("structural_score", 0.0) or 0.0,
+            "rule_reasons": [s.get("description", "") if isinstance(s, dict) else str(s) for s in evidence.get("top_signals", [])] or [],
+        }
+
+    if "ai_analysis" not in evidence or not isinstance(evidence["ai_analysis"], dict):
+        evidence["ai_analysis"] = {
+            "ai_score": evidence.get("reputation_score", float(final_score)) or float(final_score),
+            "ai_reasons": [],
+            "top_keywords": [],
+        }
+
+    evidence.setdefault("security_headers", {})
+    evidence.setdefault("sender_forensics", {
+        "raw_address": evidence.get("sender", "unknown"),
+        "sender_domain": "",
+    })
+    evidence.setdefault("case_id", "SMX-SCAN")
+
+    if "llm_analysis" not in evidence:
+        if evidence.get("llm_reasoning"):
+            evidence["llm_analysis"] = {
+                "llm_available": True,
+                "llm_score": float(evidence.get("llm_score", final_score)),
+                "llm_reasoning": evidence.get("llm_reasoning", ""),
+                "llm_intent": evidence.get("scan_category", "general"),
+                "llm_tactics": [],
+            }
+        else:
+            evidence["llm_analysis"] = {"llm_available": False}
+
+    return evidence
+
+
 def generate_pdf_report(evidence: dict) -> str:
     # ── Prevent ReportLab Unicode Crashes ──────────────────────────────────────
     def _sanitize_unicode(obj):
@@ -162,6 +222,7 @@ def generate_pdf_report(evidence: dict) -> str:
         return obj
         
     evidence = _sanitize_unicode(evidence)
+    evidence = normalize_evidence_for_report(evidence)
 
     # ── Setup ─────────────────────────────────────────────────────────────────
     os.makedirs(REPORTS_DIR, exist_ok=True)

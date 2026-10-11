@@ -636,26 +636,79 @@ def rescan(scan_id: str, _auth=Depends(require_auth)):
     return queued_scan
 
 
+def _ensure_report_file(scan: dict, kind: str) -> Path:
+    from utils.pdf_report import generate_pdf_report
+    from utils.json_report import save_json_report
+    
+    report_key = "report_pdf" if kind == "pdf" else "report_json"
+    path_value = scan.get(report_key)
+    if path_value:
+        path = Path(path_value)
+        if path.exists() and path.stat().st_size > 0:
+            return path
+            
+    # File is missing on disk (ephemeral Railway container filesystem reset, or instant scan).
+    # Re-generate on-the-fly from persisted evidence in DB!
+    evidence = scan.get("evidence") or {}
+    evidence = dict(evidence)
+    evidence.setdefault("case_id", scan.get("id"))
+    evidence.setdefault("timestamp", scan.get("created_at"))
+    evidence.setdefault("subject", scan.get("subject"))
+    evidence.setdefault("sender", scan.get("sender"))
+    evidence.setdefault("final_score", scan.get("final_score", 0.0))
+    evidence.setdefault("final_label", scan.get("final_label", "suspicious"))
+    
+    if kind == "pdf":
+        new_path_str = generate_pdf_report(evidence)
+    else:
+        new_path_str = save_json_report(evidence)
+        
+    new_path = Path(new_path_str)
+    try:
+        if kind == "pdf":
+            repository.update_report_paths(scan["id"], report_pdf=str(new_path))
+        else:
+            repository.update_report_paths(scan["id"], report_json=str(new_path))
+    except Exception as exc:
+        print(f"[REPORTS] Could not update scan report path in DB: {exc}")
+        
+    return new_path
+
+
 @app.get("/api/scans/{scan_id}/report.pdf")
 def report_pdf(scan_id: str, _auth=Depends(require_auth)):
     scan = repository.get_scan(scan_id, user_id=_user_id(_auth))
-    if not scan or not scan.get("report_pdf"):
-        raise HTTPException(status_code=404, detail="PDF report not found")
-    path = Path(scan["report_pdf"])
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="PDF file missing")
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    try:
+        path = _ensure_report_file(scan, "pdf")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {exc}")
+    filename = f"SafeMailX_Report_{scan_id[:8]}.pdf"
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @app.get("/api/scans/{scan_id}/evidence.json")
 def report_json(scan_id: str, _auth=Depends(require_auth)):
     scan = repository.get_scan(scan_id, user_id=_user_id(_auth))
-    if not scan or not scan.get("report_json"):
+    if not scan:
         raise HTTPException(status_code=404, detail="Evidence JSON not found")
-    path = Path(scan["report_json"])
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Evidence file missing")
-    return FileResponse(path, media_type="application/json", filename=path.name)
+    try:
+        path = _ensure_report_file(scan, "json")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate JSON: {exc}")
+    filename = f"SafeMailX_Evidence_{scan_id[:8]}.json"
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @app.post("/api/scans/{scan_id}/report-link", response_model=ReportDownloadLinkResponse)
@@ -670,9 +723,12 @@ def report_download_link(
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    report_key = "report_pdf" if kind == "pdf" else "report_json"
-    if not scan.get(report_key):
-        raise HTTPException(status_code=404, detail=f"{kind.upper()} report not found")
+    try:
+        _ensure_report_file(scan, kind)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate {kind.upper()} report: {exc}")
 
     expires_minutes = 10
     token = create_signed_token(
@@ -698,16 +754,24 @@ def download_report_with_token(token: str = Query(...)):
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    report_key = "report_pdf" if kind == "pdf" else "report_json"
-    path_value = scan.get(report_key)
-    if not path_value:
-        raise HTTPException(status_code=404, detail=f"{kind.upper()} report not found")
-    path = Path(path_value)
+    try:
+        path = _ensure_report_file(scan, kind)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate {kind.upper()} report: {exc}")
+
     if not path.exists():
         raise HTTPException(status_code=404, detail="Report file missing")
 
     media_type = "application/pdf" if kind == "pdf" else "application/json"
-    return FileResponse(path, media_type=media_type, filename=path.name)
+    filename = f"SafeMailX_Report_{scan_id[:8]}.{kind}"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=filename,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @app.post("/api/gmail/connect")
