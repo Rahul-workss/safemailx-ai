@@ -963,6 +963,7 @@ def _safe_oauth_return_url(return_url: str | None) -> str:
         "localhost",
         "127.0.0.1",
         "safemailx-ai.onrender.com",
+        "safemailx-ai-production.up.railway.app",
     }
     if parsed.scheme in {"http", "https"} and parsed.hostname in ALLOWED_WEB_HOSTS:
         # Block credentials or fragments in redirect URL

@@ -1,6 +1,9 @@
 import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } from "./session";
 
-const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai-production.up.railway.app";
+// Render is the currently registered Google OAuth callback deployment. Keep
+// the fallback aligned with it until the Railway redirect URI is registered
+// in Google and its production environment is updated as one migration.
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 let apiBaseUrl = configuredApiBaseUrl;
 
 let accessToken = "";
@@ -361,8 +364,16 @@ export async function exchangeOAuthCode(code: string): Promise<AuthTokenSet> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code }),
-  });
-  if (!response.ok) throw new Error("OAuth sign-in link expired");
+  }, 10000, false);
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 404) {
+      throw new Error("This sign-in link has expired or was already used. Please start Google sign-in again.");
+    }
+    if (response.status >= 500) {
+      throw new Error("Google sign-in service is temporarily unavailable. Please try again.");
+    }
+    throw new Error("Google sign-in could not be completed. Please try again.");
+  }
   const payload = await response.json();
   return {
     accessToken: payload.access_token,

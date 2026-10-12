@@ -338,6 +338,12 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "" }>({ msg: "", type: "" });
 
+  // Android can deliver the same OAuth deep link through both the initial URL
+  // promise and the URL event. The exchange code is deliberately one-use, so
+  // keep duplicate deliveries from making a successful sign-in look expired.
+  const oauthCodeInFlightRef = useRef(new Set<string>());
+  const oauthCodeCompletedRef = useRef(new Set<string>());
+
   // Blocks rendering login/dashboard until cold-start session restore completes
   // (prevents the login-screen flash on valid session cold start)
   const [isRestoringSession, setIsRestoringSession] = useState(true);
@@ -509,7 +515,20 @@ function App() {
       const params = parsed.queryParams || {};
       const code = typeof params.code === "string" ? params.code : "";
 
+      const callbackError = typeof params.error === "string" ? params.error : "";
+      if (callbackError) {
+        showToast("Google sign-in was cancelled or could not be completed.");
+        return;
+      }
+
       if (code) {
+        if (
+          oauthCodeInFlightRef.current.has(code) ||
+          oauthCodeCompletedRef.current.has(code)
+        ) {
+          return;
+        }
+        oauthCodeInFlightRef.current.add(code);
         try {
           const tokens = await exchangeOAuthCode(code);
           const emailVal = tokens.email || "";
@@ -529,11 +548,14 @@ function App() {
           }
           refresh();
           refreshGmailStatus();
-        } catch {
-          // Token was invalid or expired — clear it
+          oauthCodeCompletedRef.current.add(code);
+        } catch (error: any) {
+          // Do not turn every backend/network failure into an "expired" link.
           setAccessToken("");
           setEmail("");
-          showToast("This sign-in link has expired. Please try again.");
+          showToast(error?.message || "Google sign-in could not be completed. Please try again.");
+        } finally {
+          oauthCodeInFlightRef.current.delete(code);
         }
       }
     } catch (e) {
