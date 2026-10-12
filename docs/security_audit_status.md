@@ -12,21 +12,22 @@ The mobile app showed: “This sign-in link has expired. Please try again.”
 
 - Google sign-in uses a short-lived, one-use handoff code. That security rule is correct and must stay.
 - Android can deliver one deep link twice: once as the app's initial URL and once as a URL event. The second request then correctly receives “expired” because the first request already used the code. This made a successful sign-in look like a failure.
-- Railway currently starts Google OAuth but returns a callback URI on Render; using Railway for the mobile exchange while the callback remains on Render can make a one-use code appear missing. The mobile release remains on Render until the Railway OAuth redirect is registered and migrated as one change.
-- Safe checks against both hosted health endpoints showed the APIs were online, but Redis reported offline. Redis must be restored for reliable multi-instance production OAuth handoffs.
+- Railway is the production mobile API, but its OAuth callback setting still points to the former Render host. Sending the user to one deployment and exchanging the code on another makes the one-use code appear missing.
+- Railway's database is online while Redis is offline. The server now uses the shared database as a short-lived, hashed, one-use fallback for the OAuth handoff, so a process restart or replica change does not invalidate a legitimate sign-in.
 
 ### Changes made
 
 - `trustmail-mobile/App.tsx`: ignores duplicate in-flight or completed OAuth callback codes, handles provider cancellation, and shows the actual safe failure reason instead of always saying the link expired.
 - `trustmail-mobile/src/api.ts`: exchanges OAuth codes without attempting session refresh and distinguishes expired/used links, server outages, and generic failures.
-- `trustmail-mobile/src/api.ts` and `trustmail-mobile/eas.json`: keep development fallback and release builds on the currently registered Render OAuth deployment so callback and one-use code exchange stay together.
+- `trustmail-mobile/src/api.ts` and `trustmail-mobile/eas.json`: use Railway consistently for development fallback and release builds.
+- `src/server/auth.py` and `src/server/repository.py`: retain Redis as the preferred one-use code store, but use the shared database with a 90-second expiry and a hashed code when Redis is unavailable.
 - `src/server/app.py`: allows the canonical Railway host for validated web OAuth return URLs while keeping the existing allowlist protections.
 
 ### What is still required outside the repository
 
-- Restore and verify the production Redis service on the mobile OAuth deployment.
-- Build a new APK/AAB from the updated EAS profile; existing installed builds retain their old duplicate-callback behavior.
-- Migrate OAuth to Railway only after adding `https://safemailx-ai-production.up.railway.app/api/auth/google/callback` to Google credentials and updating `GMAIL_OAUTH_REDIRECT_URI` together.
+- Set Railway's `GMAIL_OAUTH_REDIRECT_URI` to `https://safemailx-ai-production.up.railway.app/api/gmail/oauth/callback` and register the matching sign-in callback, `https://safemailx-ai-production.up.railway.app/api/auth/google/callback`, in the Google OAuth client.
+- Build a new APK/AAB from the updated EAS profile; existing installed builds retain their previous embedded API URL.
+- Restore Redis when possible for the preferred in-memory security and performance path; the database fallback keeps sign-in working in the meantime.
 - Test Google sign-in on a real Android device with a fresh account/session, including cancel, slow consent, app cold start, and retry cases.
 
 ## What this work covers
@@ -143,7 +144,7 @@ This section explains where the changes were made. “Backend” means the API u
 
 | File | What changed | Why it matters |
 |---|---|---|
-| `trustmail-mobile/eas.json` | Preview and production profiles explicitly use the currently registered Render OAuth API URL. | Keeps Google OAuth start, callback, and one-use code exchange on the same deployment. |
+| `trustmail-mobile/eas.json` | Preview and production profiles explicitly use the Railway production API URL. | Keeps Google OAuth start, callback, and one-use code exchange on the same deployment. |
 | `trustmail-mobile/src/api.ts` | Release builds cannot change the API URL at runtime; developer builds still support local HTTP/HTTPS testing. | Protects released apps from being redirected to an attacker-controlled API. |
 | `trustmail-mobile/App.tsx` | Fixed the existing invalid `sms` tab type and the toast callback type mismatch. | Restores a clean TypeScript check without removing the share-to-SMS feature. |
 | `trustmail-mobile/src/session.ts` | No storage downgrade was made; access, refresh, and email values remain in Expo SecureStore. | Preserves encrypted mobile session storage. |
@@ -165,7 +166,7 @@ This section explains where the changes were made. “Backend” means the API u
 
 ## Current security issues still being fixed
 
-1. The mobile OAuth deployment must have authentication and shared Redis enabled and re-tested; repository changes cannot edit provider variables automatically.
+1. Railway must have the Google redirect URI aligned with the Google OAuth client; repository changes cannot edit Google Cloud credentials automatically.
 2. Certificate pinning still needs a native Expo/EAS implementation and a controlled certificate-rotation process.
 3. The custom API hostname still needs its Cloudflare/origin configuration repaired or formally retired.
 4. Mobile dependency upgrades and automated security scans still need to be completed without breaking the Expo build.
@@ -214,8 +215,8 @@ Run backend tests, mobile checks, security tests, dependency audits, staging tes
 - Finish the remaining backend verification and production provider configuration.
 - Finish native mobile certificate pinning and compatible dependency work.
 - Expand regression/security coverage after staging and production-provider verification.
-- Update the live mobile OAuth environment with production authentication and Redis settings.
-- Migrate OAuth to Railway only after Google redirect registration and provider variables are updated together; then rebuild the mobile app.
+- Update the live Railway environment with the production Google callback URL, and keep Redis restoration on the deployment checklist.
+- Rebuild the mobile app so the Railway API URL is embedded in release profiles.
 - Complete staging and controlled live testing.
 - Re-run all required checks and record final results here.
 

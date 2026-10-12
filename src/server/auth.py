@@ -8,6 +8,7 @@ import time
 from threading import Lock
 import uuid
 from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import Depends, HTTPException
@@ -162,34 +163,48 @@ def consume_ws_ticket(ticket: str, scan_id: str) -> str | None:
         return None
 
 
-def create_oauth_exchange_code(email: str, user_id: str, name: str = "User") -> str:
+def create_oauth_exchange_code(
+    email: str,
+    user_id: str,
+    name: str = "User",
+    durable_store: Callable[[str, dict[str, str], int], bool] | None = None,
+) -> str:
     """Create a short-lived, single-use code for mobile OAuth handoff.
-    Always falls back to in-memory storage if Redis is unavailable.
+    Redis is the primary store. A shared database fallback keeps production
+    handoffs reliable if Redis is temporarily unavailable; local memory is
+    retained only for development and tests without a durable store.
     """
     code = secrets.token_urlsafe(32)
+    expires_seconds = 90
+    payload = {"email": email, "uid": user_id, "name": name}
     client = _revocation_client()
     stored_in_redis = False
     if client is not None:
         try:
             client.setex(
                 f"safemailx:oauth-exchange:{code}",
-                90,
-                json.dumps({"email": email, "uid": user_id, "name": name}),
+                expires_seconds,
+                json.dumps(payload),
             )
             stored_in_redis = True
         except Exception:
             pass  # Fall through to local memory
+    if not stored_in_redis and durable_store and durable_store(code, payload, expires_seconds):
+        return code
     if not stored_in_redis:
         with _local_oauth_lock:
             _local_oauth_codes[code] = (
-                time.monotonic() + 90,
-                {"email": email, "uid": user_id, "name": name},
+                time.monotonic() + expires_seconds,
+                payload,
             )
     return code
 
 
-def consume_oauth_exchange_code(code: str) -> dict[str, str] | None:
-    """Consume a one-time OAuth exchange code. Checks Redis first, then local memory."""
+def consume_oauth_exchange_code(
+    code: str,
+    durable_consumer: Callable[[str], dict[str, str] | None] | None = None,
+) -> dict[str, str] | None:
+    """Consume a one-time OAuth exchange code from Redis, database, or local dev memory."""
     client = _revocation_client()
     if client is not None:
         try:
@@ -210,7 +225,12 @@ def consume_oauth_exchange_code(code: str) -> dict[str, str] | None:
         except Exception:
             pass  # Fall through to local memory
 
-    # Always check local memory as fallback (code may have been stored there if Redis was down)
+    if durable_consumer:
+        durable_payload = durable_consumer(code)
+        if durable_payload:
+            return durable_payload
+
+    # Local memory is only used when a durable shared fallback is unavailable.
     with _local_oauth_lock:
         stored = _local_oauth_codes.pop(code, None)
     if stored and stored[0] >= time.monotonic():

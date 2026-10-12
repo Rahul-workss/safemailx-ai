@@ -37,6 +37,25 @@ class SecurityControlTests(unittest.TestCase):
             self.assertEqual(auth.consume_oauth_exchange_code(code)["uid"], "user-1")
             self.assertIsNone(auth.consume_oauth_exchange_code(code))
 
+    def test_oauth_exchange_code_uses_durable_store_when_redis_is_offline(self):
+        stored: dict[str, dict[str, str]] = {}
+
+        def store(code: str, payload: dict[str, str], _expires_seconds: int) -> bool:
+            stored[code] = payload
+            return True
+
+        def consume(code: str) -> dict[str, str] | None:
+            return stored.pop(code, None)
+
+        with patch.object(auth, "_revocation_client", return_value=None):
+            code = auth.create_oauth_exchange_code(
+                "user@example.com",
+                "user-1",
+                durable_store=store,
+            )
+            self.assertEqual(auth.consume_oauth_exchange_code(code, durable_consumer=consume)["uid"], "user-1")
+            self.assertIsNone(auth.consume_oauth_exchange_code(code, durable_consumer=consume))
+
     def test_refresh_token_cannot_be_used_as_access_token(self):
         refresh = auth.create_signed_token({"sub": "user@example.com", "uid": "user-1", "type": "refresh"})
         with self.assertRaises(Exception):

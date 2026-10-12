@@ -364,7 +364,10 @@ def refresh_token(payload: RefreshRequest):
 
 @app.post("/auth/oauth/exchange", response_model=TokenResponse)
 def exchange_oauth_code(payload: OAuthExchangeRequest):
-    exchanged = consume_oauth_exchange_code(payload.code)
+    exchanged = consume_oauth_exchange_code(
+        payload.code,
+        durable_consumer=repository.consume_oauth_exchange_code,
+    )
     if not exchanged:
         raise HTTPException(status_code=401, detail="Invalid or expired OAuth code")
     return TokenResponse(
@@ -1100,7 +1103,12 @@ def auth_google_callback(code: str = Query(...), state: str = Query(...)):
             backup_svc = GoogleBackupService(repository)
             threading.Thread(target=backup_svc.sync_scans_to_drive, args=(user_id,), daemon=True).start()
 
-    exchange_code = create_oauth_exchange_code(email, user_id, name)
+    exchange_code = create_oauth_exchange_code(
+        email,
+        user_id,
+        name,
+        durable_store=repository.store_oauth_exchange_code,
+    )
     deep_link_base = _safe_oauth_return_url(payload.get("return_url"))
     join_char = "&" if "?" in deep_link_base else "?"
     

@@ -2,7 +2,7 @@ import json
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -101,6 +101,18 @@ class ScanRepository:
                         )
                         """
                     )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS oauth_exchange_codes (
+                            code_hash TEXT PRIMARY KEY,
+                            email TEXT NOT NULL,
+                            user_id TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            expires_at TIMESTAMPTZ NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
                 else:
                     conn.execute(
                         """
@@ -144,6 +156,18 @@ class ScanRepository:
                         CREATE TABLE IF NOT EXISTS password_reset_tokens (
                             token TEXT PRIMARY KEY,
                             user_id TEXT NOT NULL,
+                            expires_at TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS oauth_exchange_codes (
+                            code_hash TEXT PRIMARY KEY,
+                            email TEXT NOT NULL,
+                            user_id TEXT NOT NULL,
+                            name TEXT NOT NULL,
                             expires_at TEXT NOT NULL,
                             created_at TEXT NOT NULL
                         )
@@ -597,6 +621,96 @@ class ScanRepository:
                 f"DELETE FROM password_reset_tokens WHERE token = {placeholder}",
                 (token,),
             )
+
+    @staticmethod
+    def _oauth_code_hash(code: str) -> str:
+        import hashlib
+
+        return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+    def store_oauth_exchange_code(self, code: str, payload: dict[str, str], expires_seconds: int) -> bool:
+        """Store a hashed, short-lived OAuth handoff code for shared fallback use."""
+        email = payload.get("email")
+        user_id = payload.get("uid")
+        name = payload.get("name", "User")
+        if not isinstance(email, str) or not email or not isinstance(user_id, str) or not user_id:
+            return False
+
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(seconds=expires_seconds)
+        code_hash = self._oauth_code_hash(code)
+        placeholder = "%s" if self.is_postgres else "?"
+        try:
+            with self._db() as conn:
+                if self.is_postgres:
+                    conn.execute("DELETE FROM oauth_exchange_codes WHERE expires_at <= NOW()")
+                    conn.execute(
+                        """
+                        INSERT INTO oauth_exchange_codes (code_hash, email, user_id, name, expires_at, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (code_hash) DO UPDATE SET
+                            email = EXCLUDED.email,
+                            user_id = EXCLUDED.user_id,
+                            name = EXCLUDED.name,
+                            expires_at = EXCLUDED.expires_at,
+                            created_at = EXCLUDED.created_at
+                        """,
+                        (code_hash, email, user_id, name, expires_at, now),
+                    )
+                else:
+                    conn.execute("DELETE FROM oauth_exchange_codes WHERE expires_at <= ?", (now.isoformat(),))
+                    conn.execute(
+                        """
+                        INSERT INTO oauth_exchange_codes (code_hash, email, user_id, name, expires_at, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(code_hash) DO UPDATE SET
+                            email = excluded.email,
+                            user_id = excluded.user_id,
+                            name = excluded.name,
+                            expires_at = excluded.expires_at,
+                            created_at = excluded.created_at
+                        """,
+                        (code_hash, email, user_id, name, expires_at.isoformat(), now.isoformat()),
+                    )
+            return True
+        except Exception:
+            return False
+
+    def consume_oauth_exchange_code(self, code: str) -> dict[str, str] | None:
+        """Atomically consume a valid OAuth handoff code from the shared database."""
+        code_hash = self._oauth_code_hash(code)
+        placeholder = "%s" if self.is_postgres else "?"
+        try:
+            with self._db() as conn:
+                if self.is_postgres:
+                    row = conn.execute(
+                        """
+                        DELETE FROM oauth_exchange_codes
+                        WHERE code_hash = %s AND expires_at > NOW()
+                        RETURNING email, user_id, name
+                        """,
+                        (code_hash,),
+                    ).fetchone()
+                else:
+                    conn.row_factory = sqlite3.Row
+                    row = conn.execute(
+                        """
+                        DELETE FROM oauth_exchange_codes
+                        WHERE code_hash = ? AND expires_at > ?
+                        RETURNING email, user_id, name
+                        """,
+                        (code_hash, datetime.now(timezone.utc).isoformat()),
+                    ).fetchone()
+        except Exception:
+            return None
+
+        if not row:
+            return None
+        return {
+            "email": row["email"] if isinstance(row, dict) else row["email"],
+            "uid": row["user_id"] if isinstance(row, dict) else row["user_id"],
+            "name": row["name"] if isinstance(row, dict) else row["name"],
+        }
 
     def update_user_password(self, user_id: str, password_hash: str, salt: str) -> None:
         placeholder = "%s" if self.is_postgres else "?"
