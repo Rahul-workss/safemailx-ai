@@ -1,40 +1,21 @@
-name: "CodeQL Advanced Security Analysis"
+# CodeQL scanning disabled — GitHub Code Scanning is not enabled on this private repo.
+# Re-enable by uncommenting the on: block and restoring the jobs section.
+#
+# name: "CodeQL Advanced Security Analysis"
+# on:
+#   push:
+#     branches: [ "main" ]
+# ... (disabled to prevent repeated "Code scanning not enabled" errors in Actions)
+
+name: "CodeQL (Disabled)"
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '30 1 * * 0' # Run automatically every Sunday morning
+  workflow_dispatch: # Only runs if manually triggered — never fires automatically
 
 jobs:
-  analyze:
-    name: SAST Code Analysis
+  placeholder:
+    name: "CodeQL is disabled"
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'javascript', 'python' ]
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
-
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
-      with:
-        languages: ${{ matrix.language }}
-        # Exclude vendor directory from being scanned for our own bugs
-        queries: security-extended,security-and-quality
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
-      with:
-        category: "/language:${{matrix.language}}"
+      - name: Skip
+        run: echo "CodeQL scanning is disabled for this repository. Enable Code Scanning in Settings > Security > Code scanning to re-activate."
