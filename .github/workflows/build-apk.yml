@@ -33,7 +33,7 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
@@ -105,5 +105,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: safemailx-mobile-app
+          name: safemailx-user-apk-v1.0.6-run${{ github.run_number }}
           path: trustmail-mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
