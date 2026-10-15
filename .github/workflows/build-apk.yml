@@ -18,9 +18,11 @@ jobs:
         working-directory: trustmail-mobile
 
     steps:
+      # ── 1. Checkout ───────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ── 2. Node.js ────────────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,64 +30,71 @@ jobs:
           cache: 'npm'
           cache-dependency-path: trustmail-mobile/package-lock.json
 
+      # ── 3. Java ───────────────────────────────────────────────────────────
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      # ── Install JS dependencies ────────────────────────────────────────
+      # ── 4. JS dependencies ────────────────────────────────────────────────
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ── Generate native Android project ───────────────────────────────
-      - name: Generate Native Android Project (Prebuild)
+      # ── 5. Expo prebuild → generates android/ folder ──────────────────────
+      - name: Generate Native Android Project
         run: npx expo prebuild --platform android --no-install
 
-      # ── Stable debug keystore for consistent Google Sign-In SHA-1 ─────
+      # ── 6. Stable debug keystore (consistent SHA-1 for Google Sign-In) ────
       - name: Restore stable debug keystore
         run: |
           echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
 
-      # ── Harden gradle.properties (all known stability flags) ──────────
+      # ── 7. Harden gradle.properties ───────────────────────────────────────
+      #    All flags written here are read by EVERY Gradle task in this build.
+      #    This is the most reliable place to disable lint because it runs
+      #    before any task-name resolution happens.
       - name: Harden gradle.properties
         run: |
           PROPS="android/gradle.properties"
           touch "$PROPS"
 
-          # AndroidX
-          grep -q '^android.useAndroidX='          "$PROPS" || echo 'android.useAndroidX=true'          >> "$PROPS"
-          grep -q '^android.enableJetifier='       "$PROPS" || echo 'android.enableJetifier=true'       >> "$PROPS"
+          # AndroidX + Jetifier
+          grep -q '^android.useAndroidX='              "$PROPS" || echo 'android.useAndroidX=true'              >> "$PROPS"
+          grep -q '^android.enableJetifier='           "$PROPS" || echo 'android.enableJetifier=true'           >> "$PROPS"
 
-          # Disable release linting (prevents bundleReleaseLocalLintAar crash)
-          grep -q '^android.lint.checkReleaseBuilds' "$PROPS" || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
-          grep -q '^android.lint.abortOnError'     "$PROPS" || echo 'android.lint.abortOnError=false'   >> "$PROPS"
+          # ── Lint: disabled at the AGP DSL level ──────────────────────────
+          # These two flags tell AGP to never wire lint into assembleRelease.
+          # This prevents ALL lint task creation (bundleReleaseLocalLintAar,
+          # lintVitalAnalyzeRelease, lintVitalReportRelease, etc.)
+          grep -q '^android.lint.checkReleaseBuilds'   "$PROPS" || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
+          grep -q '^android.lint.abortOnError'         "$PROPS" || echo 'android.lint.abortOnError=false'       >> "$PROPS"
 
-          # Disable parallel Gradle execution (prevents file-access.bin race condition)
-          grep -q '^org.gradle.parallel='          "$PROPS" || echo 'org.gradle.parallel=false'         >> "$PROPS"
+          # ── Parallelism: disabled to prevent file-access.bin race ─────────
+          # Multiple CMake ABI builds running in parallel all write to the
+          # same Gradle cache journal and corrupt it. Single-threaded is safer.
+          grep -q '^org.gradle.parallel='              "$PROPS" || echo 'org.gradle.parallel=false'             >> "$PROPS"
+          grep -q '^org.gradle.daemon='                "$PROPS" || echo 'org.gradle.daemon=false'               >> "$PROPS"
+          grep -q '^org.gradle.configureondemand='     "$PROPS" || echo 'org.gradle.configureondemand=false'    >> "$PROPS"
+          grep -q '^org.gradle.configuration-cache='  "$PROPS" || echo 'org.gradle.configuration-cache=false'  >> "$PROPS"
 
-          # Disable Gradle daemon in CI (prevents stale state)
-          grep -q '^org.gradle.daemon='            "$PROPS" || echo 'org.gradle.daemon=false'           >> "$PROPS"
-
-          # Disable configuration cache (can cause serialisation errors in CI)
-          grep -q '^org.gradle.configuration-cache' "$PROPS" || echo 'org.gradle.configuration-cache=false' >> "$PROPS"
-
-          # Disable configure-on-demand (incompatible with some RN setups)
-          grep -q '^org.gradle.configureondemand=' "$PROPS" || echo 'org.gradle.configureondemand=false' >> "$PROPS"
-
-      # ── Cache Gradle dependencies for faster future builds ─────────────
-      - name: Cache Gradle packages
+      # ── 8. Cache Gradle wrapper + caches (faster subsequent builds) ───────
+      - name: Cache Gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('trustmail-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('trustmail-mobile/**/*.gradle*', 'trustmail-mobile/**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('trustmail-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # ── Patch repos and inject init script ────────────────────────────
-      - name: Patch Gradle repos
+      # ── 9. Gradle init script: repos + afterEvaluate lint disabler ────────
+      #    afterEvaluate guarantees tasks are registered before we touch them.
+      #    We do NOT use -x flags in the Gradle command because ambiguous
+      #    task-name abbreviation (e.g. "-x lintVital" matching 5 tasks)
+      #    causes Gradle to abort before a single source file is compiled.
+      - name: Inject Gradle init script
         run: |
           SETTINGS_FILE="android/settings.gradle"
           if [ -f "$SETTINGS_FILE" ] && ! grep -q "mavenCentral()" "$SETTINGS_FILE"; then
@@ -93,6 +102,7 @@ jobs:
               /repositories {/a\        mavenCentral()
             }' "$SETTINGS_FILE"
           fi
+
           mkdir -p ~/.gradle
           cat > ~/.gradle/init.gradle << 'INIT_EOF'
           allprojects {
@@ -107,8 +117,12 @@ jobs:
               mavenCentral()
               google()
             }
-            tasks.configureEach { task ->
-              if (task.name.toLowerCase().contains("lint")) {
+            // afterEvaluate: runs after each project is configured, so all
+            // tasks are registered. We then disable every lint task by name.
+            afterEvaluate { project ->
+              project.tasks.matching { task ->
+                task.name.toLowerCase().contains("lint")
+              }.configureEach { task ->
                 task.enabled = false
               }
             }
@@ -124,14 +138,14 @@ jobs:
           }
           INIT_EOF
 
-      # ── Build release APK ──────────────────────────────────────────────
+      # ── 10. Build release APK ─────────────────────────────────────────────
+      #    IMPORTANT: No -x lint* flags here — they cause "ambiguous task"
+      #    errors. Lint is already fully disabled by steps 7 and 9 above.
+      #    Only -x test is safe (single unambiguous task name).
       - name: Build Release APK
         working-directory: trustmail-mobile/android
         env:
-          GRADLE_OPTS: >-
-            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-            -Dorg.gradle.parallel=false
-            -Dorg.gradle.daemon=false
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.parallel=false -Dorg.gradle.daemon=false"
         run: |
           ./gradlew assembleRelease \
             --no-daemon \
@@ -139,19 +153,13 @@ jobs:
             --no-parallel \
             --max-workers=2 \
             --init-script ~/.gradle/init.gradle \
-            -x lint \
-            -x lintVital \
-            -x lintVitalRelease \
-            -x lintRelease \
             -x test \
-            -x testRelease \
-            -x bundleReleaseLocalLintAar \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
-      # ── Upload artifact ────────────────────────────────────────────────
+      # ── 11. Upload APK artifact ───────────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
