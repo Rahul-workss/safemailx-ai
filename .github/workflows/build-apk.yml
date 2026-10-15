@@ -11,89 +11,97 @@ on:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Standalone User APK
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: trustmail-mobile
 
     steps:
-      # ── 1. Checkout ───────────────────────────────────────────────────────
+      # ── 1. Checkout repository ──────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Node.js ────────────────────────────────────────────────────────
+      # ── 2. Free Disk Space on Runner (prevents "No space left on device") ─
+      - name: Free Disk Space
+        run: |
+          echo "=== Disk space before reclamation ==="
+          df -h
+          # Remove unused large runtimes preinstalled on GitHub Actions runners
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          # Keep only the target NDK (27.1.12297006), remove other NDK versions if present
+          if [ -d "/usr/local/lib/android/sdk/ndk" ]; then
+            for d in /usr/local/lib/android/sdk/ndk/* ; do
+              if [ -d "$d" ] && [[ "$d" != *"27.1.12297006"* ]]; then
+                echo "Removing unneeded NDK: $d"
+                sudo rm -rf "$d" || true
+              fi
+            done
+          fi
+          echo "=== Disk space after reclamation ==="
+          df -h
+
+      # ── 3. Node.js setup ────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: trustmail-mobile/package-lock.json
 
-      # ── 3. Java ───────────────────────────────────────────────────────────
+      # ── 4. Java 21 setup ────────────────────────────────────────────────
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      # ── 4. JS dependencies ────────────────────────────────────────────────
+      # ── 5. Install JS dependencies ──────────────────────────────────────
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ── 5. Expo prebuild → generates android/ folder ──────────────────────
+      # ── 6. Generate Native Android Project (Expo Prebuild) ──────────────
       - name: Generate Native Android Project
         run: npx expo prebuild --platform android --no-install
 
-      # ── 6. Stable debug keystore (consistent SHA-1 for Google Sign-In) ────
+      # ── 7. Restore stable keystore for Google Sign-In ───────────────────
       - name: Restore stable debug keystore
         run: |
           echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
 
-      # ── 7. Harden gradle.properties ───────────────────────────────────────
-      #    All flags written here are read by EVERY Gradle task in this build.
-      #    This is the most reliable place to disable lint because it runs
-      #    before any task-name resolution happens.
+      # ── 8. Harden gradle.properties ─────────────────────────────────────
       - name: Harden gradle.properties
         run: |
           PROPS="android/gradle.properties"
           touch "$PROPS"
 
-          # AndroidX + Jetifier
-          grep -q '^android.useAndroidX='              "$PROPS" || echo 'android.useAndroidX=true'              >> "$PROPS"
-          grep -q '^android.enableJetifier='           "$PROPS" || echo 'android.enableJetifier=true'           >> "$PROPS"
+          # 1. Target physical Android phones (cuts C++ compile time and disk by 75%)
+          grep -q '^reactNativeArchitectures=' "$PROPS" \
+            || echo 'reactNativeArchitectures=arm64-v8a,armeabi-v7a' >> "$PROPS"
 
-          # ── Lint: disabled at the AGP DSL level ──────────────────────────
-          # These two flags tell AGP to never wire lint into assembleRelease.
-          # This prevents ALL lint task creation (bundleReleaseLocalLintAar,
-          # lintVitalAnalyzeRelease, lintVitalReportRelease, etc.)
-          grep -q '^android.lint.checkReleaseBuilds'   "$PROPS" || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
-          grep -q '^android.lint.abortOnError'         "$PROPS" || echo 'android.lint.abortOnError=false'       >> "$PROPS"
+          # 2. AndroidX & Jetifier
+          grep -q '^android.useAndroidX=' "$PROPS" \
+            || echo 'android.useAndroidX=true' >> "$PROPS"
+          grep -q '^android.enableJetifier=' "$PROPS" \
+            || echo 'android.enableJetifier=true' >> "$PROPS"
 
-          # ── Parallelism: disabled to prevent file-access.bin race ─────────
-          # Multiple CMake ABI builds running in parallel all write to the
-          # same Gradle cache journal and corrupt it. Single-threaded is safer.
-          grep -q '^org.gradle.parallel='              "$PROPS" || echo 'org.gradle.parallel=false'             >> "$PROPS"
-          grep -q '^org.gradle.daemon='                "$PROPS" || echo 'org.gradle.daemon=false'               >> "$PROPS"
-          grep -q '^org.gradle.configureondemand='     "$PROPS" || echo 'org.gradle.configureondemand=false'    >> "$PROPS"
-          grep -q '^org.gradle.configuration-cache='  "$PROPS" || echo 'org.gradle.configuration-cache=false'  >> "$PROPS"
+          # 3. Disable release linting (prevents bundleReleaseLocalLintAar crash)
+          grep -q '^android.lint.checkReleaseBuilds' "$PROPS" \
+            || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
+          grep -q '^android.lint.abortOnError' "$PROPS" \
+            || echo 'android.lint.abortOnError=false' >> "$PROPS"
 
-      # ── 8. Cache Gradle wrapper + caches (faster subsequent builds) ───────
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('trustmail-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+          # 4. Disable parallelism to prevent file-access.bin race corruption
+          grep -q '^org.gradle.parallel=' "$PROPS" \
+            || echo 'org.gradle.parallel=false' >> "$PROPS"
+          grep -q '^org.gradle.daemon=' "$PROPS" \
+            || echo 'org.gradle.daemon=false' >> "$PROPS"
+          grep -q '^org.gradle.configureondemand=' "$PROPS" \
+            || echo 'org.gradle.configureondemand=false' >> "$PROPS"
+          grep -q '^org.gradle.configuration-cache=' "$PROPS" \
+            || echo 'org.gradle.configuration-cache=false' >> "$PROPS"
 
-      # ── 9. Gradle init script: repos + afterEvaluate lint disabler ────────
-      #    afterEvaluate guarantees tasks are registered before we touch them.
-      #    We do NOT use -x flags in the Gradle command because ambiguous
-      #    task-name abbreviation (e.g. "-x lintVital" matching 5 tasks)
-      #    causes Gradle to abort before a single source file is compiled.
+      # ── 9. Inject Gradle repositories and afterEvaluate lint disabler ────
       - name: Inject Gradle init script
         run: |
           SETTINGS_FILE="android/settings.gradle"
@@ -117,8 +125,6 @@ jobs:
               mavenCentral()
               google()
             }
-            // afterEvaluate: runs after each project is configured, so all
-            // tasks are registered. We then disable every lint task by name.
             afterEvaluate { project ->
               project.tasks.matching { task ->
                 task.name.toLowerCase().contains("lint")
@@ -138,11 +144,8 @@ jobs:
           }
           INIT_EOF
 
-      # ── 10. Build release APK ─────────────────────────────────────────────
-      #    IMPORTANT: No -x lint* flags here — they cause "ambiguous task"
-      #    errors. Lint is already fully disabled by steps 7 and 9 above.
-      #    Only -x test is safe (single unambiguous task name).
-      - name: Build Release APK
+      # ── 10. Build Standalone Release APK ────────────────────────────────
+      - name: Build Standalone Release APK
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.parallel=false -Dorg.gradle.daemon=false"
@@ -159,7 +162,7 @@ jobs:
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
-      # ── 11. Upload APK artifact ───────────────────────────────────────────
+      # ── 11. Upload Release APK Artifact ─────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
