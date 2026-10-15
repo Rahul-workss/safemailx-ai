@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - 'trustmail-mobile/**'
-      - '.github/workflows/**'
+      - '.github/workflows/build-apk.yml'
 
 jobs:
   build:
@@ -25,38 +25,67 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
+          cache-dependency-path: trustmail-mobile/package-lock.json
 
-      - name: Setup Java (Java 21 for modern RN)
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
+      # ── Install JS dependencies ────────────────────────────────────────
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      # ── Generate native Android project ───────────────────────────────
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
 
-      - name: Restore stable debug keystore (fixes Google Sign-In SHA-1)
+      # ── Stable debug keystore for consistent Google Sign-In SHA-1 ─────
+      - name: Restore stable debug keystore
         run: |
           echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
 
-      - name: Enable AndroidX and Jetifier
+      # ── Harden gradle.properties (all known stability flags) ──────────
+      - name: Harden gradle.properties
         run: |
-          PROPERTIES_FILE="android/gradle.properties"
-          touch "$PROPERTIES_FILE"
+          PROPS="android/gradle.properties"
+          touch "$PROPS"
 
-          grep -q '^android.useAndroidX=' "$PROPERTIES_FILE" \
-            || echo 'android.useAndroidX=true' >> "$PROPERTIES_FILE"
+          # AndroidX
+          grep -q '^android.useAndroidX='          "$PROPS" || echo 'android.useAndroidX=true'          >> "$PROPS"
+          grep -q '^android.enableJetifier='       "$PROPS" || echo 'android.enableJetifier=true'       >> "$PROPS"
 
-          grep -q '^android.enableJetifier=' "$PROPERTIES_FILE" \
-            || echo 'android.enableJetifier=true' >> "$PROPERTIES_FILE"
+          # Disable release linting (prevents bundleReleaseLocalLintAar crash)
+          grep -q '^android.lint.checkReleaseBuilds' "$PROPS" || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
+          grep -q '^android.lint.abortOnError'     "$PROPS" || echo 'android.lint.abortOnError=false'   >> "$PROPS"
 
-          echo 'android.lint.checkReleaseBuilds=false' >> "$PROPERTIES_FILE"
-          echo 'android.lint.abortOnError=false' >> "$PROPERTIES_FILE"
+          # Disable parallel Gradle execution (prevents file-access.bin race condition)
+          grep -q '^org.gradle.parallel='          "$PROPS" || echo 'org.gradle.parallel=false'         >> "$PROPS"
 
-      - name: Patch Gradle repos (ensure mavenCentral for plugins)
+          # Disable Gradle daemon in CI (prevents stale state)
+          grep -q '^org.gradle.daemon='            "$PROPS" || echo 'org.gradle.daemon=false'           >> "$PROPS"
+
+          # Disable configuration cache (can cause serialisation errors in CI)
+          grep -q '^org.gradle.configuration-cache' "$PROPS" || echo 'org.gradle.configuration-cache=false' >> "$PROPS"
+
+          # Disable configure-on-demand (incompatible with some RN setups)
+          grep -q '^org.gradle.configureondemand=' "$PROPS" || echo 'org.gradle.configureondemand=false' >> "$PROPS"
+
+      # ── Cache Gradle dependencies for faster future builds ─────────────
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('trustmail-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('trustmail-mobile/**/*.gradle*', 'trustmail-mobile/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # ── Patch repos and inject init script ────────────────────────────
+      - name: Patch Gradle repos
         run: |
           SETTINGS_FILE="android/settings.gradle"
           if [ -f "$SETTINGS_FILE" ] && ! grep -q "mavenCentral()" "$SETTINGS_FILE"; then
@@ -65,7 +94,7 @@ jobs:
             }' "$SETTINGS_FILE"
           fi
           mkdir -p ~/.gradle
-          cat > ~/.gradle/init.gradle << 'EOF'
+          cat > ~/.gradle/init.gradle << 'INIT_EOF'
           allprojects {
             buildscript {
               repositories {
@@ -93,26 +122,36 @@ jobs:
               }
             }
           }
-          EOF
+          INIT_EOF
 
-      - name: Build APK (Standalone Release)
+      # ── Build release APK ──────────────────────────────────────────────
+      - name: Build Release APK
         working-directory: trustmail-mobile/android
         env:
-          GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          GRADLE_OPTS: >-
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+            -Dorg.gradle.parallel=false
+            -Dorg.gradle.daemon=false
         run: |
-          # NOTE: Signed with stable debug keystore so Google Sign-In SHA-1 stays consistent.
-          # For Play Store upload, replace with a dedicated release keystore secret.
           ./gradlew assembleRelease \
             --no-daemon \
+            --no-build-cache \
+            --no-parallel \
+            --max-workers=2 \
             --init-script ~/.gradle/init.gradle \
             -x lint \
-            -x test \
+            -x lintVital \
             -x lintVitalRelease \
+            -x lintRelease \
+            -x test \
+            -x testRelease \
+            -x bundleReleaseLocalLintAar \
             -Pandroid.injected.signing.store.file=${{ github.workspace }}/trustmail-mobile/android/app/debug.keystore \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
+      # ── Upload artifact ────────────────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
