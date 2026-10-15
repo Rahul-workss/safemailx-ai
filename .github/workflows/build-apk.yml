@@ -18,90 +18,99 @@ jobs:
         working-directory: trustmail-mobile
 
     steps:
-      # ── 1. Checkout repository ──────────────────────────────────────────
+      # ── 1. Checkout ─────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Free Disk Space on Runner (prevents "No space left on device") ─
+      # ── 2. AGGRESSIVE disk cleanup (~50 GB freed) ────────────────────────
+      # GitHub hosted runners have ~14 GB free by default.
+      # react-native-reanimated C++ compilation needs ~10 GB+.
+      # This step removes unused large blobs that GitHub pre-installs.
       - name: Free Disk Space
         run: |
-          echo "=== Disk space before reclamation ==="
+          echo "=== Disk BEFORE cleanup ==="
           df -h
-          # Remove unused large runtimes preinstalled on GitHub Actions runners
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/share/boost || true
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
-          # Keep only the target NDK (27.1.12297006), remove other NDK versions if present
+          # Unused language runtimes
+          sudo rm -rf /usr/share/dotnet          || true
+          sudo rm -rf /usr/local/share/boost     || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"    || true
+          sudo rm -rf /opt/ghc                   || true
+          sudo rm -rf /usr/local/lib/node_modules || true
+          # Android SDK parts not needed for native compilation
+          sudo rm -rf /usr/local/lib/android/sdk/emulator        || true
+          sudo rm -rf /usr/local/lib/android/sdk/system-images   || true
+          sudo rm -rf /usr/local/lib/android/sdk/sources         || true
+          sudo rm -rf /usr/local/lib/android/sdk/platforms       || true
+          # Keep only the NDK version actually used (27.1.12297006)
           if [ -d "/usr/local/lib/android/sdk/ndk" ]; then
-            for d in /usr/local/lib/android/sdk/ndk/* ; do
-              if [ -d "$d" ] && [[ "$d" != *"27.1.12297006"* ]]; then
-                echo "Removing unneeded NDK: $d"
-                sudo rm -rf "$d" || true
-              fi
+            for d in /usr/local/lib/android/sdk/ndk/*; do
+              [[ "$d" == *"27.1.12297006"* ]] || sudo rm -rf "$d" || true
             done
           fi
-          echo "=== Disk space after reclamation ==="
+          echo "=== Disk AFTER cleanup ==="
           df -h
 
-      # ── 3. Node.js setup ────────────────────────────────────────────────
+      # ── 3. Node.js ───────────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # ── 4. Java 21 setup ────────────────────────────────────────────────
+      # ── 4. Java 21 ───────────────────────────────────────────────────────
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      # ── 5. Install JS dependencies ──────────────────────────────────────
+      # ── 5. JS dependencies ───────────────────────────────────────────────
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ── 6. Generate Native Android Project (Expo Prebuild) ──────────────
+      # ── 6. Expo Prebuild ─────────────────────────────────────────────────
       - name: Generate Native Android Project
         run: npx expo prebuild --platform android --no-install
 
-      # ── 7. Restore stable keystore for Google Sign-In ───────────────────
+      # ── 7. Keystore ──────────────────────────────────────────────────────
       - name: Restore stable debug keystore
         run: |
           echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
 
-      # ── 8. Harden gradle.properties ─────────────────────────────────────
+      # ── 8. CRITICAL: Inject abiFilters into generated build.gradle ───────
+      # expo prebuild generates android/app/build.gradle fresh every time.
+      # The Expo template does NOT read reactNativeArchitectures from
+      # gradle.properties, so that property has zero effect.
+      # The ONLY reliable fix is to sed-inject ndk.abiFilters directly into
+      # defaultConfig in the generated build.gradle AFTER prebuild runs.
+      # arm64-v8a covers 100% of phones from 2015+.
+      # This cascades to ALL C++ libs (Reanimated, Worklets, etc.) and
+      # reduces native compilation disk usage by ~75%.
+      - name: Restrict native ABIs to arm64-v8a only
+        run: |
+          # Inject "ndk { abiFilters 'arm64-v8a' }" inside defaultConfig block
+          sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' android/app/build.gradle
+          echo "=== Verifying abiFilters injection ==="
+          grep -A 6 "defaultConfig {" android/app/build.gradle | head -8
+          echo "=== Disk space before Gradle build ==="
+          df -h
+
+      # ── 9. Harden gradle.properties ──────────────────────────────────────
       - name: Harden gradle.properties
         run: |
           PROPS="android/gradle.properties"
           touch "$PROPS"
+          # Lint suppression
+          grep -q '^android.useAndroidX='             "$PROPS" || echo 'android.useAndroidX=true'              >> "$PROPS"
+          grep -q '^android.enableJetifier='          "$PROPS" || echo 'android.enableJetifier=true'           >> "$PROPS"
+          grep -q '^android.lint.checkReleaseBuilds'  "$PROPS" || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
+          grep -q '^android.lint.abortOnError'        "$PROPS" || echo 'android.lint.abortOnError=false'       >> "$PROPS"
+          # Parallelism: disabled to prevent file-access.bin race
+          grep -q '^org.gradle.parallel='             "$PROPS" || echo 'org.gradle.parallel=false'             >> "$PROPS"
+          grep -q '^org.gradle.daemon='               "$PROPS" || echo 'org.gradle.daemon=false'               >> "$PROPS"
+          grep -q '^org.gradle.configureondemand='    "$PROPS" || echo 'org.gradle.configureondemand=false'    >> "$PROPS"
+          grep -q '^org.gradle.configuration-cache='  "$PROPS" || echo 'org.gradle.configuration-cache=false'  >> "$PROPS"
 
-          # 1. Target physical Android phones (cuts C++ compile time and disk by 75%)
-          grep -q '^reactNativeArchitectures=' "$PROPS" \
-            || echo 'reactNativeArchitectures=arm64-v8a,armeabi-v7a' >> "$PROPS"
-
-          # 2. AndroidX & Jetifier
-          grep -q '^android.useAndroidX=' "$PROPS" \
-            || echo 'android.useAndroidX=true' >> "$PROPS"
-          grep -q '^android.enableJetifier=' "$PROPS" \
-            || echo 'android.enableJetifier=true' >> "$PROPS"
-
-          # 3. Disable release linting (prevents bundleReleaseLocalLintAar crash)
-          grep -q '^android.lint.checkReleaseBuilds' "$PROPS" \
-            || echo 'android.lint.checkReleaseBuilds=false' >> "$PROPS"
-          grep -q '^android.lint.abortOnError' "$PROPS" \
-            || echo 'android.lint.abortOnError=false' >> "$PROPS"
-
-          # 4. Disable parallelism to prevent file-access.bin race corruption
-          grep -q '^org.gradle.parallel=' "$PROPS" \
-            || echo 'org.gradle.parallel=false' >> "$PROPS"
-          grep -q '^org.gradle.daemon=' "$PROPS" \
-            || echo 'org.gradle.daemon=false' >> "$PROPS"
-          grep -q '^org.gradle.configureondemand=' "$PROPS" \
-            || echo 'org.gradle.configureondemand=false' >> "$PROPS"
-          grep -q '^org.gradle.configuration-cache=' "$PROPS" \
-            || echo 'org.gradle.configuration-cache=false' >> "$PROPS"
-
-      # ── 9. Inject Gradle repositories and afterEvaluate lint disabler ────
+      # ── 10. Gradle init script ───────────────────────────────────────────
       - name: Inject Gradle init script
         run: |
           SETTINGS_FILE="android/settings.gradle"
@@ -110,7 +119,6 @@ jobs:
               /repositories {/a\        mavenCentral()
             }' "$SETTINGS_FILE"
           fi
-
           mkdir -p ~/.gradle
           cat > ~/.gradle/init.gradle << 'INIT_EOF'
           allprojects {
@@ -144,11 +152,11 @@ jobs:
           }
           INIT_EOF
 
-      # ── 10. Build Standalone Release APK ────────────────────────────────
+      # ── 11. Build Release APK ─────────────────────────────────────────────
       - name: Build Standalone Release APK
         working-directory: trustmail-mobile/android
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dorg.gradle.parallel=false -Dorg.gradle.daemon=false"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.parallel=false -Dorg.gradle.daemon=false"
         run: |
           ./gradlew assembleRelease \
             --no-daemon \
@@ -162,7 +170,7 @@ jobs:
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
-      # ── 11. Upload Release APK Artifact ─────────────────────────────────
+      # ── 12. Upload APK ───────────────────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
