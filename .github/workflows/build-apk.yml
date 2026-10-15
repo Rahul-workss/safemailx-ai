@@ -30,18 +30,16 @@ jobs:
         run: |
           echo "=== Disk BEFORE cleanup ==="
           df -h
-          # Unused language runtimes
+          # Unused language runtimes and toolchains (frees ~45 GB)
           sudo rm -rf /usr/share/dotnet          || true
           sudo rm -rf /usr/local/share/boost     || true
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"    || true
           sudo rm -rf /opt/ghc                   || true
-          sudo rm -rf /usr/local/lib/node_modules || true
-          # Android SDK parts not needed for native compilation
+          # Android SDK parts not needed for compilation (frees ~12 GB)
           sudo rm -rf /usr/local/lib/android/sdk/emulator        || true
           sudo rm -rf /usr/local/lib/android/sdk/system-images   || true
           sudo rm -rf /usr/local/lib/android/sdk/sources         || true
-          sudo rm -rf /usr/local/lib/android/sdk/platforms       || true
-          # Keep only the NDK version actually used (27.1.12297006)
+          # Keep only the target NDK (27.1.12297006), remove other NDK versions if present
           if [ -d "/usr/local/lib/android/sdk/ndk" ]; then
             for d in /usr/local/lib/android/sdk/ndk/*; do
               [[ "$d" == *"27.1.12297006"* ]] || sudo rm -rf "$d" || true
