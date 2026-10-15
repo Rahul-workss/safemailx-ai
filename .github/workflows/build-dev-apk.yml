@@ -32,7 +32,7 @@ jobs:
           java-version: '21'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Generate Native Android Project (Prebuild)
         run: npx expo prebuild --platform android --no-install
