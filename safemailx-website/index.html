@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SafeMailx AI — Email Security That Feels Human</title>
-  <meta name="description" content="SafeMailx AI is a local-first email threat analysis system. Coming soon." />
+  <title>SafeMail X AI — AI-Powered Phishing, Scam & Identity Threat Defense</title>
+  <meta name="description" content="SafeMail X AI is a production-grade multi-layer cybersecurity platform detecting phishing, smishing, vishing calls, UPI payment fraud, malicious QRs, and identity forgery." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
@@ -19,41 +19,44 @@
       --border:    rgba(255,255,255,0.07);
       --border-hi: rgba(255,255,255,0.13);
       --text:      #e8edf5;
-      --muted:     rgba(232,237,245,0.55);
-      --dim:       rgba(232,237,245,0.28);
+      --muted:     rgba(232,237,245,0.58);
+      --dim:       rgba(232,237,245,0.32);
       --cyan:      #5de4d8;
       --cyan-dim:  rgba(93,228,216,0.1);
+      --blue:      #4287f5;
+      --purple:    #ba55d3;
       --amber:     #f5a623;
       --amber-dim: rgba(245,166,35,0.1);
       --green:     #52e8a5;
       --green-dim: rgba(82,232,165,0.08);
-      --red-dim:   rgba(255,107,107,0.1);
+      --red:       #ff5c5c;
+      --red-dim:   rgba(255,92,92,0.1);
       --champagne: #f2e2b0;
 
-      /* Original TrustMail Glass Recipe */
-      --glass-bg:      rgba(4, 10, 22, 0.12);
-      --glass-blur:    blur(6px);
-      --glass-border:  rgba(142, 240, 255, 0.08);
-      --glass-rim-top: rgba(142, 240, 255, 0.03);
+      /* Liquid Obsidian Glass Recipe */
+      --glass-bg:      rgba(4, 10, 22, 0.45);
+      --glass-blur:    blur(12px);
+      --glass-border:  rgba(142, 240, 255, 0.1);
+      --glass-rim-top: rgba(255, 255, 255, 0.08);
       --glass-rim-bot: transparent;
-      --glass-shadow:  0 8px 32px rgba(0, 0, 0, 0.2);
-      --glass-radius:  28px;
+      --glass-shadow:  0 12px 40px rgba(0, 0, 0, 0.35);
+      --glass-radius:  24px;
     }
 
     html { scroll-behavior: smooth; }
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
     
-    /* Global Cyber Background Animation Layer */
+    /* Global Cyber Ambient Layer */
     body::before {
       content: '';
       position: fixed;
-      top: -2%; left: -2%; width: 104%; height: 104%; /* Oversized to hide scale edges */
+      top: -2%; left: -2%; width: 104%; height: 104%;
       background-image: url('/images/cyber-bg.png');
       background-size: cover;
       background-position: center;
@@ -68,7 +71,7 @@
       50% { transform: scale(1.03); opacity: 0.6; filter: brightness(0.95) saturate(1.1); }
     }
 
-    /* Moving Data Pulse / Scanning Beam */
+    /* Moving Data Pulse Beam */
     body::after {
       content: '';
       position: fixed;
@@ -76,24 +79,24 @@
       background: linear-gradient(90deg, 
         transparent 0%, 
         rgba(93, 228, 216, 0.0) 20%, 
-        rgba(93, 228, 216, 0.3) 50%, 
-        rgba(255, 255, 255, 0.7) 55%, 
-        rgba(93, 228, 216, 0.3) 60%, 
+        rgba(93, 228, 216, 0.25) 50%, 
+        rgba(255, 255, 255, 0.6) 55%, 
+        rgba(93, 228, 216, 0.25) 60%, 
         transparent 80%, 
         transparent 100%);
       transform: skewX(-25deg) translateX(-100vw);
       mix-blend-mode: color-dodge;
-      animation: data-sweep 6s infinite;
+      animation: data-sweep 7s infinite;
       pointer-events: none;
       z-index: -1;
     }
 
     @keyframes data-sweep {
       0% { transform: skewX(-25deg) translateX(-100vw); }
-      30%, 100% { transform: skewX(-25deg) translateX(400vw); } /* Moves across quickly, then waits */
+      30%, 100% { transform: skewX(-25deg) translateX(400vw); }
     }
 
-    /* ── iOS GLASS UTILITY ─────────────────── */
+    /* ── GLASS UTILITIES ─────────────────── */
     .glass {
       background: var(--glass-bg);
       backdrop-filter: var(--glass-blur);
@@ -110,40 +113,49 @@
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 300;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 2rem; height: 64px;
+      padding: 0 2rem; height: 68px;
     }
     nav.glass {
       border-radius: 0;
       border-top: none; border-left: none; border-right: none;
-      background: rgba(7,12,21,0.72);
+      background: rgba(7,12,21,0.85);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
 
-    .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .nav-logo-img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(93,228,216,0.5)); transition: filter .2s; }
-    .nav-brand:hover .nav-logo-img { filter: drop-shadow(0 0 16px rgba(93,228,216,0.8)); }
-    .nav-brand-text { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-logo-img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(93,228,216,0.6)); transition: filter .2s; }
+    .nav-brand:hover .nav-logo-img { filter: drop-shadow(0 0 18px rgba(93,228,216,0.9)); }
+    .nav-brand-text { font-size: 1.05rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+    .nav-brand-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--cyan); background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.3); padding: 2px 7px; border-radius: 6px; }
+
+    .nav-links { display: flex; align-items: center; gap: 1.6rem; list-style: none; }
+    .nav-links a { font-size: 0.85rem; font-weight: 500; color: var(--muted); text-decoration: none; transition: color .2s; }
+    .nav-links a:hover { color: #fff; }
 
     .nav-actions { display: flex; align-items: center; gap: 12px; }
-    .badge-soon {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 600;
-      letter-spacing: 0.1em; color: var(--cyan); background: var(--cyan-dim);
-      border: 1px solid rgba(93,228,216,0.3); padding: 5px 12px; border-radius: 999px;
+    .btn-nav-github {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.82rem; font-weight: 600; color: var(--text); text-decoration: none;
+      padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-hi);
+      background: rgba(255,255,255,0.05); transition: all .2s ease;
     }
-    .btn-nav {
-      font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; letter-spacing: -0.01em; color: var(--text); text-decoration: none;
-      padding: 8px 18px; border-radius: 999px; border: 1px solid var(--border-hi);
-      background: rgba(255,255,255,0.06); transition: all .2s ease;
+    .btn-nav-github:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+    .btn-nav-apk {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.82rem; font-weight: 700; color: #060a10; text-decoration: none;
+      padding: 7px 16px; border-radius: 999px; background: var(--cyan);
+      box-shadow: 0 0 20px rgba(93,228,216,0.35); transition: all .2s ease;
     }
-    .btn-nav:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+    .btn-nav-apk:hover { background: #7aeee5; box-shadow: 0 0 28px rgba(93,228,216,0.6); transform: translateY(-1px); }
 
-    @media(max-width: 600px) {
-      nav { padding: 12px 1rem; }
-      .nav-brand-text { display: none; }
-      .badge-soon { display: none; }
-      .btn-nav { padding: 8px 14px; font-size: 0.75rem; }
+    @media(max-width: 860px) {
+      .nav-links { display: none; }
+      nav { padding: 0 1rem; }
+      .nav-brand-badge { display: none; }
     }
+
     /* ── HERO SCROLL SEQUENCE ───────────── */
-    #hero-sequence { position: relative; height: 250vh; }
+    #hero-sequence { position: relative; height: 260vh; }
 
     #hero-stage {
       position: sticky; top: 0; height: 100vh; overflow: hidden;
@@ -155,79 +167,41 @@
     #hero-video {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; z-index: 0;
-      opacity: 0.75;
+      opacity: 0.72;
       will-change: transform;
     }
 
-    /* Scrim — edges only, glass handles center */
+    /* Scrim edges */
     .hero-scrim {
       position: absolute; inset: 0; z-index: 2; pointer-events: none;
       background:
         linear-gradient(to bottom,
-          rgba(7,12,21,0.72) 0%,
-          transparent 13%,
-          transparent 82%,
+          rgba(7,12,21,0.85) 0%,
+          transparent 15%,
+          transparent 80%,
           rgba(7,12,21,1) 100%
         ),
         linear-gradient(to right,
-          rgba(7,12,21,0.55) 0%,
+          rgba(7,12,21,0.65) 0%,
           transparent 15%,
           transparent 85%,
-          rgba(7,12,21,0.55) 100%
+          rgba(7,12,21,0.65) 100%
         );
     }
     .hero-grid {
       background-image:
         linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-      background-size: 5rem 5rem;
-      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.9));
+      background-size: 4.5rem 4.5rem;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.95));
       z-index: 1;
     }
 
-    
-
     /* ── HERO COPY ─────── */
-    /* Apply iOS Liquid Glass to the Title Box */
-    @keyframes border-glow-rotate {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .pl-title-box {
-      position: relative;
-      padding: 2.5rem 2.5rem;
-      background: rgba(4, 10, 22, 0.35);
-      backdrop-filter: blur(4px) saturate(160%) contrast(110%);
-      -webkit-backdrop-filter: blur(4px) saturate(160%) contrast(110%);
-      border-radius: var(--glass-radius, 28px);
-      box-shadow: 
-        inset 0 1px 0 rgba(255, 255, 255, 0.08), 
-        0 24px 60px rgba(0, 0, 0, 0.4);
-    }
-    
-    .pl-title-box::before {
-      content: "";
-      position: absolute;
-      inset: -1.5px;
-      border-radius: calc(var(--glass-radius, 28px) + 1.5px);
-      padding: 1.5px;
-      background: linear-gradient(120deg, var(--cyan), transparent, #ba55d3, transparent, #4287f5);
-      background-size: 200% 200%;
-      animation: border-glow-rotate 5s ease-in-out infinite;
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
-      z-index: -1;
-      opacity: 0.8;
-    }
-
     #hero-copy {
       position: absolute; left: 50%; transform: translateX(-50%);
-      top: clamp(6.5rem, 12vh, 8rem);
-      width: min(680px, calc(100% - 2rem));
+      top: clamp(5.8rem, 11vh, 7.5rem);
+      width: min(820px, calc(100% - 2rem));
       padding: 0 1rem;
       z-index: 4;
       text-align: center;
@@ -236,25 +210,24 @@
     .hero-tag {
       display: inline-flex; align-items: center; gap: 8px;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em;
-      color: var(--muted); border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 999px; padding: 5px 13px; margin-bottom: 1.6rem;
-      background: rgba(255,255,255,0.04);
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+      color: var(--cyan); border: 1px solid rgba(93,228,216,0.35);
+      border-radius: 999px; padding: 6px 15px; margin-bottom: 1.4rem;
+      background: rgba(93,228,216,0.08); box-shadow: 0 0 20px rgba(93,228,216,0.15);
     }
     .hero-tag-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--green); box-shadow: 0 0 8px var(--green);
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 10px var(--green);
       animation: pulse-dot 2s ease-in-out infinite;
     }
-    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
 
     .hero-h1 {
-      font-size: clamp(2.6rem, 7vw, 5.6rem);
-      font-weight: 900; line-height: 0.96; letter-spacing: -0.04em; color: #fff;
+      font-size: clamp(2.3rem, 6.2vw, 4.8rem);
+      font-weight: 900; line-height: 1.02; letter-spacing: -0.04em; color: #fff;
       text-shadow: 0 2px 28px rgba(0,0,0,0.9), 0 0 60px rgba(0,0,0,0.7);
-      margin-bottom: 0.15em;
+      margin-bottom: 0.2em;
     }
-    /* Warm champagne — pops against cool cyan shield */
     .hero-h1 em {
       font-family: 'Fraunces', Georgia, serif;
       font-style: italic; font-weight: 300; letter-spacing: -0.02em;
@@ -264,116 +237,115 @@
     }
 
     .hero-sub {
-      font-size: clamp(0.88rem, 1.7vw, 1.05rem); line-height: 1.75; color: var(--muted);
-      max-width: 480px; margin: 1.3rem auto 0;
+      font-size: clamp(0.9rem, 1.6vw, 1.08rem); line-height: 1.7; color: var(--muted);
+      max-width: 640px; margin: 1.2rem auto 0;
     }
-    .hero-sub strong { color: var(--text); font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .hero-sub strong { color: #fff; font-weight: 600; }
 
     .hero-text-glass {
       position: relative;
-      margin: 0 auto 2.2rem auto;
-      padding: 3rem 2rem;
-      background: rgba(255, 255, 255, 0.015);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      margin: 0 auto 1.8rem auto;
+      padding: 2.8rem 2.2rem;
+      background: rgba(4, 10, 22, 0.45);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border-radius: 32px;
       z-index: 1;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
       text-align: center;
     }
     .hero-text-glass::before {
       content: ''; position: absolute; inset: -1px; z-index: -1;
       border-radius: 33px;
-      padding: 2px;
+      padding: 1.5px;
       background: linear-gradient(90deg, rgba(93,228,216,0.8), rgba(66,135,245,0.8), rgba(186,85,211,0.8), rgba(93,228,216,0.8));
       background-size: 300% 100%;
-      animation: shiftBorder 4s linear infinite;
+      animation: shiftBorder 5s linear infinite;
       -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
       -webkit-mask-composite: xor;
       mask-composite: exclude;
-      opacity: 0.6;
+      opacity: 0.65;
     }
     @keyframes shiftBorder {
       0% { background-position: 0% 0%; }
       100% { background-position: 300% 0%; }
     }
 
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 2.2rem; margin-bottom: 0; }
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 2rem; }
 
     .btn-primary {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--cyan); color: #060a10; font-size: 0.88rem; font-weight: 700;
-      text-decoration: none; padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer;
-      box-shadow: 0 0 32px rgba(93,228,216,0.4);
+      display: inline-flex; align-items: center; gap: 9px;
+      background: var(--cyan); color: #060a10; font-size: 0.9rem; font-weight: 700;
+      text-decoration: none; padding: 13px 26px; border-radius: 12px; border: none; cursor: pointer;
+      box-shadow: 0 0 32px rgba(93,228,216,0.42);
       transition: transform .18s, box-shadow .18s, background .18s;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 44px rgba(93,228,216,0.55); background: #7aeee5; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 44px rgba(93,228,216,0.6); background: #7aeee5; }
 
     .btn-ghost {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; gap: 9px;
       background: rgba(255,255,255,0.06); color: var(--text);
-      font-size: 0.88rem; font-weight: 600; text-decoration: none;
-      padding: 12px 24px; border-radius: 10px;
+      font-size: 0.9rem; font-weight: 600; text-decoration: none;
+      padding: 13px 24px; border-radius: 12px;
       border: 1px solid var(--border-hi); cursor: pointer;
-      transition: background .18s, transform .18s;
+      transition: background .18s, transform .18s, border-color .18s;
     }
-    .btn-ghost:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
 
     /* Metrics row */
     .hero-metrics {
       display: flex; gap: 12px; width: 100%;
     }
     .metric-cell { 
-      flex: 1; padding: 1rem 0.6rem; text-align: center; 
+      flex: 1; padding: 1.1rem 0.8rem; text-align: center; 
       display: flex; flex-direction: column; justify-content: center; align-items: center;
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 14px;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot);
+      background: rgba(4, 10, 22, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
     }
-    .metric-val  { display: block; font-size: 1.55rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; margin-bottom: 8px; }
+    .metric-val  { display: block; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-bottom: 7px; }
     .metric-val.cyan  { color: var(--cyan); }
     .metric-val.amber { color: var(--amber); }
     .metric-val.green { color: var(--green); }
-    .metric-desc { font-size: 0.75rem; font-weight: 700; color: rgba(255, 255, 255, 0.85); letter-spacing: 0.05em; text-transform: uppercase; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+    .metric-desc { font-size: 0.72rem; font-weight: 700; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.06em; text-transform: uppercase; }
 
     /* Scroll cue */
     .scroll-cue {
-      position: absolute; bottom: 2.2rem; left: 50%; transform: translateX(-50%);
+      position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%);
       z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 6px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.18em; color: var(--dim);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; color: var(--dim);
     }
-    .scroll-line { width: 1px; height: 38px; background: linear-gradient(to bottom, var(--dim), transparent); animation: sb 2s ease-in-out infinite; }
+    .scroll-line { width: 1px; height: 36px; background: linear-gradient(to bottom, var(--dim), transparent); animation: sb 2s ease-in-out infinite; }
     @keyframes sb { 0%,100%{transform:scaleY(1);opacity:.5} 50%{transform:scaleY(1.2);opacity:1} }
 
-    /* ── SCROLL OVERLAY CARDS ───────────── */
-    /* ── PIPELINE CARDS (Overlay layout) ───────────── */
+    /* ── SCROLL OVERLAY PIPELINE CARDS ───── */
     .pipeline-card {
       position: absolute; z-index: 10; pointer-events: none;
-      width: 320px;
+      width: 325px;
       max-width: 90vw;
-      background: rgba(4, 10, 22, 0.4);
-      backdrop-filter: blur(8px) saturate(140%);
-      -webkit-backdrop-filter: blur(8px) saturate(140%);
-      border-radius: 16px;
-      padding: 22px;
-      border: 1px solid var(--glass-border);
+      background: rgba(4, 10, 22, 0.55);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border-radius: 18px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.1);
       display: flex; flex-direction: column; gap: 16px;
       will-change: transform, opacity;
     }
-    .pc-cyan { border-top: 2px solid var(--cyan); box-shadow: 0 -4px 20px rgba(93,228,216,0.1), 0 20px 40px rgba(0,0,0,0.5); }
-    .pc-blue { border-top: 2px solid #4287f5; box-shadow: 0 -4px 20px rgba(66,135,245,0.1), 0 20px 40px rgba(0,0,0,0.5); }
-    .pc-purple { border-top: 2px solid #ba55d3; box-shadow: 0 -4px 20px rgba(186,85,211,0.1), 0 20px 40px rgba(0,0,0,0.5); }
+    .pc-cyan { border-top: 3px solid var(--cyan); box-shadow: 0 -4px 20px rgba(93,228,216,0.12), 0 20px 40px rgba(0,0,0,0.5); }
+    .pc-blue { border-top: 3px solid #4287f5; box-shadow: 0 -4px 20px rgba(66,135,245,0.12), 0 20px 40px rgba(0,0,0,0.5); }
+    .pc-purple { border-top: 3px solid #ba55d3; box-shadow: 0 -4px 20px rgba(186,85,211,0.12), 0 20px 40px rgba(0,0,0,0.5); }
 
     .pc-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .pc-num { font-size: 2rem; font-weight: 800; line-height: 1; font-family: 'JetBrains Mono', monospace; }
     .pc-cyan .pc-num { color: var(--cyan); }
     .pc-blue .pc-num { color: #4287f5; }
     .pc-purple .pc-num { color: #ba55d3; }
-    .pc-icon { width: 28px; height: 28px; opacity: 0.8; }
+    .pc-icon { width: 28px; height: 28px; opacity: 0.9; }
     .pc-cyan .pc-icon { stroke: var(--cyan); }
     .pc-blue .pc-icon { stroke: #4287f5; }
     .pc-purple .pc-icon { stroke: #ba55d3; }
@@ -382,122 +354,51 @@
     .pc-layer { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); }
     .pc-name { font-size: 1.15rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
 
-    .pc-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-    .pc-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.85rem; color: rgba(255,255,255,0.85); line-height: 1.3; }
+    .pc-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; }
+    .pc-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.83rem; color: rgba(255,255,255,0.85); line-height: 1.35; }
     .pc-list li svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; stroke: var(--cyan); }
     .pc-blue .pc-list li svg { stroke: #4287f5; }
     .pc-purple .pc-list li svg { stroke: #ba55d3; }
+
     .pipeline-bottom-bar {
       position: absolute; pointer-events: none;
-      bottom: 8%; left: 50%; transform: translateX(-50%);
-      width: min(1080px, 92vw);
-      background: rgba(4, 10, 22, 0.45);
-      backdrop-filter: blur(12px) saturate(140%);
-      -webkit-backdrop-filter: blur(12px) saturate(140%);
-      border: 1px solid rgba(255,255,255,0.08);
+      bottom: 7%; left: 50%; transform: translateX(-50%);
+      width: min(1100px, 92vw);
+      background: rgba(4, 10, 22, 0.55);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border: 1px solid rgba(255,255,255,0.1);
       border-radius: 20px;
-      padding: 24px 36px;
+      padding: 20px 36px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
       z-index: 10;
       will-change: opacity, transform;
     }
     .pl-feature { display: flex; align-items: center; gap: 16px; }
     .pl-feature svg { width: 24px; height: 24px; stroke: var(--cyan); opacity: 0.9; }
-    .pl-f-text { display: flex; flex-direction: column; gap: 4px; }
+    .pl-f-text { display: flex; flex-direction: column; gap: 3px; }
     .pl-f-text strong { font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
     .pl-f-text span { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
 
     @media (max-width: 1000px) {
-      .pipeline-bottom-bar { flex-wrap: wrap; gap: 20px; justify-content: center; bottom: 5%; }
+      .pipeline-bottom-bar { flex-wrap: wrap; gap: 18px; justify-content: center; bottom: 4%; padding: 18px; }
       .pl-feature { width: 45%; }
     }
     @media (max-width: 600px) {
       .pl-feature { width: 100%; }
+      .hero-metrics { flex-direction: column; }
     }
 
-
-    .overlay-card {
-      position: absolute; z-index: 10;
-      /* iOS glass */
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      will-change: transform, opacity;
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      box-shadow:
-        inset 0 1px 0 var(--glass-rim-top),
-        inset 0 -1px 0 var(--glass-rim-bot),
-        0 20px 50px rgba(0,0,0,0.45),
-        0 0 0 1px rgba(255,255,255,0.05);
-      padding: 1.5rem 1.8rem;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    /* HUD Layout */
-    .wide-hud-card { width: min(500px, 45vw); }
-    #card-rules.wide-hud-card { width: min(580px, 90vw); }
-    
-    .hud-inner { display: flex; align-items: center; gap: 1.5rem; justify-content: space-between; }
-    .hud-content { flex: 1; }
-    .hud-quote { font-size: 0.88rem; line-height: 1.65; color: var(--text); font-style: italic; border-left: 2px solid var(--green); padding-left: 1rem; }
-    .hud-status { flex-shrink: 0; text-align: right; }
-    .hud-badge {
-      display: inline-block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em;
-      border-radius: 6px; padding: 4px 10px; margin-bottom: 8px; border: 1px solid transparent;
-    }
-    .hud-badge.cyan { color: var(--cyan); background: rgba(93,228,216,0.12); border-color: rgba(93,228,216,0.28); }
-    .hud-badge.amber { color: var(--amber); background: rgba(245,166,35,0.12); border-color: rgba(245,166,35,0.28); }
-    .hud-badge.red { color: #ff6b6b; background: rgba(255,107,107,0.12); border-color: rgba(255,107,107,0.28); }
-    .hud-stat-row { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--dim); margin-bottom: 3px; }
-
-    @media(max-width: 900px) {
-      .wide-hud-card { width: 92vw !important; max-width: 520px; position: absolute !important; left: 50% !important; right: auto !important; top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) !important; margin: 0 !important; padding: 1.8rem 2rem; }
-      #overlay-l1.wide-hud-card, #overlay-l2.wide-hud-card, #overlay-l3.wide-hud-card { top: 50% !important; bottom: auto !important; left: 50% !important; }
-      .hud-inner { flex-direction: column; align-items: flex-start; gap: 1rem; }
-      .hud-status { text-align: left; display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-top: 0.5rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.06); width: 100%; }
-      .hud-badge { margin-bottom: 0; }
-      .hud-stat-row { margin-bottom: 0; }
-
-      /* MOBILE PERFORMANCE OPTIMIZATIONS (Lag Fixes) */
-      * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-      nav.glass, .wide-hud-card, .glass-panel, .how-card, footer { background-color: rgba(11, 15, 23, 0.98) !important; }
-      .sweep-overlay { mix-blend-mode: normal !important; opacity: 0.08 !important; }
-      #hero-sequence { height: 250vh !important; }
-
-      /* Bug #4: Remove invisible liquid glass layer */
-      
-      /* Bug #5: Disable duplicate cyber background pseudo-elements */
-      body::before, body::after { display: none !important; animation: none !important; }
-      /* Bug #6: Hide oversized hero cyber overlay with blend mode */
-      #cyber-overlay { display: none !important; }
-    }
-
-    .overlay-label {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; font-weight: 700;
-      letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.5rem;
-    }
-    .overlay-label.cyan  { color: var(--cyan); }
-    .overlay-label.amber { color: var(--amber); }
-    .overlay-label.green { color: var(--green); }
-
-    .overlay-list { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }
-    .overlay-list li { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 7px; }
-    .overlay-list li::before { content: '✓'; color: var(--green); font-size: 0.7rem; flex-shrink: 0; }
-    .l3-verdict-row span { color: var(--green); font-weight: 700; }
-
-    /* ── CHAPTER DOTS (right edge) ──────── */
+    /* ── CHAPTER DOTS ───────────────────── */
     #chapter-dots {
       position: fixed; right: 1.4rem; top: 50%; transform: translateY(-50%);
       z-index: 400; display: flex; flex-direction: column; gap: 10px;
       opacity: 0; transition: opacity .4s;
     }
     #chapter-dots.visible { opacity: 1; }
-
     .ch-dot-wrap { position: relative; display: flex; align-items: center; }
     .ch-dot {
       width: 7px; height: 7px; border-radius: 50%;
@@ -514,322 +415,312 @@
     .ch-dot-wrap:hover .ch-label { opacity: 1; }
     .ch-dot-wrap.active .ch-label { opacity: 1; color: var(--cyan); }
 
-    /* ── CONTENT SECTIONS ───────────────── */
+    /* ── SECTION COMMON ─────────────────── */
     .content-section { position: relative; z-index: 10; background: transparent; }
-    .section-inner { max-width: 1100px; margin: 0 auto; padding: 5.5rem 2rem; }
+    .section-inner { max-width: 1140px; margin: 0 auto; padding: 5.5rem 2rem; }
 
     .section-label {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 700;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700;
       letter-spacing: 0.18em; color: var(--cyan); text-transform: uppercase;
       display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;
     }
     .section-label::after { content: ''; flex: 0 0 36px; height: 1px; background: var(--cyan); opacity: 0.4; }
 
-    .section-title { font-size: clamp(1.8rem,4vw,2.9rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: #fff; margin-bottom: 0.9rem; }
-    .section-title em { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; color: var(--muted); }
-    .section-body { font-size: 0.97rem; line-height: 1.75; color: var(--muted); max-width: 540px; }
+    .section-title { font-size: clamp(2rem,4vw,3.2rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: #fff; margin-bottom: 0.9rem; }
+    .section-title em { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-weight: 300; color: var(--champagne); }
+    .section-body { font-size: 1rem; line-height: 1.75; color: var(--muted); max-width: 620px; }
 
-    /* Circular Feature Chain */
-    .how-circle-stage {
-      position: relative;
-      width: 100%;
-      max-width: 900px;
-      height: 850px;
-      margin: 6rem auto 4rem auto;
+    /* ── THREAT VECTORS GRID ────────────── */
+    .threat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.6rem;
+      margin-top: 3.5rem;
     }
-    
-    .how-circle-center {
-      position: absolute;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 140px; height: 140px;
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border);
-      border-radius: 50%;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 0 50px rgba(93,228,216,0.15);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 5;
-    }
-    .how-circle-center img { width: 70px; height: 70px; filter: drop-shadow(0 0 15px rgba(93,228,216,0.6)); }
-
-    .how-circle-svg {
-      position: absolute;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 180px; height: 180px;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .how-chain-pulse {
-      transform-origin: 50% 50%;
-      animation: orbit-pulse 10s linear infinite;
-    }
-    @keyframes orbit-pulse {
-      0% { transform: rotate(-90deg); }
-      100% { transform: rotate(270deg); }
-    }
-
-    .how-card { 
+    .threat-card {
       background: var(--glass-bg);
       backdrop-filter: var(--glass-blur);
       -webkit-backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
       border-radius: 20px;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2);
+      padding: 2.2rem;
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 16px 36px rgba(0,0,0,0.3);
+      transition: transform .25s ease, border-color .25s ease;
+    }
+    .threat-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(93,228,216,0.35);
+    }
+    .threat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0; transition: opacity .25s;
+    }
+    .threat-card:hover::before { opacity: 1; }
+
+    .tc-icon-wrap {
+      width: 50px; height: 50px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.4rem; font-size: 1.5rem;
+      background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.25);
+    }
+    .tc-icon-wrap.amber { background: var(--amber-dim); border-color: rgba(245,166,35,0.25); }
+    .tc-icon-wrap.purple { background: rgba(186,85,211,0.1); border-color: rgba(186,85,211,0.25); }
+    .tc-icon-wrap.green { background: var(--green-dim); border-color: rgba(82,232,165,0.25); }
+    .tc-icon-wrap.red { background: var(--red-dim); border-color: rgba(255,92,92,0.25); }
+    .tc-icon-wrap.blue { background: rgba(66,135,245,0.1); border-color: rgba(66,135,245,0.25); }
+
+    .tc-title { font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; letter-spacing: -0.02em; }
+    .tc-desc { font-size: 0.88rem; line-height: 1.65; color: var(--muted); margin-bottom: 1.4rem; flex: 1; }
+    .tc-tags { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
+    .tc-tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600;
+      color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08); padding: 3px 9px; border-radius: 6px;
+    }
+    .tc-tag.highlight { color: var(--cyan); border-color: rgba(93,228,216,0.3); background: var(--cyan-dim); }
+
+    /* ── MOBILE APP SPOTLIGHT ───────────── */
+    .app-spotlight {
+      margin-top: 4rem;
+      background: linear-gradient(135deg, rgba(12,22,34,0.7) 0%, rgba(4,10,22,0.85) 100%);
+      border: 1px solid rgba(93,228,216,0.2);
+      border-radius: 30px;
+      padding: 3.5rem;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 3rem;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .app-spotlight::after {
+      content: ''; position: absolute; right: -100px; bottom: -100px; width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(93,228,216,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .as-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
+      color: var(--green); background: var(--green-dim); border: 1px solid rgba(82,232,165,0.3);
+      padding: 5px 12px; border-radius: 8px; margin-bottom: 1.2rem;
+    }
+    .as-title { font-size: clamp(1.8rem, 3.2vw, 2.6rem); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 1rem; }
+    .as-desc { font-size: 0.95rem; line-height: 1.7; color: var(--muted); margin-bottom: 2rem; }
+    .as-features { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 2.2rem; }
+    .as-feat { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; color: #fff; }
+    .as-feat svg { width: 18px; height: 18px; stroke: var(--cyan); flex-shrink: 0; }
+
+    .as-download-box {
+      display: flex; flex-direction: column; gap: 12px;
+      background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);
+      padding: 1.8rem; border-radius: 20px; text-align: center;
+    }
+    .as-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--dim); }
+    .as-btn-download {
+      display: inline-flex; justify-content: center; align-items: center; gap: 10px;
+      background: var(--cyan); color: #060a10; font-size: 0.95rem; font-weight: 800;
+      text-decoration: none; padding: 15px 24px; border-radius: 12px;
+      box-shadow: 0 0 30px rgba(93,228,216,0.4); transition: all .2s;
+    }
+    .as-btn-download:hover { background: #7aeee5; box-shadow: 0 8px 40px rgba(93,228,216,0.6); transform: translateY(-2px); }
+
+    @media(max-width: 900px) {
+      .app-spotlight { grid-template-columns: 1fr; padding: 2.2rem; gap: 2rem; }
+      .as-features { grid-template-columns: 1fr; }
+    }
+
+    /* ── CIRCULAR ARCHITECTURE STAGE ───── */
+    .how-circle-stage {
+      position: relative; width: 100%; max-width: 900px; height: 850px;
+      margin: 6rem auto 4rem auto;
+    }
+    .how-circle-center {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 140px; height: 140px;
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border); border-radius: 50%;
+      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 0 50px rgba(93,228,216,0.15);
+      display: flex; align-items: center; justify-content: center; z-index: 5;
+    }
+    .how-circle-center img { width: 70px; height: 70px; filter: drop-shadow(0 0 15px rgba(93,228,216,0.6)); }
+
+    .how-circle-svg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 180px; height: 180px; pointer-events: none; z-index: 0;
+    }
+    .how-chain-pulse {
+      transform-origin: 50% 50%;
+      animation: orbit-pulse 10s linear infinite;
+    }
+    @keyframes orbit-pulse { 0% { transform: rotate(-90deg); } 100% { transform: rotate(270deg); } }
+
+    .how-card { 
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border); border-radius: 20px;
       padding: 2rem; position: absolute; transition: transform .25s; 
       width: 300px; z-index: 10;
+      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 10px 30px rgba(0,0,0,0.25);
     }
     .how-card:hover { transform: translateY(-4px) !important; }
 
-    /* Desktop Circle Positioning & Animation */
     @media(min-width: 901px) {
-      .how-card:nth-child(7) { top: 0; left: calc(50% - 150px); animation: card-glow-1 10s infinite; } /* Top */
-      .how-card:nth-child(8) { top: calc(50% - 120px); right: -40px; animation: card-glow-2 10s infinite; } /* Right */
-      .how-card:nth-child(9) { bottom: 0; left: calc(50% - 150px); animation: card-glow-3 10s infinite; } /* Bottom */
-      .how-card:nth-child(10) { top: calc(50% - 120px); left: -40px; animation: card-glow-4 10s infinite; } /* Left */
+      .how-card:nth-child(7) { top: 0; left: calc(50% - 150px); animation: card-glow-1 10s infinite; }
+      .how-card:nth-child(8) { top: calc(50% - 120px); right: -40px; animation: card-glow-2 10s infinite; }
+      .how-card:nth-child(9) { bottom: 0; left: calc(50% - 150px); animation: card-glow-3 10s infinite; }
+      .how-card:nth-child(10) { top: calc(50% - 120px); left: -40px; animation: card-glow-4 10s infinite; }
     }
 
     @keyframes card-glow-1 {
-      0%, 20%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      2%, 12% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
+      0%, 20%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+      2%, 12% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
     }
     @keyframes card-glow-2 {
-      0%, 23%, 45%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      25%, 35% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
+      0%, 23%, 45%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+      25%, 35% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
     }
     @keyframes card-glow-3 {
-      0%, 48%, 70%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      50%, 60% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
+      0%, 48%, 70%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+      50%, 60% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
     }
     @keyframes card-glow-4 {
-      0%, 73%, 95%, 100% { border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 10px 30px rgba(0,0,0,0.2); }
-      75%, 85% { border-color: var(--cyan); box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 0 50px rgba(93,228,216,0.3), inset 0 0 20px rgba(93,228,216,0.15); transform: scale(1.02); }
+      0%, 73%, 95%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+      75%, 85% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
     }
 
-    /* Laser Beams */
     .data-beam { position: absolute; opacity: 0; pointer-events: none; z-index: 1; filter: drop-shadow(0 0 10px var(--cyan)); }
-    
-    .beam-1 { /* Top */
-      width: 2px; height: 160px;
-      top: calc(50% - 250px); left: calc(50% - 1px);
-      background: linear-gradient(to top, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-1 10s infinite;
-    }
-    .beam-2 { /* Right */
-      height: 2px; width: 160px;
-      top: calc(50% - 1px); left: calc(50% + 90px);
-      background: linear-gradient(to right, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-2 10s infinite;
-    }
-    .beam-3 { /* Bottom */
-      width: 2px; height: 160px;
-      top: calc(50% + 90px); left: calc(50% - 1px);
-      background: linear-gradient(to bottom, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-3 10s infinite;
-    }
-    .beam-4 { /* Left */
-      height: 2px; width: 160px;
-      top: calc(50% - 1px); left: calc(50% - 250px);
-      background: linear-gradient(to left, rgba(93,228,216,0) 0%, var(--cyan) 100%);
-      animation: beam-fire-4 10s infinite;
-    }
+    .beam-1 { width: 2px; height: 160px; top: calc(50% - 250px); left: calc(50% - 1px); background: linear-gradient(to top, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-1 10s infinite; }
+    .beam-2 { height: 2px; width: 160px; top: calc(50% - 1px); left: calc(50% + 90px); background: linear-gradient(to right, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-2 10s infinite; }
+    .beam-3 { width: 2px; height: 160px; top: calc(50% + 90px); left: calc(50% - 1px); background: linear-gradient(to bottom, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-3 10s infinite; }
+    .beam-4 { height: 2px; width: 160px; top: calc(50% - 1px); left: calc(50% - 250px); background: linear-gradient(to left, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-4 10s infinite; }
 
-    @keyframes beam-fire-1 {
-      0%, 98%, 100% { opacity: 0; transform: scaleY(0); transform-origin: bottom; }
-      2% { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
-      12% { opacity: 0; transform: scaleY(1); transform-origin: bottom; }
-    }
-    @keyframes beam-fire-2 {
-      0%, 23%, 100% { opacity: 0; transform: scaleX(0); transform-origin: left; }
-      25% { opacity: 1; transform: scaleX(1); transform-origin: left; }
-      35% { opacity: 0; transform: scaleX(1); transform-origin: left; }
-    }
-    @keyframes beam-fire-3 {
-      0%, 48%, 100% { opacity: 0; transform: scaleY(0); transform-origin: top; }
-      50% { opacity: 1; transform: scaleY(1); transform-origin: top; }
-      60% { opacity: 0; transform: scaleY(1); transform-origin: top; }
-    }
-    @keyframes beam-fire-4 {
-      0%, 73%, 100% { opacity: 0; transform: scaleX(0); transform-origin: right; }
-      75% { opacity: 1; transform: scaleX(1); transform-origin: right; }
-      85% { opacity: 0; transform: scaleX(1); transform-origin: right; }
-    }
+    @keyframes beam-fire-1 { 0%, 98%, 100% { opacity: 0; transform: scaleY(0); } 2%, 12% { opacity: 1; transform: scaleY(1); } }
+    @keyframes beam-fire-2 { 0%, 23%, 100% { opacity: 0; transform: scaleX(0); } 25%, 35% { opacity: 1; transform: scaleX(1); } }
+    @keyframes beam-fire-3 { 0%, 48%, 100% { opacity: 0; transform: scaleY(0); } 50%, 60% { opacity: 1; transform: scaleY(1); } }
+    @keyframes beam-fire-4 { 0%, 73%, 100% { opacity: 0; transform: scaleX(0); } 75%, 85% { opacity: 1; transform: scaleX(1); } }
 
-    /* Mobile Fallback to Grid */
     @media(max-width: 900px) {
       .how-circle-stage { height: auto; max-width: 100%; display: grid; gap: 1.5rem; margin-top: 2rem; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); }
       .how-circle-center, .how-circle-svg, .data-beam { display: none; }
       .how-card { position: relative !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; width: 100% !important; animation: none !important; }
     }
-    .how-card-num { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 1rem; }
-    .how-card-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 1rem; }
-    .icon-cyan  { background: var(--cyan-dim);  border: 1px solid rgba(93,228,216,0.18); }
-    .icon-amber { background: var(--amber-dim); border: 1px solid rgba(245,166,35,0.18); }
-    .icon-red   { background: var(--red-dim);   border: 1px solid rgba(255,107,107,0.18); }
-    .icon-green { background: var(--green-dim); border: 1px solid rgba(82,232,165,0.18); }
-    .how-card-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-bottom: 0.5rem; }
-    .how-card-body  { font-size: 0.85rem; line-height: 1.7; color: var(--muted); }
-    .how-card-accent { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: transparent; transition: background .3s; }
-    .how-card:hover .how-card-accent { background: linear-gradient(90deg, var(--cyan), transparent); }
+    .how-card-num { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 700; color: var(--dim); margin-bottom: 0.8rem; }
+    .how-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 1rem; }
+    .icon-cyan  { background: var(--cyan-dim);  border: 1px solid rgba(93,228,216,0.25); }
+    .icon-amber { background: var(--amber-dim); border: 1px solid rgba(245,166,35,0.25); }
+    .icon-red   { background: var(--red-dim);   border: 1px solid rgba(255,92,92,0.25); }
+    .icon-green { background: var(--green-dim); border: 1px solid rgba(82,232,165,0.25); }
+    .how-card-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+    .how-card-body  { font-size: 0.86rem; line-height: 1.65; color: var(--muted); }
 
-    /* ── PIPELINE SECTION (Timeline) ───────────── */
+    /* ── PIPELINE TIMELINE ──────────────── */
     .timeline-row {
       position: relative;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin: 4rem 0 6rem 0;
+      margin: 4rem 0 5rem 0;
       padding: 0 20px;
     }
     .tl-line {
-      position: absolute;
-      top: 66px;
-      left: 60px; right: 60px;
-      height: 2px;
-      background: rgba(255,255,255,0.1);
-      z-index: 0;
+      position: absolute; top: 66px; left: 60px; right: 60px; height: 2px;
+      background: rgba(255,255,255,0.1); z-index: 0;
     }
     .tl-progress {
       position: absolute; top: -1px; left: 0; height: 4px; width: var(--tl-progress, 0%);
       background: linear-gradient(90deg, var(--cyan) 0%, var(--blue) 50%, var(--purple) 100%);
-      box-shadow: 0 0 15px var(--blue);
-      border-radius: 4px;
+      box-shadow: 0 0 15px var(--blue); border-radius: 4px;
     }
     .tl-node {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 140px;
-      text-align: center;
+      position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;
+      width: 150px; text-align: center;
     }
-    .tl-num {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
+    .tl-num { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; }
     .tl-circle {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: rgba(4, 10, 22, 0.8);
-      backdrop-filter: blur(8px);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 20px;
-      border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.05);
+      width: 66px; height: 66px; border-radius: 50%;
+      background: rgba(4, 10, 22, 0.85); backdrop-filter: blur(8px);
+      display: flex; justify-content: center; align-items: center;
+      margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
     }
-    .cyan-border { border-color: rgba(93,228,216,0.4); box-shadow: 0 0 20px rgba(93,228,216,0.2), inset 0 0 15px rgba(93,228,216,0.1); }
-    .blue-border { border-color: rgba(66,135,245,0.4); box-shadow: 0 0 20px rgba(66,135,245,0.2), inset 0 0 15px rgba(66,135,245,0.1); }
-    .purple-border { border-color: rgba(186,85,211,0.4); box-shadow: 0 0 20px rgba(186,85,211,0.2), inset 0 0 15px rgba(186,85,211,0.1); }
-    .green-border { border-color: rgba(93,228,216,0.4); box-shadow: 0 0 20px rgba(93,228,216,0.2), inset 0 0 15px rgba(93,228,216,0.1); }
+    .cyan-border { border-color: rgba(93,228,216,0.5); box-shadow: 0 0 20px rgba(93,228,216,0.25); }
+    .blue-border { border-color: rgba(66,135,245,0.5); box-shadow: 0 0 20px rgba(66,135,245,0.25); }
+    .purple-border { border-color: rgba(186,85,211,0.5); box-shadow: 0 0 20px rgba(186,85,211,0.25); }
+    .green-border { border-color: rgba(82,232,165,0.5); box-shadow: 0 0 20px rgba(82,232,165,0.25); }
     
     .tl-icon { width: 28px; height: 28px; }
     .tl-icon.cyan { stroke: var(--cyan); }
     .tl-icon.blue { stroke: #4287f5; }
     .tl-icon.purple { stroke: #ba55d3; }
-    .tl-icon.green { stroke: var(--cyan); }
+    .tl-icon.green { stroke: var(--green); }
     .tl-num.cyan { color: var(--cyan); }
     .tl-num.blue { color: #4287f5; }
     .tl-num.purple { color: #ba55d3; }
-    .tl-num.green { color: var(--cyan); }
+    .tl-num.green { color: var(--green); }
 
-    .tl-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 6px;
-    }
-    .tl-desc {
-      font-size: 0.8rem;
-      color: rgba(255,255,255,0.6);
-      line-height: 1.4;
-    }
+    .tl-title { font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .tl-desc { font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.4; }
 
     .tl-features-bar {
-      margin: 0 auto;
-      max-width: 900px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 24px 40px;
-      backdrop-filter: blur(10px);
+      margin: 0 auto; max-width: 960px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 18px; display: flex; justify-content: space-between; align-items: center;
+      padding: 24px 36px; backdrop-filter: blur(10px);
     }
-    .tl-feature {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex: 1;
-    }
-    .tl-feature svg {
-      width: 28px; height: 28px; stroke: var(--cyan); opacity: 0.9;
-    }
-    .tl-feature-divider {
-      width: 1px;
-      height: 40px;
-      background: rgba(255,255,255,0.1);
-      margin: 0 30px;
-    }
-    .tl-f-text {
-      display: flex; flex-direction: column; text-align: left;
-    }
-    .tl-f-text strong {
-      font-size: 0.95rem; font-weight: 600; color: #fff; margin-bottom: 2px;
-    }
-    .tl-f-text span {
-      font-size: 0.75rem; color: rgba(255,255,255,0.5);
-    }
+    .tl-feature { display: flex; align-items: center; gap: 16px; flex: 1; }
+    .tl-feature svg { width: 26px; height: 26px; stroke: var(--cyan); opacity: 0.95; flex-shrink: 0; }
+    .tl-feature-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.1); margin: 0 24px; }
+    .tl-f-text { display: flex; flex-direction: column; text-align: left; }
+    .tl-f-text strong { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .tl-f-text span { font-size: 0.76rem; color: rgba(255,255,255,0.55); }
 
     @media (max-width: 1000px) {
-      .timeline-row { flex-direction: column; align-items: center; gap: 40px; margin: 2rem 0 4rem 0; }
-      .tl-line { width: 2px; height: 100%; top: 0; left: 50%; right: auto; transform: translateX(-50%); background: rgba(255,255,255,0.1); }
-      .tl-progress { top: 0; left: -1px; width: 4px; height: var(--tl-progress, 0%); background: linear-gradient(180deg, var(--cyan) 0%, var(--blue) 50%, var(--purple) 100%); }
-      .tl-features-bar { flex-direction: column; gap: 24px; align-items: flex-start; padding: 30px; }
-      .tl-feature-divider { width: 100%; height: 1px; margin: 0; }
+      .timeline-row { flex-direction: column; align-items: center; gap: 40px; margin: 2rem 0; }
+      .tl-line { width: 2px; height: 100%; top: 0; left: 50%; right: auto; transform: translateX(-50%); }
+      .tl-features-bar { flex-direction: column; gap: 20px; padding: 20px; }
+      .tl-feature-divider { display: none; }
     }
 
-    /* Waitlist */
-    .waitlist-outer { max-width: 620px; margin: 0 auto; }
+    /* ── WAITLIST & ACCESS ──────────────── */
     .waitlist-card { 
-      position: relative; overflow: hidden; padding: 3rem; border-radius: 24px; 
-      background: var(--glass-bg);
-      backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
+      position: relative; overflow: hidden; padding: 3.5rem; border-radius: 28px; 
+      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), inset 0 -1px 0 var(--glass-rim-bot), 0 20px 40px rgba(0,0,0,0.3);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4), inset 0 1px 0 var(--glass-rim-top);
     }
-    .waitlist-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at top, rgba(93,228,216,0.055) 0%, transparent 65%); pointer-events: none; }
-    .waitlist-title { font-size: clamp(1.5rem,3vw,2.1rem); font-weight: 800; letter-spacing: -0.04em; color: #fff; line-height: 1.1; margin-bottom: 0.5rem; }
-    .waitlist-sub   { font-size: 0.88rem; color: var(--muted); margin-bottom: 1.8rem; line-height: 1.65; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-    @media(max-width:520px) { .form-row { grid-template-columns: 1fr; } }
+    .waitlist-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at top, rgba(93,228,216,0.08) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .waitlist-title { font-size: clamp(1.8rem,3.2vw,2.4rem); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 0.6rem; }
+    .waitlist-sub   { font-size: 0.95rem; color: var(--muted); margin-bottom: 2rem; line-height: 1.7; max-width: 580px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    @media(max-width:560px) { .form-row { grid-template-columns: 1fr; } }
     .field-group { display: flex; flex-direction: column; gap: 6px; }
-    .field-label { font-size: 0.73rem; font-weight: 600; color: var(--muted); }
-    .field-input { background: rgba(255,255,255,0.04); border: 1px solid var(--border-hi); border-radius: 10px; padding: 11px 14px; font-size: 0.88rem; color: var(--text); font-family: 'Inter', sans-serif; outline: none; transition: border-color .2s, background .2s; }
+    .field-label { font-size: 0.75rem; font-weight: 600; color: var(--muted); }
+    .field-input { background: rgba(255,255,255,0.04); border: 1px solid var(--border-hi); border-radius: 12px; padding: 13px 16px; font-size: 0.9rem; color: #fff; font-family: inherit; outline: none; transition: border-color .2s, background .2s; }
     .field-input::placeholder { color: var(--dim); }
-    .field-input:focus { border-color: rgba(93,228,216,0.42); background: rgba(93,228,216,0.03); }
-    .btn-submit { width: 100%; background: var(--cyan); color: #060a10; font-size: 0.95rem; font-weight: 700; padding: 14px; border-radius: 10px; border: none; cursor: pointer; margin-top: 4px; box-shadow: 0 0 30px rgba(93,228,216,0.22); transition: transform .18s, box-shadow .18s, background .18s; }
-    .btn-submit:hover { background: #7aeee5; transform: translateY(-1px); box-shadow: 0 6px 40px rgba(93,228,216,0.4); }
-    .form-footnote { text-align: center; font-size: 0.73rem; color: var(--dim); margin-top: 1rem; }
-    .form-success { display: none; text-align: center; padding: 1rem; background: var(--green-dim); border: 1px solid rgba(82,232,165,0.25); border-radius: 10px; color: var(--green); font-size: 0.88rem; font-weight: 600; margin-top: 12px; }
+    .field-input:focus { border-color: rgba(93,228,216,0.5); background: rgba(93,228,216,0.04); }
+    .btn-submit { width: 100%; background: var(--cyan); color: #060a10; font-size: 1rem; font-weight: 800; padding: 15px; border-radius: 12px; border: none; cursor: pointer; margin-top: 6px; box-shadow: 0 0 30px rgba(93,228,216,0.25); transition: all .2s; }
+    .btn-submit:hover { background: #7aeee5; transform: translateY(-2px); box-shadow: 0 8px 40px rgba(93,228,216,0.45); }
+    .form-footnote { text-align: center; font-size: 0.75rem; color: var(--dim); margin-top: 1.2rem; }
+    .form-success { display: none; text-align: center; padding: 1.2rem; background: var(--green-dim); border: 1px solid rgba(82,232,165,0.3); border-radius: 12px; color: var(--green); font-size: 0.95rem; font-weight: 700; margin-top: 14px; }
 
-    /* Footer */
-    footer { background: rgba(6,10,16,0.8); backdrop-filter: blur(20px); border-top: 1px solid var(--border); padding: 2.5rem 2rem; position: relative; z-index: 10; }
-    .footer-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
-    .footer-copy { font-size: 0.8rem; color: var(--dim); }
-    .footer-links { display: flex; gap: 1.5rem; }
-    .footer-links a { font-size: 0.8rem; color: var(--dim); text-decoration: none; transition: color .2s; }
-    .footer-links a:hover { color: var(--muted); }
+    /* ── FOOTER ─────────────────────────── */
+    footer { background: rgba(6,10,16,0.92); backdrop-filter: blur(20px); border-top: 1px solid var(--border); padding: 3rem 2rem; position: relative; z-index: 10; }
+    .footer-inner { max-width: 1140px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; }
+    .footer-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; text-decoration: none; }
+    .footer-copy { font-size: 0.82rem; color: var(--dim); }
+    .footer-links { display: flex; gap: 1.8rem; }
+    .footer-links a { font-size: 0.82rem; color: var(--muted); text-decoration: none; transition: color .2s; }
+    .footer-links a:hover { color: var(--cyan); }
 
     /* Scroll reveal */
-    [data-anim] { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
+    [data-anim] { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
     [data-anim].visible { opacity: 1; transform: translateY(0); }
   </style>
 </head>
@@ -838,21 +729,35 @@
   <!-- NAV -->
   <nav class="glass">
     <a class="nav-brand" href="#">
-      <img src="/images/new-logo.png" alt="SafeMailx AI Logo" class="nav-logo-img" />
-      <span class="nav-brand-text">SafeMailx AI</span>
+      <img src="/images/new-logo.png" alt="SafeMail X AI Logo" class="nav-logo-img" />
+      <span class="nav-brand-text">SafeMail X AI</span>
+      <span class="nav-brand-badge">v1.0.6</span>
     </a>
+    <ul class="nav-links">
+      <li><a href="#threats">Threat Vectors</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#pipeline">Pipeline</a></li>
+      <li><a href="#mobile-app">Mobile APK</a></li>
+      <li><a href="#waitlist">Early Access</a></li>
+    </ul>
     <div class="nav-actions">
-      <span class="badge-soon">COMING SOON</span>
-      <a class="btn-nav" href="#waitlist">Get early access</a>
+      <a class="btn-nav-github" href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub ★
+      </a>
+      <a class="btn-nav-apk" href="#mobile-app">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Get APK
+      </a>
     </div>
   </nav>
 
   <!-- CHAPTER DOTS -->
   <div id="chapter-dots">
-    <div class="ch-dot-wrap" data-chapter="0"><span class="ch-label">Intro</span><div class="ch-dot active"></div></div>
-    <div class="ch-dot-wrap" data-chapter="1"><span class="ch-label">Rule Engine</span><div class="ch-dot"></div></div>
-    <div class="ch-dot-wrap" data-chapter="2"><span class="ch-label">ML Model</span><div class="ch-dot"></div></div>
-    <div class="ch-dot-wrap" data-chapter="3"><span class="ch-label">LLM</span><div class="ch-dot"></div></div>
+    <div class="ch-dot-wrap" data-chapter="0"><span class="ch-label">Defense Platform</span><div class="ch-dot active"></div></div>
+    <div class="ch-dot-wrap" data-chapter="1"><span class="ch-label">Rules & Heuristics</span><div class="ch-dot"></div></div>
+    <div class="ch-dot-wrap" data-chapter="2"><span class="ch-label">ML & Telecom</span><div class="ch-dot"></div></div>
+    <div class="ch-dot-wrap" data-chapter="3"><span class="ch-label">Qwen3-8B AI</span><div class="ch-dot"></div></div>
     <div class="ch-dot-wrap" data-chapter="4"><span class="ch-label">Complete</span><div class="ch-dot"></div></div>
   </div>
 
@@ -860,7 +765,7 @@
   <div id="hero-sequence">
     <div id="hero-stage">
       <!-- Video Background -->
-      <video id="hero-video" autoplay muted loop playsinline preload="auto" style="transform: scale(1.25) translate(8%, 8%);">
+      <video id="hero-video" autoplay muted loop playsinline preload="auto" style="transform: scale(1.25) translate(6%, 6%);">
         <source src="/video/HEROBG.mp4" type="video/mp4">
       </video>
 
@@ -871,26 +776,29 @@
       <!-- Hero Copy -->
       <div id="hero-copy">
         <div class="hero-text-glass">
-          <h1 class="hero-h1">Email security<br>that <em>actually works</em></h1>
+          <div class="hero-tag">
+            <span class="hero-tag-dot"></span>
+            AI-POWERED MULTI-VECTOR THREAT DEFENSE
+          </div>
+          <h1 class="hero-h1">Multi-vector security<br>against <em>modern scams & fraud</em></h1>
           <p class="hero-sub">
-            <strong>Your inbox gets hundreds of phishing attempts that slip past basic filters.
-            SafeMailx runs three layers of local analysis — no data ever leaves your machine.</strong>
+            Protecting individuals and organizations from <strong>Phishing, Vishing Calls, Malicious QR Codes, UPI Payment Traps, and Identity Forgery</strong>. Powered by a local-first hybrid pipeline of Rule Heuristics, ML Scoring, and Local <strong>Qwen3-8B Thinking AI</strong>.
           </p>
           <div class="hero-actions">
-          <a class="btn-primary" href="#waitlist">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 5.49 5.49l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            Join the waitlist
-          </a>
-          <a class="btn-ghost" href="#why">
-            See how it works
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </a>
+            <a class="btn-primary" href="#mobile-app">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download User APK v1.0.6
+            </a>
+            <a class="btn-ghost" href="#threats">
+              Explore Threat Vectors
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
           </div>
         </div>
         <div class="hero-metrics">
-          <div class="metric-cell"><span class="metric-val cyan">Multi-Channel</span><span class="metric-desc">Email, SMS, URL</span></div>
-          <div class="metric-cell"><span class="metric-val amber">3-Layer</span><span class="metric-desc">AI + Rules + ML</span></div>
-          <div class="metric-cell"><span class="metric-val green">0 Data Retention</span><span class="metric-desc">fully private</span></div>
+          <div class="metric-cell"><span class="metric-val cyan">6+ Channels</span><span class="metric-desc">Email · Calls · SMS · UPI · Docs · Web</span></div>
+          <div class="metric-cell"><span class="metric-val amber">7-Layer Engine</span><span class="metric-desc">Rules + ML + Qwen3 Thinking AI</span></div>
+          <div class="metric-cell"><span class="metric-val green">100% Private</span><span class="metric-desc">Zero PII · Offline Cryptography</span></div>
         </div>
       </div>
 
@@ -904,29 +812,29 @@
         </div>
         <div class="pc-title-area">
           <div class="pc-layer">LAYER 01</div>
-          <div class="pc-name">Rule Engine</div>
+          <div class="pc-name">Heuristic & Rule Engine</div>
         </div>
         <ul class="pc-list">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> SPF / DKIM / DMARC</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> URL reputation checks</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> 347 header heuristics</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> 50+ Vishing heuristic rules & OTP traps</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> NPCI UPI reverse-charge & debit trap audit</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> SPF / DKIM / DMARC & domain Bloom filter</li>
         </ul>
       </div>
 
       <!-- Card 2: ML Model — CENTER -->
-      <div class="pipeline-card pc-blue" id="overlay-l2" style="top: 18%; left: 50%; margin-left: -160px;">
+      <div class="pipeline-card pc-blue" id="overlay-l2" style="top: 18%; left: 50%; margin-left: -162px;">
         <div class="pc-header">
           <div class="pc-num">02</div>
           <svg class="pc-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
         </div>
         <div class="pc-title-area">
           <div class="pc-layer">LAYER 02</div>
-          <div class="pc-name">ML Analysis</div>
+          <div class="pc-name">ML & Telecom Intel</div>
         </div>
         <ul class="pc-list">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Semantic analysis</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Vocabulary scoring</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span>Risk score: <strong style="color: #4287f5">0.87</strong> / 1.0</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> TF-IDF trained phishing & scam corpus</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> TRAI 140/160 series & international fraud hubs</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Homoglyph & Punycode redirect resolution</li>
         </ul>
       </div>
 
@@ -938,65 +846,220 @@
         </div>
         <div class="pc-title-area">
           <div class="pc-layer">LAYER 03</div>
-          <div class="pc-name">LLM Reasoning</div>
+          <div class="pc-name">Qwen3-8B Thinking AI</div>
         </div>
         <ul class="pc-list">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Executive impersonation</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Urgency & intent analysis</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span>Confidence: <strong style="color: #ba55d3">94.2%</strong></span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Cognitive reasoning & Digital Arrest audit</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Plain-language ELI5 safety explanations</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Real-time translation into 12 Indian languages</li>
         </ul>
       </div>
-
 
       <!-- Bottom Feature Bar -->
       <div class="pipeline-bottom-bar" id="overlay-bottom">
         <div class="pl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           <div class="pl-f-text">
-            <strong>Transparent pipeline</strong>
-            <span>See every check in real time</span>
+            <strong>Multi-Channel Security</strong>
+            <span>Calls, SMS, Email, QR & Identity</span>
           </div>
         </div>
         <div class="pl-feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
           <div class="pl-f-text">
-            <strong>Audit-ready</strong>
-            <span>Complete logs and evidence</span>
+            <strong>Offline Cryptography</strong>
+            <span>RSA-2048 UIDAI verification</span>
           </div>
         </div>
         <div class="pl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <div class="pl-f-text">
-            <strong>Sub-10ms analysis</strong>
-            <span>Fast. Local. Private.</span>
+            <strong>Sub-Second Scans</strong>
+            <span>Local AI on your private hardware</span>
           </div>
         </div>
         <div class="pl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           <div class="pl-f-text">
-            <strong>Zero data retention</strong>
-            <span>Nothing stored. Ever.</span>
+            <strong>Zero Data Retention</strong>
+            <span>Never stored, logged, or shared</span>
           </div>
         </div>
       </div>
 
       <!-- Scroll cue -->
       <div class="scroll-cue" id="scroll-cue">
-        <span>SCROLL</span><div class="scroll-line"></div>
+        <span>SCROLL DOWN</span><div class="scroll-line"></div>
       </div>
     </div>
   </div>
 
-  <!-- ── WHY DIFFERENT ── -->
-  <section class="content-section" id="why">
+  <!-- ── SECTION: MULTI-VECTOR THREAT DEFENSE ── -->
+  <section class="content-section" id="threats">
     <div class="section-inner">
       <div data-anim>
-        <div class="section-label">What makes us different</div>
-        <h2 class="section-title">Built to catch<br><em>what ordinary filters miss</em></h2>
-        <p class="section-body">Phishing emails are crafted to look legitimate — they pass SPF, DKIM, and DMARC. SafeMailx combines three distinct intelligence layers to find what others overlook.</p>
+        <div class="section-label">Attack Vectors Covered</div>
+        <h2 class="section-title">Beyond simple email filters.<br><em>Total defense across all modern channels.</em></h2>
+        <p class="section-body">Modern cybercriminals don't just send emails. They call you pretending to be the police, send deceptive UPI QR codes, register fake telecom numbers, and forge identity documents. SafeMail X AI neutralizes every vector.</p>
       </div>
+
+      <div class="threat-grid">
+        <!-- Card 1: Call Analyzer / Vishing -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap amber">📞</div>
+          <h3 class="tc-title">Call Analyzer & Vishing Defense</h3>
+          <p class="tc-desc">Detect phone scams by describing what the caller said or uploading call audio. Whisper transcribes speech while our 7-layer scam intelligence classifies Digital Arrests, courier parcel traps, and fake CBI/police threats in real time with Tavily policy checks.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">Whisper Audio STT</li>
+            <li class="tc-tag">Digital Arrest Scams</li>
+            <li class="tc-tag">12 Indian Languages</li>
+            <li class="tc-tag">ELI5 Plain Explanations</li>
+          </ul>
+        </div>
+
+        <!-- Card 2: UPI & QR Forensic Scanner -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap cyan">💸</div>
+          <h3 class="tc-title">UPI Fraud & QR Forensic Scanner</h3>
+          <p class="tc-desc">Scan QR codes with live camera or gallery screenshots. The NPCI forensic engine decodes VPAs, payee names, Merchant Category Codes (MCC), and uncovers debit-traps where attackers trick you into paying money under the guise of receiving a cashback or refund.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">Live Camera & Gallery</li>
+            <li class="tc-tag">Debit Trap Detection</li>
+            <li class="tc-tag">Bank Handle Audit</li>
+            <li class="tc-tag">MCC Code Decoder</li>
+          </ul>
+        </div>
+
+        <!-- Card 3: Aadhaar & Gov Doc Verifier -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap purple">🪪</div>
+          <h3 class="tc-title">Offline Aadhaar & Document Verifier</h3>
+          <p class="tc-desc">Cryptographically verify Aadhaar Secure QR codes 100% offline using embedded UIDAI public certificates and RSA-2048 verification. Decompresses big-endian gzip payloads, extracts demographic data and photo preview, with zero UIDAI calls and zero PII stored.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">RSA-2048 Offline Crypto</li>
+            <li class="tc-tag">Tamper Detection</li>
+            <li class="tc-tag">DigiLocker Portal Safe Route</li>
+            <li class="tc-tag">Zero Cloud Retention</li>
+          </ul>
+        </div>
+
+        <!-- Card 4: Who Called? Intelligence -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap red">🔍</div>
+          <h3 class="tc-title">Who Called? Deep Profiler</h3>
+          <p class="tc-desc">Auto-detects copied numbers from your clipboard. Audits against TRAI 140/160 telemarketer regulation standards, detects international cybercrime hubs (+855 Cambodia, +95 Myanmar, +856 Laos), decodes telecom circles, and provides one-tap DOT Chakshu reporting.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">Clipboard Auto-Detect</li>
+            <li class="tc-tag">TRAI 140/160 Audit</li>
+            <li class="tc-tag">MHA Cybercrime Hubs</li>
+            <li class="tc-tag">DOT Chakshu 1-Tap Link</li>
+          </ul>
+        </div>
+
+        <!-- Card 5: Email & SMS Phishing -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap blue">✉️</div>
+          <h3 class="tc-title">Email & SMS Phishing Engine</h3>
+          <p class="tc-desc">Multi-engine analysis for inbox threats. Connect via privacy-preserving Gmail OAuth 2.0 (label-only model) or instant scan. Resolves deep URL redirect chains, analyzes domain age (RDAP), flags typosquatting and homoglyphs, and sandboxes documents with YARA.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">Gmail OAuth Label-Only</li>
+            <li class="tc-tag">Instant Smishing Scan</li>
+            <li class="tc-tag">PDF / DOCX Malware YARA</li>
+            <li class="tc-tag">Redirect Chain Tracer</li>
+          </ul>
+        </div>
+
+        <!-- Card 6: Assistive Touch Shield -->
+        <div class="threat-card" data-anim>
+          <div class="tc-icon-wrap green">🛡️</div>
+          <h3 class="tc-title">Assistive Touch Floating Shield</h3>
+          <p class="tc-desc">A floating obsidian glass orb on Android that stays accessible across any app. Inspect suspicious links, scan UPI payment QRs, or profile an incoming caller without ever switching away from WhatsApp, Telegram, SMS, or banking apps.</p>
+          <ul class="tc-tags">
+            <li class="tc-tag highlight">Android Floating Shield</li>
+            <li class="tc-tag">Instant Link Verification</li>
+            <li class="tc-tag">Quick Forensic Notepad</li>
+            <li class="tc-tag">Obsidian Glass UI</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION: MOBILE APP SPOTLIGHT ── -->
+  <section class="content-section" id="mobile-app">
+    <div class="section-inner">
+      <div class="app-spotlight" data-anim>
+        <div class="as-left">
+          <span class="as-badge">● STANDALONE ANDROID APK RELEASE</span>
+          <h2 class="as-title">Security in your pocket.<br>Every second. Across all apps.</h2>
+          <p class="as-desc">
+            The SafeMail X AI mobile app is built with high-performance React Native and Expo SDK 54. It brings our entire threat intelligence suite into a fluid, responsive <strong>Liquid Glass / Obsidian Nocturne</strong> interface.
+          </p>
+          <div class="as-features">
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Floating Assistive Touch Overlay</span>
+            </div>
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Dual-Mode Live Camera QR Scanner</span>
+            </div>
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Offline Cryptographic Aadhaar Verifier</span>
+            </div>
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Voice / Audio Vishing Detection</span>
+            </div>
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>12 Indian Regional Languages</span>
+            </div>
+            <div class="as-feat">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Downloadable Forensic PDF Reports</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a class="btn-primary" href="https://github.com/Rahul-workss/safemailx-ai/actions" target="_blank" rel="noopener">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download User APK v1.0.6
+            </a>
+            <a class="btn-ghost" href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">
+              View Source on GitHub
+            </a>
+          </div>
+        </div>
+
+        <div class="as-right">
+          <div class="as-download-box">
+            <div style="font-size:2.8rem; margin-bottom:0.4rem;">📱</div>
+            <h4 style="font-size:1.25rem; font-weight:800; color:#fff;">SafeMail X AI for Android</h4>
+            <div class="as-meta">Release v1.0.6 · ARM64 Standalone APK</div>
+            <p style="font-size:0.84rem; color:var(--muted); margin:0.8rem 0 1.2rem;">Signed standalone build with offline bundling. Runs completely without needing any development server.</p>
+            <a class="as-btn-download" href="https://github.com/Rahul-workss/safemailx-ai/actions" target="_blank" rel="noopener">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Get Latest APK
+            </a>
+            <div style="font-size:0.75rem; color:var(--dim); margin-top:6px;">Compatible with Android 8.0+ (ARM64)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SECTION: WHY DIFFERENT / CORE ARCHITECTURE ── -->
+  <section class="content-section" id="architecture">
+    <div class="section-inner">
+      <div data-anim>
+        <div class="section-label">Core Engineering</div>
+        <h2 class="section-title">Built with local-first precision.<br><em>How the hybrid engine operates.</em></h2>
+        <p class="section-body">Cloud-only scanners force you to upload sensitive communications to third-party servers. SafeMail X AI is architected from the ground up to analyze threats locally on your device or private infrastructure.</p>
+      </div>
+
       <div class="how-circle-stage" data-anim style="transition-delay:.12s">
-        <!-- Tight SVG Orbit Ring -->
+        <!-- Circular SVG Pulse Orbit -->
         <svg class="how-circle-svg" viewBox="0 0 180 180">
           <circle cx="90" cy="90" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-dasharray="6 8" />
           <circle class="how-chain-pulse" cx="90" cy="90" r="88" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-linecap="round" stroke-dasharray="30 600" />
@@ -1008,49 +1071,45 @@
         <div class="data-beam beam-3"></div>
         <div class="data-beam beam-4"></div>
 
-        <!-- Central Anchor -->
+        <!-- Central Hub -->
         <div class="how-circle-center">
-          <img src="/images/new-logo.png" alt="SafeMailx" />
+          <img src="/images/new-logo.png" alt="SafeMail X AI" />
         </div>
 
         <div class="how-card">
-          <div class="how-card-num">01 / 04</div>
-          <div class="how-card-icon icon-cyan">🔍</div>
-          <div class="how-card-title">Triple-Layer Engine</div>
-          <div class="how-card-body">Rule-based heuristics, TF-IDF semantic modelling, and deep LLM reasoning — working together, not in isolation.</div>
-          <div class="how-card-accent"></div>
+          <div class="how-card-num">01 / HYBRID AI</div>
+          <div class="how-card-icon icon-cyan">⚙️</div>
+          <div class="how-card-title">Ensemble Detection</div>
+          <div class="how-card-body">Heuristic rules, scikit-learn TF-IDF models, and Qwen3-8B thinking LLM working as a coordinated multi-tier pipeline.</div>
         </div>
         <div class="how-card">
-          <div class="how-card-num">02 / 04</div>
-          <div class="how-card-icon icon-amber">📎</div>
-          <div class="how-card-title">Attachment Forensics</div>
-          <div class="how-card-body">SafeMailx dissects suspicious PDFs and Office docs, identifying hidden scripts and malicious macros buried inside.</div>
-          <div class="how-card-accent"></div>
+          <div class="how-card-num">02 / FORENSICS</div>
+          <div class="how-card-icon icon-amber">🔬</div>
+          <div class="how-card-title">Payload Forensics</div>
+          <div class="how-card-body">Multi-decoder QR preprocessing (ZXing + pyzbar + OpenCV) handles glare, angles, and PVC camera photos effortlessly.</div>
         </div>
         <div class="how-card">
-          <div class="how-card-num">03 / 04</div>
+          <div class="how-card-num">03 / PRIVACY</div>
           <div class="how-card-icon icon-red">🔒</div>
           <div class="how-card-title">Zero Data Retention</div>
-          <div class="how-card-body">All analysis runs locally. Your communications never leave, never hit a server, never get logged anywhere.</div>
-          <div class="how-card-accent"></div>
+          <div class="how-card-body">All parsing occurs in volatile memory. No audio, no demographic records, and no credentials ever persist in databases.</div>
         </div>
         <div class="how-card">
-          <div class="how-card-num">04 / 04</div>
+          <div class="how-card-num">04 / EVIDENCE</div>
           <div class="how-card-icon icon-green">📋</div>
-          <div class="how-card-title">Evidence-Based Reports</div>
-          <div class="how-card-body">Not just a verdict — a full forensic PDF: every red flag, every reason, fully documented.</div>
-          <div class="how-card-accent"></div>
+          <div class="how-card-title">Forensic Audit Reports</div>
+          <div class="how-card-body">Generates comprehensive evidence packs and PDF reports documenting every red flag and regulatory citation.</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── PIPELINE ── -->
+  <!-- ── SECTION: PIPELINE TIMELINE ── -->
   <section class="content-section" id="pipeline" style="text-align: center;">
     <div class="section-inner" style="max-width: 1200px; margin: 0 auto; padding-top: 2rem;">
       <div data-anim>
-        <h2 class="section-title" style="text-align: center; font-size: 3.5rem; margin-bottom: 0.5rem; font-weight: 700;">Five stages.<br><em style="color: var(--cyan); font-weight: 400; font-family: 'Fraunces', serif; font-style: italic;">One verdict.</em></h2>
-        <p class="section-body" style="text-align: center; max-width: 600px; margin: 1rem auto 4rem auto; font-size: 1.1rem;">Each email moves through a sequential pipeline.<br>Every stage leaves an audit trail so you can see exactly what was found.</p>
+        <h2 class="section-title" style="text-align: center; font-size: clamp(2.2rem, 4.2vw, 3.6rem); margin-bottom: 0.5rem; font-weight: 800;">Five stages.<br><em style="color: var(--cyan); font-family: 'Fraunces', serif; font-style: italic;">One conclusive verdict.</em></h2>
+        <p class="section-body" style="text-align: center; max-width: 640px; margin: 1rem auto 4rem auto; font-size: 1.05rem;">Every incoming event moves through an audit-backed validation pipeline, calculating dynamic risk bands from 0 to 100.</p>
       </div>
 
       <div class="timeline-row">
@@ -1063,7 +1122,7 @@
             <svg class="tl-icon cyan" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.00005L10.2 11.65C11.2667 12.45 12.7333 12.45 13.8 11.65L20 7"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
           </div>
           <div class="tl-title">Intake</div>
-          <div class="tl-desc">Clean & extract</div>
+          <div class="tl-desc">Audio, SMS, QR, Email or URL</div>
         </div>
 
         <!-- Node 2 -->
@@ -1073,7 +1132,7 @@
             <svg class="tl-icon blue" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
           <div class="tl-title">Rule Engine</div>
-          <div class="tl-desc">Headers, URLs,<br>patterns</div>
+          <div class="tl-desc">TRAI, NPCI & 50+ threat heuristics</div>
         </div>
 
         <!-- Node 3 -->
@@ -1082,8 +1141,8 @@
           <div class="tl-circle purple-border">
             <svg class="tl-icon purple" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
           </div>
-          <div class="tl-title">ML Analysis</div>
-          <div class="tl-desc">Semantic & risk<br>scoring</div>
+          <div class="tl-title">ML & Intel</div>
+          <div class="tl-desc">Semantic scoring & Bloom filters</div>
         </div>
 
         <!-- Node 4 -->
@@ -1092,8 +1151,8 @@
           <div class="tl-circle purple-border">
             <svg class="tl-icon purple" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
           </div>
-          <div class="tl-title">LLM Reasoning</div>
-          <div class="tl-desc">Behavioural intent<br>analysis</div>
+          <div class="tl-title">Qwen3-8B AI</div>
+          <div class="tl-desc">Cognitive reasoning & ELI5 summary</div>
         </div>
 
         <!-- Node 5 -->
@@ -1102,8 +1161,8 @@
           <div class="tl-circle green-border">
             <svg class="tl-icon green" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
           </div>
-          <div class="tl-title">Report</div>
-          <div class="tl-desc">Verdict & evidence<br>pack</div>
+          <div class="tl-title">Verdict</div>
+          <div class="tl-desc">Risk score, action steps & report</div>
         </div>
       </div>
 
@@ -1111,72 +1170,83 @@
         <div class="tl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           <div class="tl-f-text">
-            <strong>Transparent</strong>
-            <span>See every check in real time</span>
+            <strong>Transparent & Traceable</strong>
+            <span>Every check audited with exact reasons</span>
           </div>
         </div>
         <div class="tl-feature-divider"></div>
         <div class="tl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div class="tl-f-text">
-            <strong>Audit-ready</strong>
-            <span>Complete logs and evidence</span>
+            <strong>Smart Veto Protection</strong>
+            <span>Ensemble guardrails prevent false results</span>
           </div>
         </div>
         <div class="tl-feature-divider"></div>
         <div class="tl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
           <div class="tl-f-text">
-            <strong>Local-first</strong>
-            <span>Zero cloud. Fully private.</span>
+            <strong>Local-First Architecture</strong>
+            <span>Self-hostable or zero-cloud private setup</span>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── WAITLIST ── -->
+  <!-- ── SECTION: WAITLIST & COMMUNITY ── -->
   <section class="content-section" id="waitlist">
     <div class="section-inner">
-      <div class="waitlist-outer">
-        <div class="waitlist-card" data-anim>
-          <div class="section-label">Early access</div>
-          <h2 class="waitlist-title">Get notified<br>when we launch.</h2>
-          <p class="waitlist-sub">Join early access for launch updates and a private testing slot. No spam — only when there's something useful to share.</p>
-          <form id="wl-form">
-            <div class="form-row">
-              <div class="field-group"><label class="field-label" for="wl-name">Full Name</label><input class="field-input" id="wl-name" name="name" type="text" placeholder="Jane Smith" autocomplete="name" required /></div>
-              <div class="field-group"><label class="field-label" for="wl-email">Email Address</label><input class="field-input" id="wl-email" name="email" type="email" placeholder="you@company.com" autocomplete="email" required /></div>
+      <div class="waitlist-card" data-anim>
+        <div class="section-label">Early Access & Updates</div>
+        <h2 class="waitlist-title">Be the first to protect your digital identity.</h2>
+        <p class="waitlist-sub">Join security researchers, IT teams, and privacy advocates testing SafeMail X AI. Get launch announcements, pre-release APK builds, and open-source updates.</p>
+        <form id="wl-form">
+          <div class="form-row">
+            <div class="field-group">
+              <label class="field-label" for="wl-name">Full Name</label>
+              <input class="field-input" id="wl-name" name="name" type="text" placeholder="Rahul Sharma" autocomplete="name" required />
             </div>
-            <button class="btn-submit" type="submit">Join the waitlist →</button>
-          </form>
-          <div class="form-footnote">No spam. Product updates only.</div>
-          <div class="form-success" id="wl-success">✓ You're on the list! We'll be in touch.</div>
-        </div>
+            <div class="field-group">
+              <label class="field-label" for="wl-email">Email Address</label>
+              <input class="field-input" id="wl-email" name="email" type="email" placeholder="you@domain.com" autocomplete="email" required />
+            </div>
+          </div>
+          <button class="btn-submit" type="submit">Join Early Access Waitlist →</button>
+        </form>
+        <div class="form-footnote">Zero spam. Pure security intelligence updates. Unsubscribe anytime.</div>
+        <div class="form-success" id="wl-success">✓ You're on the list! We'll notify you with new releases and updates.</div>
       </div>
     </div>
   </section>
 
+  <!-- FOOTER -->
   <footer>
     <div class="footer-inner">
-      <span class="footer-copy">© 2026 SafeMailx AI. All rights reserved.</span>
-      <div class="footer-links"><a href="/privacy.html">Privacy Policy</a><a href="/terms.html">Terms of Service</a></div>
+      <a class="footer-brand" href="#">
+        <img src="/images/new-logo.png" alt="SafeMail X AI" style="width:26px; height:26px; object-fit:contain;" />
+        <span>SafeMail X AI</span>
+      </a>
+      <span class="footer-copy">© 2026 SafeMail X AI. Open-source threat intelligence under MIT License.</span>
+      <div class="footer-links">
+        <a href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Rahul-workss/safemailx-ai#api-reference" target="_blank" rel="noopener">API Docs</a>
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms of Service</a>
+      </div>
     </div>
   </footer>
 
   <script>
     gsap.registerPlugin(ScrollTrigger);
 
-    // ─── 1. VIDEO BACKGROUND ───────────────────────────
-    // Laggy canvas animations replaced by smooth hardware-accelerated video
-
-    // Fade out hero text slightly later
+    // Fade out hero text on scroll
     gsap.to('#hero-copy',{opacity:0,y:-30,
-      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=15% top',scrub:true}});
+      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
     gsap.to('#scroll-cue',{opacity:0,
       scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
 
-    // Hero copy children entrance
+    // Hero copy entrance
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
     // ── PIPELINE TIMELINE ANIMATION ──
@@ -1185,23 +1255,20 @@
     const tlFeaturesBar = document.querySelector('.tl-features-bar');
 
     if (tlNodes.length && tlContainer && tlFeaturesBar) {
-      // Initial states
-      gsap.set(tlNodes, { opacity: 0.3, filter: 'grayscale(1) brightness(0.6)' });
+      gsap.set(tlNodes, { opacity: 0.35, filter: 'grayscale(1) brightness(0.6)' });
       gsap.set(tlFeaturesBar, { opacity: 0, y: 30 });
 
       const pipelineTl = gsap.timeline({
         scrollTrigger: {
           trigger: '#pipeline',
-          start: 'top 50%',
+          start: 'top 55%',
           end: 'bottom 85%',
           scrub: 0.5,
         }
       });
 
-      // Animate CSS variable for progress line
       pipelineTl.to(tlContainer, { '--tl-progress': '100%', ease: 'none', duration: 1 }, 0);
 
-      // Stagger node bright-ups
       tlNodes.forEach((node, i) => {
         pipelineTl.to(node, {
           opacity: 1,
@@ -1211,7 +1278,6 @@
         }, i * 0.25 - 0.05);
       });
 
-      // Features bar fade in
       pipelineTl.to(tlFeaturesBar, {
         opacity: 1,
         y: 0,
@@ -1220,20 +1286,18 @@
       }, 1.0);
     }
 
-    // ─── 4. CHAPTER DOTS ──────────────────────────────────
+    // ── CHAPTER DOTS ──
     const chapterDots = document.getElementById('chapter-dots');
     const dotWraps    = chapterDots.querySelectorAll('.ch-dot-wrap');
     const dots        = chapterDots.querySelectorAll('.ch-dot');
 
-    // Show dots once user starts scrolling
     ScrollTrigger.create({
       trigger: '#hero-sequence', start: 'top+=5% top',
       onEnter:  () => chapterDots.classList.add('visible'),
       onLeaveBack: () => chapterDots.classList.remove('visible'),
     });
-    // Hide dots once past hero
     ScrollTrigger.create({
-      trigger: '#why', start: 'top top',
+      trigger: '#threats', start: 'top top',
       onEnter:      () => chapterDots.classList.remove('visible'),
       onLeaveBack:  () => chapterDots.classList.add('visible'),
     });
@@ -1243,10 +1307,9 @@
       dotWraps.forEach((w,i) => { w.classList.toggle('active', i===n); });
     }
 
-    // Chapter thresholds (% of hero-sequence scroll) — aligned to card animation timings
     let chapBreaks = window.innerWidth <= 900 
-      ? [0, 0.25, 0.48, 0.71, 0.92]  // Mobile timings (compressed with buffer)
-      : [0, 0.22, 0.28, 0.34, 0.90]; // Desktop timings
+      ? [0, 0.25, 0.48, 0.71, 0.92]
+      : [0, 0.22, 0.28, 0.34, 0.90];
 
     window.addEventListener('resize', () => {
       chapBreaks = window.innerWidth <= 900 
@@ -1264,11 +1327,10 @@
       }
     });
 
-    // ─── 5. SCROLL OVERLAY CARDS (GSAP) ───────────────────
+    // ── SCROLL OVERLAY CARDS (GSAP) ──
     let mm = gsap.matchMedia();
 
     mm.add("(min-width: 901px)", () => {
-      // DESKTOP: Pipeline Horizontal Layout
       // Card 1 — LEFT
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=15% top', end:'top+=25% top', scrub:.6 } })
         .fromTo('#overlay-l1', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
@@ -1292,81 +1354,58 @@
         .fromTo('#overlay-bottom', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=75% top', end:'top+=85% top', scrub:.6 } })
         .fromTo('#overlay-bottom', {opacity:1, y:0}, {opacity:0, y:20, ease:'power2.in', immediateRender:false});
-
     });
 
     mm.add("(max-width: 900px)", () => {
-      // MOBILE: Centered panel layout with scale-in materialize effect
-      // Shield dims when a card is visible, restores between cards
-
-      // Card 1
+      // Mobile overlays
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=32% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
+        .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=46% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
+        .fromTo('#overlay-l1', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
 
-      // Card 2
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=48% top', end:'top+=55% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
+        .fromTo('#overlay-l2', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=63% top', end:'top+=69% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
+        .fromTo('#overlay-l2', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
 
-      // Card 3
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=71% top', end:'top+=78% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'})
-        .fromTo('#shield-canvas', {opacity:0.4}, {opacity:0.1, ease:'power2.out'}, 0);
+        .fromTo('#overlay-l3', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=86% top', end:'top+=92% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false})
-        .fromTo('#shield-canvas', {opacity:0.1}, {opacity:0.4, ease:'power2.in', immediateRender:false}, 0);
+        .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
     });
 
-    // ─── 6. SECTION SCROLL REVEAL ─────────────────────────
-    const revObs = new IntersectionObserver(entries=>{
-      entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');revObs.unobserve(e.target);}});
-    },{threshold:.1,rootMargin:'0px 0px -40px 0px'});
-    document.querySelectorAll('[data-anim]').forEach(el=>revObs.observe(el));
+    // ── SECTION SCROLL REVEAL ──
+    const revObs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if(e.isIntersecting){
+          e.target.classList.add('visible');
+          revObs.unobserve(e.target);
+        }
+      });
+    }, {threshold:.1, rootMargin:'0px 0px -40px 0px'});
+    document.querySelectorAll('[data-anim]').forEach(el => revObs.observe(el));
 
-    // ─── 7. TERMINAL PIPELINE ANIMATION ───────────────────
-    const stepEls = document.querySelectorAll('.step-item');
-    const termOut = document.getElementById('terminal-output');
-    let pipeRunning = false;
-    const logs = [
-      {step:0,lines:['→ Parsing email headers...','✓ Raw signal extracted. Noise removed.']},
-      {step:1,lines:['→ Running 347 header rules...','⚠ SPF fail detected. Suspicious link × 3.']},
-      {step:2,lines:['→ Vectorizing body content...','✓ TF-IDF score: 0.87  (threshold: 0.65)']},
-      {step:3,lines:['→ LLM behavioural analysis...','⚠ Intent: credential harvesting  94.2%']},
-      {step:4,lines:['→ Generating forensic report...','✓ Saved: report_2026-05-25.pdf']},
-    ];
-    function appendLine(t,c){const d=document.createElement('div');d.className='t-'+c;d.textContent=t;termOut.appendChild(d);termOut.scrollTop=termOut.scrollHeight;}
-    function clearCursor(){termOut.querySelectorAll('.t-cursor').forEach(c=>c.remove());}
-    function addCursor(){clearCursor();const s=document.createElement('span');s.className='t-cursor';termOut.appendChild(s);}
-    function runStep(idx){
-      if(idx>=logs.length){addCursor();pipeRunning=false;return;}
-      const{step,lines}=logs[idx];
-      stepEls.forEach((el,i)=>{el.classList.remove('active','done');const st=el.querySelector('.step-status');if(i<step){el.classList.add('done');st.textContent='DONE';}else if(i===step){el.classList.add('active');st.textContent='RUNNING';}else st.textContent='IDLE';});
-      clearCursor();let li=0;
-      function nl(){if(li>=lines.length){setTimeout(()=>runStep(idx+1),700);return;}const t=lines[li];appendLine(t,t.startsWith('✓')?'ok':t.startsWith('⚠')?'warn':'out');li++;setTimeout(nl,850);}
-      setTimeout(nl,350);
-    }
-    new IntersectionObserver(entries=>{
-      if(entries[0].isIntersecting&&!pipeRunning){pipeRunning=true;runStep(0);}
-    },{threshold:.3}).observe(document.getElementById('pipeline'));
-    setInterval(()=>{if(pipeRunning)return;while(termOut.children.length>2)termOut.removeChild(termOut.lastChild);stepEls.forEach(el=>{el.classList.remove('active','done');el.querySelector('.step-status').textContent='IDLE';});pipeRunning=true;runStep(0);},20000);
-
-    // ─── 8. WAITLIST FORM ─────────────────────────────────
-    document.getElementById('wl-form').addEventListener('submit',async function(e){
-      e.preventDefault();const btn=this.querySelector('.btn-submit');btn.textContent='Submitting...';btn.disabled=true;
-      try{
+    // ── WAITLIST FORM ──
+    document.getElementById('wl-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const btn = this.querySelector('.btn-submit');
+      btn.textContent = 'Securing your spot...';
+      btn.disabled = true;
+      try {
         const params = new URLSearchParams();
         params.append("Name", this.name.value.trim());
-        params.append("Email", this.email.value);
-        await fetch('https://script.google.com/macros/s/AKfycbwCeEFTVFk3nlmUSkUOOvrevI2CBFOzdAHq0xoPxQMzo9b353E0Hf8b6s9GHGD_VO8p/exec',{method:'POST',body:params,mode:'no-cors'});
-        this.style.display='none';document.getElementById('wl-success').style.display='block';
-      } catch{btn.textContent='Join the waitlist →';btn.disabled=false;}
+        params.append("Email", this.email.value.trim());
+        await fetch('https://script.google.com/macros/s/AKfycbwCeEFTVFk3nlmUSkUOOvrevI2CBFOzdAHq0xoPxQMzo9b353E0Hf8b6s9GHGD_VO8p/exec', {
+          method: 'POST',
+          body: params,
+          mode: 'no-cors'
+        });
+        this.style.display = 'none';
+        document.getElementById('wl-success').style.display = 'block';
+      } catch (err) {
+        btn.textContent = 'Join Early Access Waitlist →';
+        btn.disabled = false;
+      }
     });
   </script>
 </body>
