@@ -710,6 +710,118 @@
     /* Scroll reveal */
     [data-anim] { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
     [data-anim].visible { opacity: 1; transform: translateY(0); }
+
+    /* ═══════════════════════════════════════════════════════════
+       MOBILE COMPATIBILITY OVERRIDES — max-width: 900px
+       ═══════════════════════════════════════════════════════════ */
+    @media (max-width: 900px) {
+
+      /* ── 1. Kill ALL backdrop-filter — removes ~90% of GPU lag ── */
+      *,
+      .glass, nav.glass, .pipeline-card, .how-card, .threat-card,
+      .waitlist-card, .metric-cell, .tl-features-bar, .tl-circle,
+      .app-spotlight, .hero-text-glass, .hero-kicker, .pipeline-bottom-bar,
+      footer {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      /* Restore solid backgrounds to keep cards readable without blur */
+      .glass, nav.glass { background: rgba(7, 12, 21, 0.97) !important; }
+      .pipeline-card    { background: rgba(7, 12, 21, 0.95) !important; }
+      .how-card         { background: rgba(10, 16, 28, 0.97) !important; }
+      .threat-card      { background: rgba(10, 16, 28, 0.97) !important; }
+      .waitlist-card    { background: rgba(7, 12, 21, 0.97) !important; }
+      .metric-cell      { background: rgba(10, 16, 28, 0.92) !important; }
+      .tl-features-bar  { background: rgba(10, 16, 28, 0.92) !important; }
+      .tl-circle        { background: rgba(7, 12, 21, 0.97) !important; }
+      .hero-text-glass  { background: rgba(7, 12, 21, 0.90) !important; }
+      footer            { background: rgba(6, 10, 16, 0.99) !important; }
+
+      /* ── 2. Kill expensive body ambient animations ── */
+      body::before { animation: none !important; opacity: 0.2 !important; }
+      body::after  { animation: none !important; display: none !important; }
+
+      /* ── 3. Reduce hero scroll zone height — was 260vh ── */
+      #hero-sequence { height: 160vh; }
+
+      /* ── 4. Fix overlay pipeline cards — center them on screen ──
+         Cards use position:absolute inside #hero-stage.
+         On mobile GSAP animates with xPercent/yPercent:-50 expecting
+         left:50%;top:50% as origin. Override the desktop offsets. */
+      #overlay-l1,
+      #overlay-l2,
+      #overlay-l3 {
+        left: 50% !important;
+        right: auto !important;
+        top: 50% !important;
+        margin-left: 0 !important;
+        width: min(320px, 88vw) !important;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Hide the bottom bar on mobile — too wide and not part of mobile GSAP sequence */
+      #overlay-bottom { display: none !important; }
+
+      /* ── 5. Threat grid — single column on phone ── */
+      .threat-grid { grid-template-columns: 1fr; gap: 1rem; }
+
+      /* ── 6. Hero metrics — stack vertically ── */
+      .hero-metrics { flex-direction: column; gap: 8px; }
+      .metric-cell { width: 100%; padding: 0.9rem; }
+
+      /* ── 7. Hero copy sizing ── */
+      #hero-copy { top: 4.5rem; padding: 0 0.5rem; }
+      .hero-text-glass { padding: 2rem 1.2rem; border-radius: 20px; }
+      .hero-h1 { font-size: clamp(2rem, 7vw, 3rem); }
+      .hero-sub { font-size: 0.9rem; }
+
+      /* ── 8. Hero kicker — narrower screens ── */
+      .hero-kicker {
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        padding: 5px 8px;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      /* ── 9. Hero action buttons — full width on very small ── */
+      .hero-actions { flex-direction: column; align-items: center; gap: 10px; }
+      .btn-primary, .btn-ghost { width: 100%; max-width: 320px; justify-content: center; }
+
+      /* ── 10. Section padding ── */
+      .section-inner { padding: 3.5rem 1.2rem; }
+      .waitlist-card { padding: 2rem 1.2rem; }
+      .app-spotlight { padding: 2rem 1.2rem; }
+
+      /* ── 11. Pipeline bottom bar (pl-feature) — full width ── */
+      .pl-feature { width: 100%; }
+
+      /* ── 12. Timeline features bar ── */
+      .tl-features-bar { padding: 16px; gap: 16px; }
+
+      /* ── 13. Footer — stack on mobile ── */
+      .footer-inner { flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .footer-links { flex-wrap: wrap; gap: 1rem; }
+
+      /* ── 14. Chapter dots — hide on mobile to avoid overlap ── */
+      #chapter-dots { display: none; }
+
+      /* ── 15. Scroll cue — keep visible but smaller ── */
+      .scroll-cue { bottom: 1rem; font-size: 0.55rem; }
+    }
+
+    /* Extra overrides for very small phones (< 480px) */
+    @media (max-width: 480px) {
+      .hero-h1 { font-size: clamp(1.8rem, 8.5vw, 2.4rem); }
+      .section-title { font-size: clamp(1.7rem, 7vw, 2.4rem); }
+      .as-features { grid-template-columns: 1fr; }
+      .threat-card { padding: 1.6rem; }
+      nav { padding: 0 1rem; height: 60px; }
+      .nav-brand-text { font-size: 0.95rem; }
+    }
   </style>
 </head>
 <body>
@@ -746,7 +858,7 @@
   <!-- ── HERO SCROLL ZONE ── -->
   <div id="hero-sequence">
     <div id="hero-stage">
-      <video id="hero-video" autoplay muted loop playsinline preload="auto" style="transform: scale(1.25) translate(6%, 6%);">
+      <video id="hero-video" autoplay muted loop playsinline preload="metadata" style="transform: scale(1.25) translate(6%, 6%);">
         <source src="/video/HEROBG.mp4" type="video/mp4">
       </video>
 
@@ -1231,92 +1343,121 @@
   <script>
     gsap.registerPlugin(ScrollTrigger);
 
+    const isMobile = window.innerWidth <= 900;
+
+    // ── Mobile: pause video to avoid 11.6MB streaming lag ──────────
+    if (isMobile) {
+      const vid = document.getElementById('hero-video');
+      if (vid) {
+        vid.pause();
+        vid.removeAttribute('autoplay');
+        vid.style.display = 'none';
+      }
+      // Kill expensive will-change hints on mobile
+      document.querySelectorAll('[style*="will-change"]').forEach(el => {
+        el.style.willChange = 'auto';
+      });
+    }
+
+    // ── Hero copy fade-out on scroll ────────────────────────────────
     gsap.to('#hero-copy',{opacity:0,y:-30,
       scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
     gsap.to('#scroll-cue',{opacity:0,
       scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
 
-    gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
+    if (!isMobile) {
+      gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
+    } else {
+      gsap.set('#hero-copy > *', { opacity: 1, y: 0 });
+    }
 
-    // Pipeline timeline animation
+    // ── Pipeline timeline animation ─────────────────────────────────
     const tlNodes = gsap.utils.toArray('.tl-node');
     const tlContainer = document.querySelector('.timeline-row');
     const tlFeaturesBar = document.querySelector('.tl-features-bar');
 
     if (tlNodes.length && tlContainer && tlFeaturesBar) {
-      gsap.set(tlNodes, { opacity: 0.35, filter: 'grayscale(1) brightness(0.6)' });
-      gsap.set(tlFeaturesBar, { opacity: 0, y: 30 });
+      if (!isMobile) {
+        gsap.set(tlNodes, { opacity: 0.35, filter: 'grayscale(1) brightness(0.6)' });
+        gsap.set(tlFeaturesBar, { opacity: 0, y: 30 });
 
-      const pipelineTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: '#pipeline',
-          start: 'top 55%',
-          end: 'bottom 85%',
-          scrub: 0.5,
+        const pipelineTl = gsap.timeline({
+          scrollTrigger: {
+            trigger: '#pipeline',
+            start: 'top 55%',
+            end: 'bottom 85%',
+            scrub: 0.5,
+          }
+        });
+
+        pipelineTl.to(tlContainer, { '--tl-progress': '100%', ease: 'none', duration: 1 }, 0);
+
+        tlNodes.forEach((node, i) => {
+          pipelineTl.to(node, {
+            opacity: 1,
+            filter: 'grayscale(0) brightness(1)',
+            duration: 0.1,
+            ease: 'power1.inOut'
+          }, i * 0.25 - 0.05);
+        });
+
+        pipelineTl.to(tlFeaturesBar, {
+          opacity: 1,
+          y: 0,
+          duration: 0.2,
+          ease: 'power2.out'
+        }, 1.0);
+      } else {
+        // Mobile: just show everything visible immediately
+        gsap.set(tlNodes, { opacity: 1, filter: 'none' });
+        gsap.set(tlFeaturesBar, { opacity: 1, y: 0 });
+        gsap.set(tlContainer, { '--tl-progress': '100%' });
+      }
+    }
+
+    // ── Chapter dots (desktop only) ─────────────────────────────────
+    const chapterDots = document.getElementById('chapter-dots');
+    if (chapterDots && !isMobile) {
+      const dotWraps = chapterDots.querySelectorAll('.ch-dot-wrap');
+      const dots     = chapterDots.querySelectorAll('.ch-dot');
+
+      ScrollTrigger.create({
+        trigger: '#hero-sequence', start: 'top+=5% top',
+        onEnter:     () => chapterDots.classList.add('visible'),
+        onLeaveBack: () => chapterDots.classList.remove('visible'),
+      });
+      ScrollTrigger.create({
+        trigger: '#threats', start: 'top top',
+        onEnter:     () => chapterDots.classList.remove('visible'),
+        onLeaveBack: () => chapterDots.classList.add('visible'),
+      });
+
+      function setChapter(n) {
+        dots.forEach((d,i)    => { d.classList.toggle('active', i===n); });
+        dotWraps.forEach((w,i) => { w.classList.toggle('active', i===n); });
+      }
+
+      let chapBreaks = [0, 0.22, 0.28, 0.34, 0.90];
+      window.addEventListener('resize', () => {
+        chapBreaks = window.innerWidth <= 900
+          ? [0, 0.25, 0.48, 0.71, 0.92]
+          : [0, 0.15, 0.25, 0.35, 0.80];
+      });
+
+      ScrollTrigger.create({
+        trigger: '#hero-sequence', start: 'top top', end: 'bottom bottom',
+        onUpdate: (self) => {
+          const p = self.progress;
+          let ch = 0;
+          chapBreaks.forEach((b,i) => { if(p >= b) ch = i; });
+          setChapter(ch);
         }
       });
-
-      pipelineTl.to(tlContainer, { '--tl-progress': '100%', ease: 'none', duration: 1 }, 0);
-
-      tlNodes.forEach((node, i) => {
-        pipelineTl.to(node, {
-          opacity: 1,
-          filter: 'grayscale(0) brightness(1)',
-          duration: 0.1,
-          ease: 'power1.inOut'
-        }, i * 0.25 - 0.05);
-      });
-
-      pipelineTl.to(tlFeaturesBar, {
-        opacity: 1,
-        y: 0,
-        duration: 0.2,
-        ease: 'power2.out'
-      }, 1.0);
     }
 
-    // Chapter dots
-    const chapterDots = document.getElementById('chapter-dots');
-    const dotWraps    = chapterDots.querySelectorAll('.ch-dot-wrap');
-    const dots        = chapterDots.querySelectorAll('.ch-dot');
-
-    ScrollTrigger.create({
-      trigger: '#hero-sequence', start: 'top+=5% top',
-      onEnter:  () => chapterDots.classList.add('visible'),
-      onLeaveBack: () => chapterDots.classList.remove('visible'),
-    });
-    ScrollTrigger.create({
-      trigger: '#threats', start: 'top top',
-      onEnter:      () => chapterDots.classList.remove('visible'),
-      onLeaveBack:  () => chapterDots.classList.add('visible'),
-    });
-
-    function setChapter(n) {
-      dots.forEach((d,i) => { d.classList.toggle('active', i===n); });
-      dotWraps.forEach((w,i) => { w.classList.toggle('active', i===n); });
-    }
-
-    let chapBreaks = window.innerWidth <= 900 
-      ? [0, 0.25, 0.48, 0.71, 0.92]
-      : [0, 0.22, 0.28, 0.34, 0.90];
-
-    window.addEventListener('resize', () => {
-      chapBreaks = window.innerWidth <= 900 
-        ? [0, 0.25, 0.48, 0.71, 0.92]
-        : [0, 0.15, 0.25, 0.35, 0.80];
-    });
-
-    ScrollTrigger.create({
-      trigger: '#hero-sequence', start: 'top top', end: 'bottom bottom',
-      onUpdate: (self) => {
-        const p = self.progress;
-        let ch = 0;
-        chapBreaks.forEach((b,i) => { if(p >= b) ch = i; });
-        setChapter(ch);
-      }
-    });
-
-    // Scroll overlay cards (GSAP)
+    // ── Scroll overlay cards (desktop only) ────────────────────────
+    // On mobile: overlay cards are hidden (display:none via CSS).
+    // On desktop: animated via matchMedia.
     let mm = gsap.matchMedia();
 
     mm.add("(min-width: 901px)", () => {
@@ -1341,22 +1482,8 @@
         .fromTo('#overlay-bottom', {opacity:1, y:0}, {opacity:0, y:20, ease:'power2.in', immediateRender:false});
     });
 
-    mm.add("(max-width: 900px)", () => {
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=32% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=46% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
-
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=48% top', end:'top+=55% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=63% top', end:'top+=69% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
-
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=71% top', end:'top+=78% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=86% top', end:'top+=92% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
-    });
+    // Mobile: skip overlay card scroll-sync. Cards hidden via CSS.
+    // This removes ~6 unnecessary ScrollTrigger instances from mobile.
 
     // Reveal on scroll
     const revObs = new IntersectionObserver(entries => {
