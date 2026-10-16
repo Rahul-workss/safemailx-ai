@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SafeMail X AI — AI-Powered Phishing, Scam & Identity Threat Defense</title>
-  <meta name="description" content="SafeMail X AI is a production-grade multi-layer cybersecurity platform detecting phishing, smishing, vishing calls, UPI payment fraud, malicious QRs, and identity forgery." />
+  <title>SafeMail X AI — AI-Powered Scam, Fraud & Identity Threat Defense</title>
+  <meta name="description" content="SafeMail X AI is a production-grade cybersecurity platform detecting phishing, smishing, scam calls, UPI payment traps, malicious QRs, and identity forgery." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
   <script src="/vendor/gsap.min.js"></script>
   <script src="/vendor/ScrollTrigger.min.js"></script>
   <style>
@@ -33,14 +33,14 @@
       --red-dim:   rgba(255,92,92,0.1);
       --champagne: #f2e2b0;
 
-      /* Liquid Obsidian Glass Recipe */
-      --glass-bg:      rgba(4, 10, 22, 0.45);
-      --glass-blur:    blur(12px);
+      /* Liquid Obsidian Glass */
+      --glass-bg:      rgba(4, 10, 22, 0.52);
+      --glass-blur:    blur(14px);
       --glass-border:  rgba(142, 240, 255, 0.1);
       --glass-rim-top: rgba(255, 255, 255, 0.08);
       --glass-rim-bot: transparent;
-      --glass-shadow:  0 12px 40px rgba(0, 0, 0, 0.35);
-      --glass-radius:  24px;
+      --glass-shadow:  0 14px 44px rgba(0, 0, 0, 0.38);
+      --glass-radius:  22px;
     }
 
     html { scroll-behavior: smooth; }
@@ -71,7 +71,7 @@
       50% { transform: scale(1.03); opacity: 0.6; filter: brightness(0.95) saturate(1.1); }
     }
 
-    /* Moving Data Pulse Beam */
+    /* Moving Data Pulse */
     body::after {
       content: '';
       position: fixed;
@@ -79,9 +79,9 @@
       background: linear-gradient(90deg, 
         transparent 0%, 
         rgba(93, 228, 216, 0.0) 20%, 
-        rgba(93, 228, 216, 0.25) 50%, 
-        rgba(255, 255, 255, 0.6) 55%, 
-        rgba(93, 228, 216, 0.25) 60%, 
+        rgba(93, 228, 216, 0.22) 50%, 
+        rgba(255, 255, 255, 0.5) 55%, 
+        rgba(93, 228, 216, 0.22) 60%, 
         transparent 80%, 
         transparent 100%);
       transform: skewX(-25deg) translateX(-100vw);
@@ -113,12 +113,12 @@
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 300;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 2rem; height: 68px;
+      padding: 0 2.2rem; height: 68px;
     }
     nav.glass {
       border-radius: 0;
       border-top: none; border-left: none; border-right: none;
-      background: rgba(7,12,21,0.85);
+      background: rgba(7,12,21,0.88);
       border-bottom: 1px solid rgba(255,255,255,0.08);
     }
 
@@ -126,32 +126,22 @@
     .nav-logo-img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(93,228,216,0.6)); transition: filter .2s; }
     .nav-brand:hover .nav-logo-img { filter: drop-shadow(0 0 18px rgba(93,228,216,0.9)); }
     .nav-brand-text { font-size: 1.05rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
-    .nav-brand-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--cyan); background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.3); padding: 2px 7px; border-radius: 6px; }
 
-    .nav-links { display: flex; align-items: center; gap: 1.6rem; list-style: none; }
+    .nav-links { display: flex; align-items: center; gap: 1.8rem; list-style: none; }
     .nav-links a { font-size: 0.85rem; font-weight: 500; color: var(--muted); text-decoration: none; transition: color .2s; }
     .nav-links a:hover { color: #fff; }
 
-    .nav-actions { display: flex; align-items: center; gap: 12px; }
-    .btn-nav-github {
-      display: inline-flex; align-items: center; gap: 7px;
-      font-size: 0.82rem; font-weight: 600; color: var(--text); text-decoration: none;
-      padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-hi);
-      background: rgba(255,255,255,0.05); transition: all .2s ease;
-    }
-    .btn-nav-github:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
-    .btn-nav-apk {
-      display: inline-flex; align-items: center; gap: 7px;
+    .btn-nav-cta {
+      display: inline-flex; align-items: center; gap: 8px;
       font-size: 0.82rem; font-weight: 700; color: #060a10; text-decoration: none;
-      padding: 7px 16px; border-radius: 999px; background: var(--cyan);
-      box-shadow: 0 0 20px rgba(93,228,216,0.35); transition: all .2s ease;
+      padding: 8px 18px; border-radius: 999px; background: var(--cyan);
+      box-shadow: 0 0 20px rgba(93,228,216,0.3); transition: all .2s ease;
     }
-    .btn-nav-apk:hover { background: #7aeee5; box-shadow: 0 0 28px rgba(93,228,216,0.6); transform: translateY(-1px); }
+    .btn-nav-cta:hover { background: #7aeee5; box-shadow: 0 0 28px rgba(93,228,216,0.55); transform: translateY(-1px); }
 
     @media(max-width: 860px) {
       .nav-links { display: none; }
-      nav { padding: 0 1rem; }
-      .nav-brand-badge { display: none; }
+      nav { padding: 0 1.2rem; }
     }
 
     /* ── HERO SCROLL SEQUENCE ───────────── */
@@ -163,7 +153,6 @@
       background-color: var(--bg);
     }
 
-    /* Hero Video Background */
     #hero-video {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; z-index: 0;
@@ -171,12 +160,11 @@
       will-change: transform;
     }
 
-    /* Scrim edges */
     .hero-scrim {
       position: absolute; inset: 0; z-index: 2; pointer-events: none;
       background:
         linear-gradient(to bottom,
-          rgba(7,12,21,0.85) 0%,
+          rgba(7,12,21,0.88) 0%,
           transparent 15%,
           transparent 80%,
           rgba(7,12,21,1) 100%
@@ -197,36 +185,50 @@
       z-index: 1;
     }
 
+    /* ── BESPOKE HERO KICKER (NOT A GENERIC PILL) ── */
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: var(--cyan);
+      background: rgba(4, 10, 22, 0.65);
+      border: 1px solid rgba(93, 228, 216, 0.25);
+      border-left: 3px solid var(--cyan);
+      border-radius: 4px;
+      padding: 7px 15px;
+      margin-bottom: 1.6rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 24px rgba(93, 228, 216, 0.1);
+      position: relative;
+    }
+    .kicker-bracket { color: rgba(255, 255, 255, 0.35); font-weight: 300; }
+    .kicker-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: kicker-pulse 2s ease-in-out infinite;
+    }
+    @keyframes kicker-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+    .kicker-sub { color: rgba(232, 237, 245, 0.65); font-size: 0.65rem; font-weight: 500; }
+
     /* ── HERO COPY ─────── */
     #hero-copy {
       position: absolute; left: 50%; transform: translateX(-50%);
-      top: clamp(5.8rem, 11vh, 7.5rem);
-      width: min(820px, calc(100% - 2rem));
+      top: clamp(5.6rem, 11vh, 7.5rem);
+      width: min(840px, calc(100% - 2rem));
       padding: 0 1rem;
       z-index: 4;
       text-align: center;
     }
 
-    .hero-tag {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
-      color: var(--cyan); border: 1px solid rgba(93,228,216,0.35);
-      border-radius: 999px; padding: 6px 15px; margin-bottom: 1.4rem;
-      background: rgba(93,228,216,0.08); box-shadow: 0 0 20px rgba(93,228,216,0.15);
-    }
-    .hero-tag-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green); box-shadow: 0 0 10px var(--green);
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
-
     .hero-h1 {
-      font-size: clamp(2.3rem, 6.2vw, 4.8rem);
+      font-size: clamp(2.4rem, 6.4vw, 5.2rem);
       font-weight: 900; line-height: 1.02; letter-spacing: -0.04em; color: #fff;
       text-shadow: 0 2px 28px rgba(0,0,0,0.9), 0 0 60px rgba(0,0,0,0.7);
-      margin-bottom: 0.2em;
+      margin-bottom: 0.25em;
     }
     .hero-h1 em {
       font-family: 'Fraunces', Georgia, serif;
@@ -237,16 +239,16 @@
     }
 
     .hero-sub {
-      font-size: clamp(0.9rem, 1.6vw, 1.08rem); line-height: 1.7; color: var(--muted);
-      max-width: 640px; margin: 1.2rem auto 0;
+      font-size: clamp(0.92rem, 1.6vw, 1.1rem); line-height: 1.7; color: var(--muted);
+      max-width: 660px; margin: 1.2rem auto 0;
     }
     .hero-sub strong { color: #fff; font-weight: 600; }
 
     .hero-text-glass {
       position: relative;
       margin: 0 auto 1.8rem auto;
-      padding: 2.8rem 2.2rem;
-      background: rgba(4, 10, 22, 0.45);
+      padding: 3rem 2.2rem;
+      background: rgba(4, 10, 22, 0.48);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       border-radius: 32px;
@@ -257,8 +259,7 @@
     }
     .hero-text-glass::before {
       content: ''; position: absolute; inset: -1px; z-index: -1;
-      border-radius: 33px;
-      padding: 1.5px;
+      border-radius: 33px; padding: 1.5px;
       background: linear-gradient(90deg, rgba(93,228,216,0.8), rgba(66,135,245,0.8), rgba(186,85,211,0.8), rgba(93,228,216,0.8));
       background-size: 300% 100%;
       animation: shiftBorder 5s linear infinite;
@@ -267,26 +268,23 @@
       mask-composite: exclude;
       opacity: 0.65;
     }
-    @keyframes shiftBorder {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 300% 0%; }
-    }
+    @keyframes shiftBorder { 0% { background-position: 0% 0%; } 100% { background-position: 300% 0%; } }
 
     .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 2rem; }
 
     .btn-primary {
       display: inline-flex; align-items: center; gap: 9px;
-      background: var(--cyan); color: #060a10; font-size: 0.9rem; font-weight: 700;
+      background: var(--cyan); color: #060a10; font-size: 0.92rem; font-weight: 800;
       text-decoration: none; padding: 13px 26px; border-radius: 12px; border: none; cursor: pointer;
-      box-shadow: 0 0 32px rgba(93,228,216,0.42);
+      box-shadow: 0 0 32px rgba(93,228,216,0.4);
       transition: transform .18s, box-shadow .18s, background .18s;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 44px rgba(93,228,216,0.6); background: #7aeee5; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 44px rgba(93,228,216,0.58); background: #7aeee5; }
 
     .btn-ghost {
       display: inline-flex; align-items: center; gap: 9px;
       background: rgba(255,255,255,0.06); color: var(--text);
-      font-size: 0.9rem; font-weight: 600; text-decoration: none;
+      font-size: 0.92rem; font-weight: 600; text-decoration: none;
       padding: 13px 24px; border-radius: 12px;
       border: 1px solid var(--border-hi); cursor: pointer;
       transition: background .18s, transform .18s, border-color .18s;
@@ -294,15 +292,12 @@
     .btn-ghost:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
 
     /* Metrics row */
-    .hero-metrics {
-      display: flex; gap: 12px; width: 100%;
-    }
+    .hero-metrics { display: flex; gap: 12px; width: 100%; }
     .metric-cell { 
       flex: 1; padding: 1.1rem 0.8rem; text-align: center; 
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       background: rgba(4, 10, 22, 0.45);
       backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 16px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
@@ -313,7 +308,6 @@
     .metric-val.green { color: var(--green); }
     .metric-desc { font-size: 0.72rem; font-weight: 700; color: rgba(255, 255, 255, 0.8); letter-spacing: 0.06em; text-transform: uppercase; }
 
-    /* Scroll cue */
     .scroll-cue {
       position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%);
       z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -325,13 +319,10 @@
     /* ── SCROLL OVERLAY PIPELINE CARDS ───── */
     .pipeline-card {
       position: absolute; z-index: 10; pointer-events: none;
-      width: 325px;
-      max-width: 90vw;
-      background: rgba(4, 10, 22, 0.55);
+      width: 325px; max-width: 90vw;
+      background: rgba(4, 10, 22, 0.58);
       backdrop-filter: blur(14px) saturate(140%);
-      -webkit-backdrop-filter: blur(14px) saturate(140%);
-      border-radius: 18px;
-      padding: 24px;
+      border-radius: 18px; padding: 24px;
       border: 1px solid rgba(255,255,255,0.1);
       display: flex; flex-direction: column; gap: 16px;
       will-change: transform, opacity;
@@ -364,21 +355,17 @@
       position: absolute; pointer-events: none;
       bottom: 7%; left: 50%; transform: translateX(-50%);
       width: min(1100px, 92vw);
-      background: rgba(4, 10, 22, 0.55);
+      background: rgba(4, 10, 22, 0.58);
       backdrop-filter: blur(14px) saturate(140%);
-      -webkit-backdrop-filter: blur(14px) saturate(140%);
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 20px;
       padding: 20px 36px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: flex; justify-content: space-between; align-items: center;
       box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
-      z-index: 10;
-      will-change: opacity, transform;
+      z-index: 10; will-change: opacity, transform;
     }
     .pl-feature { display: flex; align-items: center; gap: 16px; }
-    .pl-feature svg { width: 24px; height: 24px; stroke: var(--cyan); opacity: 0.9; }
+    .pl-feature svg { width: 24px; height: 24px; stroke: var(--cyan); opacity: 0.95; flex-shrink: 0; }
     .pl-f-text { display: flex; flex-direction: column; gap: 3px; }
     .pl-f-text strong { font-size: 0.95rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
     .pl-f-text span { font-size: 0.75rem; color: rgba(255,255,255,0.6); }
@@ -440,7 +427,6 @@
     .threat-card {
       background: var(--glass-bg);
       backdrop-filter: var(--glass-blur);
-      -webkit-backdrop-filter: var(--glass-blur);
       border: 1px solid var(--glass-border);
       border-radius: 20px;
       padding: 2.2rem;
@@ -460,17 +446,24 @@
     }
     .threat-card:hover::before { opacity: 1; }
 
+    /* SVG Icon Container */
     .tc-icon-wrap {
-      width: 50px; height: 50px; border-radius: 14px;
+      width: 48px; height: 48px; border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
-      margin-bottom: 1.4rem; font-size: 1.5rem;
+      margin-bottom: 1.4rem;
       background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.25);
     }
+    .tc-icon-wrap svg { width: 22px; height: 22px; stroke: var(--cyan); }
     .tc-icon-wrap.amber { background: var(--amber-dim); border-color: rgba(245,166,35,0.25); }
+    .tc-icon-wrap.amber svg { stroke: var(--amber); }
     .tc-icon-wrap.purple { background: rgba(186,85,211,0.1); border-color: rgba(186,85,211,0.25); }
+    .tc-icon-wrap.purple svg { stroke: var(--purple); }
     .tc-icon-wrap.green { background: var(--green-dim); border-color: rgba(82,232,165,0.25); }
+    .tc-icon-wrap.green svg { stroke: var(--green); }
     .tc-icon-wrap.red { background: var(--red-dim); border-color: rgba(255,92,92,0.25); }
+    .tc-icon-wrap.red svg { stroke: var(--red); }
     .tc-icon-wrap.blue { background: rgba(66,135,245,0.1); border-color: rgba(66,135,245,0.25); }
+    .tc-icon-wrap.blue svg { stroke: #4287f5; }
 
     .tc-title { font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; letter-spacing: -0.02em; }
     .tc-desc { font-size: 0.88rem; line-height: 1.65; color: var(--muted); margin-bottom: 1.4rem; flex: 1; }
@@ -482,12 +475,12 @@
     }
     .tc-tag.highlight { color: var(--cyan); border-color: rgba(93,228,216,0.3); background: var(--cyan-dim); }
 
-    /* ── MOBILE APP SPOTLIGHT ───────────── */
+    /* ── MOBILE CLIENT SPOTLIGHT ────────── */
     .app-spotlight {
       margin-top: 4rem;
-      background: linear-gradient(135deg, rgba(12,22,34,0.7) 0%, rgba(4,10,22,0.85) 100%);
+      background: linear-gradient(135deg, rgba(12,22,34,0.7) 0%, rgba(4,10,22,0.88) 100%);
       border: 1px solid rgba(93,228,216,0.2);
-      border-radius: 30px;
+      border-radius: 28px;
       padding: 3.5rem;
       display: grid;
       grid-template-columns: 1.2fr 0.8fr;
@@ -499,14 +492,14 @@
     }
     .app-spotlight::after {
       content: ''; position: absolute; right: -100px; bottom: -100px; width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(93,228,216,0.15) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(93,228,216,0.12) 0%, transparent 70%);
       pointer-events: none;
     }
     .as-badge {
       display: inline-flex; align-items: center; gap: 8px;
       font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
-      color: var(--green); background: var(--green-dim); border: 1px solid rgba(82,232,165,0.3);
-      padding: 5px 12px; border-radius: 8px; margin-bottom: 1.2rem;
+      color: var(--cyan); background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.3);
+      padding: 5px 12px; border-radius: 6px; margin-bottom: 1.2rem;
     }
     .as-title { font-size: clamp(1.8rem, 3.2vw, 2.6rem); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 1rem; }
     .as-desc { font-size: 0.95rem; line-height: 1.7; color: var(--muted); margin-bottom: 2rem; }
@@ -515,18 +508,17 @@
     .as-feat svg { width: 18px; height: 18px; stroke: var(--cyan); flex-shrink: 0; }
 
     .as-download-box {
-      display: flex; flex-direction: column; gap: 12px;
-      background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);
-      padding: 1.8rem; border-radius: 20px; text-align: center;
+      display: flex; flex-direction: column; gap: 14px;
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.1);
+      padding: 2rem; border-radius: 20px; text-align: center;
     }
+    .as-icon-badge {
+      width: 56px; height: 56px; margin: 0 auto; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.25);
+    }
+    .as-icon-badge svg { width: 28px; height: 28px; stroke: var(--cyan); }
     .as-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--dim); }
-    .as-btn-download {
-      display: inline-flex; justify-content: center; align-items: center; gap: 10px;
-      background: var(--cyan); color: #060a10; font-size: 0.95rem; font-weight: 800;
-      text-decoration: none; padding: 15px 24px; border-radius: 12px;
-      box-shadow: 0 0 30px rgba(93,228,216,0.4); transition: all .2s;
-    }
-    .as-btn-download:hover { background: #7aeee5; box-shadow: 0 8px 40px rgba(93,228,216,0.6); transform: translateY(-2px); }
 
     @media(max-width: 900px) {
       .app-spotlight { grid-template-columns: 1fr; padding: 2.2rem; gap: 2rem; }
@@ -608,36 +600,32 @@
       .how-card { position: relative !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; width: 100% !important; animation: none !important; }
     }
     .how-card-num { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 700; color: var(--dim); margin-bottom: 0.8rem; }
-    .how-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 1rem; }
+    .how-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
+    .how-card-icon svg { width: 22px; height: 22px; }
     .icon-cyan  { background: var(--cyan-dim);  border: 1px solid rgba(93,228,216,0.25); }
+    .icon-cyan svg { stroke: var(--cyan); }
     .icon-amber { background: var(--amber-dim); border: 1px solid rgba(245,166,35,0.25); }
+    .icon-amber svg { stroke: var(--amber); }
     .icon-red   { background: var(--red-dim);   border: 1px solid rgba(255,92,92,0.25); }
+    .icon-red svg { stroke: var(--red); }
     .icon-green { background: var(--green-dim); border: 1px solid rgba(82,232,165,0.25); }
+    .icon-green svg { stroke: var(--green); }
+
     .how-card-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
     .how-card-body  { font-size: 0.86rem; line-height: 1.65; color: var(--muted); }
 
     /* ── PIPELINE TIMELINE ──────────────── */
     .timeline-row {
-      position: relative;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin: 4rem 0 5rem 0;
-      padding: 0 20px;
+      position: relative; display: flex; justify-content: space-between; align-items: flex-start;
+      margin: 4rem 0 5rem 0; padding: 0 20px;
     }
-    .tl-line {
-      position: absolute; top: 66px; left: 60px; right: 60px; height: 2px;
-      background: rgba(255,255,255,0.1); z-index: 0;
-    }
+    .tl-line { position: absolute; top: 66px; left: 60px; right: 60px; height: 2px; background: rgba(255,255,255,0.1); z-index: 0; }
     .tl-progress {
       position: absolute; top: -1px; left: 0; height: 4px; width: var(--tl-progress, 0%);
       background: linear-gradient(90deg, var(--cyan) 0%, var(--blue) 50%, var(--purple) 100%);
       box-shadow: 0 0 15px var(--blue); border-radius: 4px;
     }
-    .tl-node {
-      position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;
-      width: 150px; text-align: center;
-    }
+    .tl-node { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; width: 150px; text-align: center; }
     .tl-num { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; }
     .tl-circle {
       width: 66px; height: 66px; border-radius: 50%;
@@ -731,23 +719,17 @@
     <a class="nav-brand" href="#">
       <img src="/images/new-logo.png" alt="SafeMail X AI Logo" class="nav-logo-img" />
       <span class="nav-brand-text">SafeMail X AI</span>
-      <span class="nav-brand-badge">v1.0.6</span>
     </a>
     <ul class="nav-links">
       <li><a href="#threats">Threat Vectors</a></li>
       <li><a href="#architecture">Architecture</a></li>
       <li><a href="#pipeline">Pipeline</a></li>
-      <li><a href="#mobile-app">Mobile APK</a></li>
+      <li><a href="#mobile-app">Mobile Client</a></li>
       <li><a href="#waitlist">Early Access</a></li>
     </ul>
     <div class="nav-actions">
-      <a class="btn-nav-github" href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-        GitHub ★
-      </a>
-      <a class="btn-nav-apk" href="#mobile-app">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Get APK
+      <a class="btn-nav-cta" href="#waitlist">
+        Request Access
       </a>
     </div>
   </nav>
@@ -764,47 +746,47 @@
   <!-- ── HERO SCROLL ZONE ── -->
   <div id="hero-sequence">
     <div id="hero-stage">
-      <!-- Video Background -->
       <video id="hero-video" autoplay muted loop playsinline preload="auto" style="transform: scale(1.25) translate(6%, 6%);">
         <source src="/video/HEROBG.mp4" type="video/mp4">
       </video>
 
-      <!-- Scrim & Grid -->
       <div class="hero-scrim"></div>
       <div class="hero-grid" style="position:absolute; inset:0;"></div>
 
-      <!-- Hero Copy -->
       <div id="hero-copy">
         <div class="hero-text-glass">
-          <div class="hero-tag">
-            <span class="hero-tag-dot"></span>
-            AI-POWERED MULTI-VECTOR THREAT DEFENSE
+          <!-- BESPOKE CYBER TELEMETRY HEADER (NO GENERIC PILL) -->
+          <div class="hero-kicker">
+            <span class="kicker-bracket">[</span>
+            <span class="kicker-dot"></span>
+            <span>CYBER DEFENSE INTELLIGENCE</span>
+            <span class="kicker-sub">&bull; ACTIVE THREAT MATRIX</span>
+            <span class="kicker-bracket">]</span>
           </div>
-          <h1 class="hero-h1">Multi-vector security<br>against <em>modern scams & fraud</em></h1>
+
+          <h1 class="hero-h1">Stop scams before<br><em>they cost you.</em></h1>
           <p class="hero-sub">
-            Protecting individuals and organizations from <strong>Phishing, Vishing Calls, Malicious QR Codes, UPI Payment Traps, and Identity Forgery</strong>. Powered by a local-first hybrid pipeline of Rule Heuristics, ML Scoring, and Local <strong>Qwen3-8B Thinking AI</strong>.
+            Real-time AI protection against fake calls, deceptive payment codes, identity fraud, and phishing &mdash; <strong>running completely private on your device</strong>.
           </p>
           <div class="hero-actions">
-            <a class="btn-primary" href="#mobile-app">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download User APK v1.0.6
+            <a class="btn-primary" href="#waitlist">
+              Request Early Access
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
             <a class="btn-ghost" href="#threats">
               Explore Threat Vectors
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
             </a>
           </div>
         </div>
         <div class="hero-metrics">
-          <div class="metric-cell"><span class="metric-val cyan">6+ Channels</span><span class="metric-desc">Email · Calls · SMS · UPI · Docs · Web</span></div>
-          <div class="metric-cell"><span class="metric-val amber">7-Layer Engine</span><span class="metric-desc">Rules + ML + Qwen3 Thinking AI</span></div>
-          <div class="metric-cell"><span class="metric-val green">100% Private</span><span class="metric-desc">Zero PII · Offline Cryptography</span></div>
+          <div class="metric-cell"><span class="metric-val cyan">6+ Channels</span><span class="metric-desc">Calls &bull; Payments &bull; SMS &bull; Identity &bull; Web</span></div>
+          <div class="metric-cell"><span class="metric-val amber">7-Layer Engine</span><span class="metric-desc">Rules &bull; ML &bull; Qwen3 Thinking AI</span></div>
+          <div class="metric-cell"><span class="metric-val green">100% Private</span><span class="metric-desc">Zero Cloud Retention &bull; Offline Crypto</span></div>
         </div>
       </div>
 
       <!-- Scroll-synced glass overlay cards -->
-
-      <!-- Card 1: Rule Engine — LEFT -->
       <div class="pipeline-card pc-cyan" id="overlay-l1" style="top: 18%; left: 6%;">
         <div class="pc-header">
           <div class="pc-num">01</div>
@@ -816,12 +798,11 @@
         </div>
         <ul class="pc-list">
           <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> 50+ Vishing heuristic rules & OTP traps</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> NPCI UPI reverse-charge & debit trap audit</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> NPCI payment reverse-charge & debit trap audit</li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> SPF / DKIM / DMARC & domain Bloom filter</li>
         </ul>
       </div>
 
-      <!-- Card 2: ML Model — CENTER -->
       <div class="pipeline-card pc-blue" id="overlay-l2" style="top: 18%; left: 50%; margin-left: -162px;">
         <div class="pc-header">
           <div class="pc-num">02</div>
@@ -838,7 +819,6 @@
         </ul>
       </div>
 
-      <!-- Card 3: LLM — RIGHT -->
       <div class="pipeline-card pc-purple" id="overlay-l3" style="top: 18%; right: 6%;">
         <div class="pc-header">
           <div class="pc-num">03</div>
@@ -855,7 +835,6 @@
         </ul>
       </div>
 
-      <!-- Bottom Feature Bar -->
       <div class="pipeline-bottom-bar" id="overlay-bottom">
         <div class="pl-feature">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -887,7 +866,6 @@
         </div>
       </div>
 
-      <!-- Scroll cue -->
       <div class="scroll-cue" id="scroll-cue">
         <span>SCROLL DOWN</span><div class="scroll-line"></div>
       </div>
@@ -900,15 +878,17 @@
       <div data-anim>
         <div class="section-label">Attack Vectors Covered</div>
         <h2 class="section-title">Beyond simple email filters.<br><em>Total defense across all modern channels.</em></h2>
-        <p class="section-body">Modern cybercriminals don't just send emails. They call you pretending to be the police, send deceptive UPI QR codes, register fake telecom numbers, and forge identity documents. SafeMail X AI neutralizes every vector.</p>
+        <p class="section-body">Modern cybercriminals don't just send emails. They call pretending to be law enforcement, generate deceptive payment QR codes, register fake telecom series, and forge identity cards. SafeMail X AI neutralizes every vector.</p>
       </div>
 
       <div class="threat-grid">
         <!-- Card 1: Call Analyzer / Vishing -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap amber">📞</div>
+          <div class="tc-icon-wrap amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 5.49 5.49l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/><path d="M14 2a8 8 0 0 1 8 8"/><path d="M14 6a4 4 0 0 1 4 4"/></svg>
+          </div>
           <h3 class="tc-title">Call Analyzer & Vishing Defense</h3>
-          <p class="tc-desc">Detect phone scams by describing what the caller said or uploading call audio. Whisper transcribes speech while our 7-layer scam intelligence classifies Digital Arrests, courier parcel traps, and fake CBI/police threats in real time with Tavily policy checks.</p>
+          <p class="tc-desc">Detect phone scams by describing what the caller said or uploading call audio. Whisper transcribes speech while our 7-layer scam intelligence classifies Digital Arrests, courier parcel traps, and fake CBI/police threats in real time with live policy checks.</p>
           <ul class="tc-tags">
             <li class="tc-tag highlight">Whisper Audio STT</li>
             <li class="tc-tag">Digital Arrest Scams</li>
@@ -919,9 +899,11 @@
 
         <!-- Card 2: UPI & QR Forensic Scanner -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap cyan">💸</div>
-          <h3 class="tc-title">UPI Fraud & QR Forensic Scanner</h3>
-          <p class="tc-desc">Scan QR codes with live camera or gallery screenshots. The NPCI forensic engine decodes VPAs, payee names, Merchant Category Codes (MCC), and uncovers debit-traps where attackers trick you into paying money under the guise of receiving a cashback or refund.</p>
+          <div class="tc-icon-wrap cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M10 12h4"/><path d="M12 10v4"/></svg>
+          </div>
+          <h3 class="tc-title">Payment & QR Forensic Scanner</h3>
+          <p class="tc-desc">Scan QR codes with live camera or gallery screenshots. The forensic engine decodes payment handles, payee identity, Merchant Category Codes (MCC), and uncovers debit-traps where attackers trick you into paying money disguised as receiving a refund.</p>
           <ul class="tc-tags">
             <li class="tc-tag highlight">Live Camera & Gallery</li>
             <li class="tc-tag">Debit Trap Detection</li>
@@ -932,7 +914,9 @@
 
         <!-- Card 3: Aadhaar & Gov Doc Verifier -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap purple">🪪</div>
+          <div class="tc-icon-wrap purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M15 8h2"/><path d="M15 12h2"/><path d="M7 16h10"/></svg>
+          </div>
           <h3 class="tc-title">Offline Aadhaar & Document Verifier</h3>
           <p class="tc-desc">Cryptographically verify Aadhaar Secure QR codes 100% offline using embedded UIDAI public certificates and RSA-2048 verification. Decompresses big-endian gzip payloads, extracts demographic data and photo preview, with zero UIDAI calls and zero PII stored.</p>
           <ul class="tc-tags">
@@ -945,7 +929,9 @@
 
         <!-- Card 4: Who Called? Intelligence -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap red">🔍</div>
+          <div class="tc-icon-wrap red">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="2" y1="12" x2="4" y2="12"/></svg>
+          </div>
           <h3 class="tc-title">Who Called? Deep Profiler</h3>
           <p class="tc-desc">Auto-detects copied numbers from your clipboard. Audits against TRAI 140/160 telemarketer regulation standards, detects international cybercrime hubs (+855 Cambodia, +95 Myanmar, +856 Laos), decodes telecom circles, and provides one-tap DOT Chakshu reporting.</p>
           <ul class="tc-tags">
@@ -958,9 +944,11 @@
 
         <!-- Card 5: Email & SMS Phishing -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap blue">✉️</div>
+          <div class="tc-icon-wrap blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/></svg>
+          </div>
           <h3 class="tc-title">Email & SMS Phishing Engine</h3>
-          <p class="tc-desc">Multi-engine analysis for inbox threats. Connect via privacy-preserving Gmail OAuth 2.0 (label-only model) or instant scan. Resolves deep URL redirect chains, analyzes domain age (RDAP), flags typosquatting and homoglyphs, and sandboxes documents with YARA.</p>
+          <p class="tc-desc">Multi-engine analysis for inbox threats. Connect via privacy-preserving Gmail OAuth (label-only model) or instant scan. Resolves deep URL redirect chains, analyzes domain age (RDAP), flags typosquatting and homoglyphs, and sandboxes documents with YARA.</p>
           <ul class="tc-tags">
             <li class="tc-tag highlight">Gmail OAuth Label-Only</li>
             <li class="tc-tag">Instant Smishing Scan</li>
@@ -971,11 +959,13 @@
 
         <!-- Card 6: Assistive Touch Shield -->
         <div class="threat-card" data-anim>
-          <div class="tc-icon-wrap green">🛡️</div>
+          <div class="tc-icon-wrap green">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="3"/></svg>
+          </div>
           <h3 class="tc-title">Assistive Touch Floating Shield</h3>
-          <p class="tc-desc">A floating obsidian glass orb on Android that stays accessible across any app. Inspect suspicious links, scan UPI payment QRs, or profile an incoming caller without ever switching away from WhatsApp, Telegram, SMS, or banking apps.</p>
+          <p class="tc-desc">A floating obsidian glass orb on mobile that stays accessible across any app. Inspect suspicious links, scan payment QRs, or profile an incoming caller without ever switching away from messaging, social, or banking applications.</p>
           <ul class="tc-tags">
-            <li class="tc-tag highlight">Android Floating Shield</li>
+            <li class="tc-tag highlight">System Floating Shield</li>
             <li class="tc-tag">Instant Link Verification</li>
             <li class="tc-tag">Quick Forensic Notepad</li>
             <li class="tc-tag">Obsidian Glass UI</li>
@@ -985,15 +975,15 @@
     </div>
   </section>
 
-  <!-- ── SECTION: MOBILE APP SPOTLIGHT ── -->
+  <!-- ── SECTION: MOBILE CLIENT SPOTLIGHT ── -->
   <section class="content-section" id="mobile-app">
     <div class="section-inner">
       <div class="app-spotlight" data-anim>
         <div class="as-left">
-          <span class="as-badge">● STANDALONE ANDROID APK RELEASE</span>
+          <span class="as-badge">MOBILE SECURITY PLATFORM</span>
           <h2 class="as-title">Security in your pocket.<br>Every second. Across all apps.</h2>
           <p class="as-desc">
-            The SafeMail X AI mobile app is built with high-performance React Native and Expo SDK 54. It brings our entire threat intelligence suite into a fluid, responsive <strong>Liquid Glass / Obsidian Nocturne</strong> interface.
+            The SafeMail X AI mobile client brings our entire threat intelligence suite into a fluid, responsive <strong>Liquid Glass / Obsidian Nocturne</strong> interface. Designed for high-stress situations where clarity and speed protect your funds and identity.
           </p>
           <div class="as-features">
             <div class="as-feat">
@@ -1022,27 +1012,28 @@
             </div>
           </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap;">
-            <a class="btn-primary" href="https://github.com/Rahul-workss/safemailx-ai/actions" target="_blank" rel="noopener">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download User APK v1.0.6
+            <a class="btn-primary" href="#waitlist">
+              Request Mobile Access
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
-            <a class="btn-ghost" href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">
-              View Source on GitHub
+            <a class="btn-ghost" href="#architecture">
+              Explore Architecture
             </a>
           </div>
         </div>
 
         <div class="as-right">
           <div class="as-download-box">
-            <div style="font-size:2.8rem; margin-bottom:0.4rem;">📱</div>
-            <h4 style="font-size:1.25rem; font-weight:800; color:#fff;">SafeMail X AI for Android</h4>
-            <div class="as-meta">Release v1.0.6 · ARM64 Standalone APK</div>
-            <p style="font-size:0.84rem; color:var(--muted); margin:0.8rem 0 1.2rem;">Signed standalone build with offline bundling. Runs completely without needing any development server.</p>
-            <a class="as-btn-download" href="https://github.com/Rahul-workss/safemailx-ai/actions" target="_blank" rel="noopener">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Get Latest APK
+            <div class="as-icon-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <h4 style="font-size:1.25rem; font-weight:800; color:#fff;">SafeMail X AI Mobile</h4>
+            <div class="as-meta">Private Beta &bull; High-Performance Engine</div>
+            <p style="font-size:0.84rem; color:var(--muted); margin:0.8rem 0 1.2rem;">Complete forensic suite with offline bundling. Runs completely without needing external cloud dependencies.</p>
+            <a class="btn-primary" style="justify-content:center;" href="#waitlist">
+              Join Mobile Beta
             </a>
-            <div style="font-size:0.75rem; color:var(--dim); margin-top:6px;">Compatible with Android 8.0+ (ARM64)</div>
+            <div style="font-size:0.75rem; color:var(--dim); margin-top:6px;">Early invites rolled out weekly</div>
           </div>
         </div>
       </div>
@@ -1059,44 +1050,49 @@
       </div>
 
       <div class="how-circle-stage" data-anim style="transition-delay:.12s">
-        <!-- Circular SVG Pulse Orbit -->
         <svg class="how-circle-svg" viewBox="0 0 180 180">
           <circle cx="90" cy="90" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-dasharray="6 8" />
           <circle class="how-chain-pulse" cx="90" cy="90" r="88" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-linecap="round" stroke-dasharray="30 600" />
         </svg>
 
-        <!-- Laser Beams -->
         <div class="data-beam beam-1"></div>
         <div class="data-beam beam-2"></div>
         <div class="data-beam beam-3"></div>
         <div class="data-beam beam-4"></div>
 
-        <!-- Central Hub -->
         <div class="how-circle-center">
           <img src="/images/new-logo.png" alt="SafeMail X AI" />
         </div>
 
         <div class="how-card">
           <div class="how-card-num">01 / HYBRID AI</div>
-          <div class="how-card-icon icon-cyan">⚙️</div>
+          <div class="how-card-icon icon-cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
           <div class="how-card-title">Ensemble Detection</div>
           <div class="how-card-body">Heuristic rules, scikit-learn TF-IDF models, and Qwen3-8B thinking LLM working as a coordinated multi-tier pipeline.</div>
         </div>
         <div class="how-card">
           <div class="how-card-num">02 / FORENSICS</div>
-          <div class="how-card-icon icon-amber">🔬</div>
+          <div class="how-card-icon icon-amber">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          </div>
           <div class="how-card-title">Payload Forensics</div>
-          <div class="how-card-body">Multi-decoder QR preprocessing (ZXing + pyzbar + OpenCV) handles glare, angles, and PVC camera photos effortlessly.</div>
+          <div class="how-card-body">Multi-decoder QR preprocessing (ZXing + pyzbar + OpenCV) handles glare, angles, and camera photos effortlessly.</div>
         </div>
         <div class="how-card">
           <div class="how-card-num">03 / PRIVACY</div>
-          <div class="how-card-icon icon-red">🔒</div>
+          <div class="how-card-icon icon-red">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
           <div class="how-card-title">Zero Data Retention</div>
           <div class="how-card-body">All parsing occurs in volatile memory. No audio, no demographic records, and no credentials ever persist in databases.</div>
         </div>
         <div class="how-card">
           <div class="how-card-num">04 / EVIDENCE</div>
-          <div class="how-card-icon icon-green">📋</div>
+          <div class="how-card-icon icon-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
           <div class="how-card-title">Forensic Audit Reports</div>
           <div class="how-card-body">Generates comprehensive evidence packs and PDF reports documenting every red flag and regulatory citation.</div>
         </div>
@@ -1115,7 +1111,6 @@
       <div class="timeline-row">
         <div class="tl-line"><div class="tl-progress"></div></div>
         
-        <!-- Node 1 -->
         <div class="tl-node">
           <div class="tl-num cyan">01</div>
           <div class="tl-circle cyan-border">
@@ -1125,7 +1120,6 @@
           <div class="tl-desc">Audio, SMS, QR, Email or URL</div>
         </div>
 
-        <!-- Node 2 -->
         <div class="tl-node">
           <div class="tl-num blue">02</div>
           <div class="tl-circle blue-border">
@@ -1135,7 +1129,6 @@
           <div class="tl-desc">TRAI, NPCI & 50+ threat heuristics</div>
         </div>
 
-        <!-- Node 3 -->
         <div class="tl-node">
           <div class="tl-num purple">03</div>
           <div class="tl-circle purple-border">
@@ -1145,7 +1138,6 @@
           <div class="tl-desc">Semantic scoring & Bloom filters</div>
         </div>
 
-        <!-- Node 4 -->
         <div class="tl-node">
           <div class="tl-num purple">04</div>
           <div class="tl-circle purple-border">
@@ -1155,7 +1147,6 @@
           <div class="tl-desc">Cognitive reasoning & ELI5 summary</div>
         </div>
 
-        <!-- Node 5 -->
         <div class="tl-node">
           <div class="tl-num green">05</div>
           <div class="tl-circle green-border">
@@ -1194,13 +1185,13 @@
     </div>
   </section>
 
-  <!-- ── SECTION: WAITLIST & COMMUNITY ── -->
+  <!-- ── SECTION: WAITLIST & ACCESS ── -->
   <section class="content-section" id="waitlist">
     <div class="section-inner">
       <div class="waitlist-card" data-anim>
         <div class="section-label">Early Access & Updates</div>
         <h2 class="waitlist-title">Be the first to protect your digital identity.</h2>
-        <p class="waitlist-sub">Join security researchers, IT teams, and privacy advocates testing SafeMail X AI. Get launch announcements, pre-release APK builds, and open-source updates.</p>
+        <p class="waitlist-sub">Join security researchers, IT teams, and privacy advocates testing SafeMail X AI. Get early platform invitations, updates, and feature access.</p>
         <form id="wl-form">
           <div class="form-row">
             <div class="field-group">
@@ -1212,10 +1203,10 @@
               <input class="field-input" id="wl-email" name="email" type="email" placeholder="you@domain.com" autocomplete="email" required />
             </div>
           </div>
-          <button class="btn-submit" type="submit">Join Early Access Waitlist →</button>
+          <button class="btn-submit" type="submit">Request Early Access &rarr;</button>
         </form>
         <div class="form-footnote">Zero spam. Pure security intelligence updates. Unsubscribe anytime.</div>
-        <div class="form-success" id="wl-success">✓ You're on the list! We'll notify you with new releases and updates.</div>
+        <div class="form-success" id="wl-success">You are on the access list. We will notify you with the next invite rollout.</div>
       </div>
     </div>
   </section>
@@ -1227,10 +1218,10 @@
         <img src="/images/new-logo.png" alt="SafeMail X AI" style="width:26px; height:26px; object-fit:contain;" />
         <span>SafeMail X AI</span>
       </a>
-      <span class="footer-copy">© 2026 SafeMail X AI. Open-source threat intelligence under MIT License.</span>
+      <span class="footer-copy">&copy; 2026 SafeMail X AI. Threat intelligence & identity protection.</span>
       <div class="footer-links">
-        <a href="https://github.com/Rahul-workss/safemailx-ai" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/Rahul-workss/safemailx-ai#api-reference" target="_blank" rel="noopener">API Docs</a>
+        <a href="#threats">Threat Vectors</a>
+        <a href="#architecture">Architecture</a>
         <a href="/privacy.html">Privacy Policy</a>
         <a href="/terms.html">Terms of Service</a>
       </div>
@@ -1240,16 +1231,14 @@
   <script>
     gsap.registerPlugin(ScrollTrigger);
 
-    // Fade out hero text on scroll
     gsap.to('#hero-copy',{opacity:0,y:-30,
       scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
     gsap.to('#scroll-cue',{opacity:0,
       scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
 
-    // Hero copy entrance
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
-    // ── PIPELINE TIMELINE ANIMATION ──
+    // Pipeline timeline animation
     const tlNodes = gsap.utils.toArray('.tl-node');
     const tlContainer = document.querySelector('.timeline-row');
     const tlFeaturesBar = document.querySelector('.tl-features-bar');
@@ -1286,7 +1275,7 @@
       }, 1.0);
     }
 
-    // ── CHAPTER DOTS ──
+    // Chapter dots
     const chapterDots = document.getElementById('chapter-dots');
     const dotWraps    = chapterDots.querySelectorAll('.ch-dot-wrap');
     const dots        = chapterDots.querySelectorAll('.ch-dot');
@@ -1327,29 +1316,25 @@
       }
     });
 
-    // ── SCROLL OVERLAY CARDS (GSAP) ──
+    // Scroll overlay cards (GSAP)
     let mm = gsap.matchMedia();
 
     mm.add("(min-width: 901px)", () => {
-      // Card 1 — LEFT
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=15% top', end:'top+=25% top', scrub:.6 } })
         .fromTo('#overlay-l1', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=65% top', end:'top+=75% top', scrub:.6 } })
         .fromTo('#overlay-l1', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
 
-      // Card 2 — CENTER
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=35% top', scrub:.6 } })
         .fromTo('#overlay-l2', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=65% top', end:'top+=75% top', scrub:.6 } })
         .fromTo('#overlay-l2', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
 
-      // Card 3 — RIGHT
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=35% top', end:'top+=45% top', scrub:.6 } })
         .fromTo('#overlay-l3', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=75% top', end:'top+=85% top', scrub:.6 } })
         .fromTo('#overlay-l3', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
 
-      // Bottom Bar
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=55% top', scrub:.6 } })
         .fromTo('#overlay-bottom', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=75% top', end:'top+=85% top', scrub:.6 } })
@@ -1357,7 +1342,6 @@
     });
 
     mm.add("(max-width: 900px)", () => {
-      // Mobile overlays
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=32% top', scrub:.6 } })
         .fromTo('#overlay-l1', {opacity:0, scale:0.85, xPercent:-50, yPercent:-50}, {opacity:1, scale:1, xPercent:-50, yPercent:-50, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=46% top', scrub:.6 } })
@@ -1374,7 +1358,7 @@
         .fromTo('#overlay-l3', {opacity:1, scale:1, xPercent:-50, yPercent:-50}, {opacity:0, scale:0.9, xPercent:-50, yPercent:-50, ease:'power2.in', immediateRender:false});
     });
 
-    // ── SECTION SCROLL REVEAL ──
+    // Reveal on scroll
     const revObs = new IntersectionObserver(entries => {
       entries.forEach(e => {
         if(e.isIntersecting){
@@ -1385,11 +1369,11 @@
     }, {threshold:.1, rootMargin:'0px 0px -40px 0px'});
     document.querySelectorAll('[data-anim]').forEach(el => revObs.observe(el));
 
-    // ── WAITLIST FORM ──
+    // Waitlist Form Submission
     document.getElementById('wl-form').addEventListener('submit', async function(e){
       e.preventDefault();
       const btn = this.querySelector('.btn-submit');
-      btn.textContent = 'Securing your spot...';
+      btn.textContent = 'Submitting request...';
       btn.disabled = true;
       try {
         const params = new URLSearchParams();
@@ -1403,7 +1387,7 @@
         this.style.display = 'none';
         document.getElementById('wl-success').style.display = 'block';
       } catch (err) {
-        btn.textContent = 'Join Early Access Waitlist →';
+        btn.textContent = 'Request Early Access \u2192';
         btn.disabled = false;
       }
     });
