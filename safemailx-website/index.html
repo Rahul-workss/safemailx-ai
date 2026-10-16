@@ -484,19 +484,37 @@
 
     .tc-title { font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; letter-spacing: -0.02em; }
     .tc-desc { font-size: 0.88rem; line-height: 1.65; color: var(--muted); margin-bottom: 1.4rem; flex: 1; }
-    .tc-tags { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
-    .tc-tag {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 600;
-      color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08); padding: 3px 9px; border-radius: 6px;
+    .tc-features {
+      list-style: none;
+      padding: 0;
+      margin: 1.4rem 0 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.4rem;
     }
-    .tc-tag.highlight { color: var(--cyan); border-color: rgba(93,228,216,0.3); background: var(--cyan-dim); }
+    .tc-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.84rem;
+      color: rgba(226, 232, 240, 0.85);
+      line-height: 1.45;
+    }
+    .tc-features li svg {
+      width: 15px;
+      height: 15px;
+      stroke: var(--cyan);
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
 
     /* ── MOBILE CLIENT SPOTLIGHT ────────── */
     .app-spotlight {
       margin-top: 4rem;
       background: linear-gradient(135deg, rgba(12,22,34,0.7) 0%, rgba(4,10,22,0.88) 100%);
-      border: 1px solid rgba(93,228,216,0.2);
+      border: 1px solid rgba(56,189,248,0.2);
       border-radius: 28px;
       padding: 3.5rem;
       display: grid;
@@ -509,13 +527,13 @@
     }
     .app-spotlight::after {
       content: ''; position: absolute; right: -100px; bottom: -100px; width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(93,228,216,0.12) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(56,189,248,0.12) 0%, transparent 70%);
       pointer-events: none;
     }
     .as-badge {
       display: inline-flex; align-items: center; gap: 8px;
       font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
-      color: var(--cyan); background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.3);
+      color: var(--cyan); background: var(--cyan-dim); border: 1px solid rgba(56,189,248,0.3);
       padding: 5px 12px; border-radius: 6px; margin-bottom: 1.2rem;
     }
     .as-title { font-size: clamp(1.8rem, 3.2vw, 2.6rem); font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 1rem; }
@@ -532,7 +550,7 @@
     .as-icon-badge {
       width: 56px; height: 56px; margin: 0 auto; border-radius: 14px;
       display: flex; align-items: center; justify-content: center;
-      background: var(--cyan-dim); border: 1px solid rgba(93,228,216,0.25);
+      background: var(--cyan-dim); border: 1px solid rgba(56,189,248,0.25);
     }
     .as-icon-badge svg { width: 28px; height: 28px; stroke: var(--cyan); }
     .as-meta { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--dim); }
@@ -541,95 +559,6 @@
       .app-spotlight { grid-template-columns: 1fr; padding: 2.2rem; gap: 2rem; }
       .as-features { grid-template-columns: 1fr; }
     }
-
-    /* ── CIRCULAR ARCHITECTURE STAGE ───── */
-    .how-circle-stage {
-      position: relative; width: 100%; max-width: 900px; height: 850px;
-      margin: 6rem auto 4rem auto;
-    }
-    .how-circle-center {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 140px; height: 140px;
-      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border); border-radius: 50%;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 0 50px rgba(93,228,216,0.15);
-      display: flex; align-items: center; justify-content: center; z-index: 5;
-    }
-    .how-circle-center img { width: 70px; height: 70px; filter: drop-shadow(0 0 15px rgba(93,228,216,0.6)); }
-
-    .how-circle-svg {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 180px; height: 180px; pointer-events: none; z-index: 0;
-    }
-    .how-chain-pulse {
-      transform-origin: 50% 50%;
-      animation: orbit-pulse 10s linear infinite;
-    }
-    @keyframes orbit-pulse { 0% { transform: rotate(-90deg); } 100% { transform: rotate(270deg); } }
-
-    .how-card { 
-      background: var(--glass-bg); backdrop-filter: var(--glass-blur);
-      border: 1px solid var(--glass-border); border-radius: 20px;
-      padding: 2rem; position: absolute; transition: transform .25s; 
-      width: 300px; z-index: 10;
-      box-shadow: inset 0 1px 0 var(--glass-rim-top), 0 10px 30px rgba(0,0,0,0.25);
-    }
-    .how-card:hover { transform: translateY(-4px) !important; }
-
-    @media(min-width: 901px) {
-      .how-card:nth-child(7) { top: 0; left: calc(50% - 150px); animation: card-glow-1 10s infinite; }
-      .how-card:nth-child(8) { top: calc(50% - 120px); right: -40px; animation: card-glow-2 10s infinite; }
-      .how-card:nth-child(9) { bottom: 0; left: calc(50% - 150px); animation: card-glow-3 10s infinite; }
-      .how-card:nth-child(10) { top: calc(50% - 120px); left: -40px; animation: card-glow-4 10s infinite; }
-    }
-
-    @keyframes card-glow-1 {
-      0%, 20%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-      2%, 12% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
-    }
-    @keyframes card-glow-2 {
-      0%, 23%, 45%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-      25%, 35% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
-    }
-    @keyframes card-glow-3 {
-      0%, 48%, 70%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-      50%, 60% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
-    }
-    @keyframes card-glow-4 {
-      0%, 73%, 95%, 100% { border-color: var(--glass-border); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-      75%, 85% { border-color: var(--cyan); box-shadow: 0 0 50px rgba(93,228,216,0.3); transform: scale(1.02); }
-    }
-
-    .data-beam { position: absolute; opacity: 0; pointer-events: none; z-index: 1; filter: drop-shadow(0 0 10px var(--cyan)); }
-    .beam-1 { width: 2px; height: 160px; top: calc(50% - 250px); left: calc(50% - 1px); background: linear-gradient(to top, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-1 10s infinite; }
-    .beam-2 { height: 2px; width: 160px; top: calc(50% - 1px); left: calc(50% + 90px); background: linear-gradient(to right, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-2 10s infinite; }
-    .beam-3 { width: 2px; height: 160px; top: calc(50% + 90px); left: calc(50% - 1px); background: linear-gradient(to bottom, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-3 10s infinite; }
-    .beam-4 { height: 2px; width: 160px; top: calc(50% - 1px); left: calc(50% - 250px); background: linear-gradient(to left, rgba(93,228,216,0) 0%, var(--cyan) 100%); animation: beam-fire-4 10s infinite; }
-
-    @keyframes beam-fire-1 { 0%, 98%, 100% { opacity: 0; transform: scaleY(0); } 2%, 12% { opacity: 1; transform: scaleY(1); } }
-    @keyframes beam-fire-2 { 0%, 23%, 100% { opacity: 0; transform: scaleX(0); } 25%, 35% { opacity: 1; transform: scaleX(1); } }
-    @keyframes beam-fire-3 { 0%, 48%, 100% { opacity: 0; transform: scaleY(0); } 50%, 60% { opacity: 1; transform: scaleY(1); } }
-    @keyframes beam-fire-4 { 0%, 73%, 100% { opacity: 0; transform: scaleX(0); } 75%, 85% { opacity: 1; transform: scaleX(1); } }
-
-    @media(max-width: 900px) {
-      .how-circle-stage { height: auto; max-width: 100%; display: grid; gap: 1.5rem; margin-top: 2rem; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); }
-      .how-circle-center, .how-circle-svg, .data-beam { display: none; }
-      .how-card { position: relative !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important; width: 100% !important; animation: none !important; }
-    }
-    .how-card-num { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 700; color: var(--dim); margin-bottom: 0.8rem; }
-    .how-card-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; }
-    .how-card-icon svg { width: 22px; height: 22px; }
-    .icon-cyan  { background: var(--cyan-dim);  border: 1px solid rgba(93,228,216,0.25); }
-    .icon-cyan svg { stroke: var(--cyan); }
-    .icon-amber { background: var(--amber-dim); border: 1px solid rgba(245,166,35,0.25); }
-    .icon-amber svg { stroke: var(--amber); }
-    .icon-red   { background: var(--red-dim);   border: 1px solid rgba(255,92,92,0.25); }
-    .icon-red svg { stroke: var(--red); }
-    .icon-green { background: var(--green-dim); border: 1px solid rgba(82,232,165,0.25); }
-    .icon-green svg { stroke: var(--green); }
-
-    .how-card-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
-    .how-card-body  { font-size: 0.86rem; line-height: 1.65; color: var(--muted); }
 
     /* ── PIPELINE TIMELINE ──────────────── */
     .timeline-row {
@@ -752,7 +681,7 @@
 
       /* ── 1. Kill ALL backdrop-filter — removes ~90% of GPU lag ── */
       *,
-      .glass, nav.glass, .pipeline-card, .how-card, .threat-card,
+      .glass, nav.glass, .pipeline-card, .threat-card,
       .waitlist-card, .metric-cell, .tl-features-bar, .tl-circle,
       .app-spotlight, .hero-text-glass, .hero-kicker, .pipeline-bottom-bar,
       footer {
@@ -764,7 +693,6 @@
       .glass, nav.glass { background: rgba(7, 12, 21, 0.98) !important; }
       .hero-text-glass  { background: rgba(11, 17, 30, 0.94) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; }
       .threat-card      { background: rgba(11, 17, 30, 0.95) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; }
-      .how-card         { background: rgba(11, 17, 30, 0.95) !important; }
       .waitlist-card    { background: rgba(11, 17, 30, 0.95) !important; }
       .metric-cell      { background: rgba(15, 23, 42, 0.92) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; }
       .tl-features-bar  { background: rgba(15, 23, 42, 0.92) !important; }
@@ -884,9 +812,8 @@
     </a>
     <ul class="nav-links">
       <li><a href="#threats">Threat Vectors</a></li>
-      <li><a href="#architecture">Architecture</a></li>
-      <li><a href="#pipeline">Pipeline</a></li>
       <li><a href="#mobile-app">Mobile Client</a></li>
+      <li><a href="#pipeline">Defense Pipeline</a></li>
       <li><a href="#waitlist">Early Access</a></li>
     </ul>
     <div class="nav-actions">
@@ -1051,11 +978,23 @@
           </div>
           <h3 class="tc-title">Call Analyzer & Vishing Defense</h3>
           <p class="tc-desc">Detect phone scams by describing what the caller said or uploading call audio. Whisper transcribes speech while our 7-layer scam intelligence classifies Digital Arrests, courier parcel traps, and fake CBI/police threats in real time with live policy checks.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">Whisper Audio STT</li>
-            <li class="tc-tag">Digital Arrest Scams</li>
-            <li class="tc-tag">12 Indian Languages</li>
-            <li class="tc-tag">ELI5 Plain Explanations</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Whisper on-device speech transcription</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Digital Arrest & fake police scam audit</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Multi-lingual coverage in 12 regional languages</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Plain-language ELI5 safety advice</span>
+            </li>
           </ul>
         </div>
 
@@ -1066,11 +1005,23 @@
           </div>
           <h3 class="tc-title">Payment & QR Forensic Scanner</h3>
           <p class="tc-desc">Scan QR codes with live camera or gallery screenshots. The forensic engine decodes payment handles, payee identity, Merchant Category Codes (MCC), and uncovers debit-traps where attackers trick you into paying money disguised as receiving a refund.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">Live Camera & Gallery</li>
-            <li class="tc-tag">Debit Trap Detection</li>
-            <li class="tc-tag">Bank Handle Audit</li>
-            <li class="tc-tag">MCC Code Decoder</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Dual-mode live camera & screenshot gallery inspection</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Reverse-charge debit trap & fake refund detection</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>NPCI bank handle & verified merchant validation</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Merchant Category Code (MCC) risk classification</span>
+            </li>
           </ul>
         </div>
 
@@ -1081,11 +1032,23 @@
           </div>
           <h3 class="tc-title">Offline Aadhaar & Document Verifier</h3>
           <p class="tc-desc">Cryptographically verify Aadhaar Secure QR codes 100% offline using embedded UIDAI public certificates and RSA-2048 verification. Decompresses big-endian gzip payloads, extracts demographic data and photo preview, with zero UIDAI calls and zero PII stored.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">RSA-2048 Offline Crypto</li>
-            <li class="tc-tag">Tamper Detection</li>
-            <li class="tc-tag">DigiLocker Portal Safe Route</li>
-            <li class="tc-tag">Zero Cloud Retention</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>100% offline RSA-2048 cryptographic signature check</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>UIDAI secure QR tamper & payload forgery detection</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Direct DigiLocker official verification safe route</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Zero cloud retention &bull; Volatile device memory only</span>
+            </li>
           </ul>
         </div>
 
@@ -1096,11 +1059,23 @@
           </div>
           <h3 class="tc-title">Who Called? Deep Profiler</h3>
           <p class="tc-desc">Auto-detects copied numbers from your clipboard. Audits against TRAI 140/160 telemarketer regulation standards, detects international cybercrime hubs (+855 Cambodia, +95 Myanmar, +856 Laos), decodes telecom circles, and provides one-tap DOT Chakshu reporting.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">Clipboard Auto-Detect</li>
-            <li class="tc-tag">TRAI 140/160 Audit</li>
-            <li class="tc-tag">MHA Cybercrime Hubs</li>
-            <li class="tc-tag">DOT Chakshu 1-Tap Link</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Instant clipboard auto-detection for incoming callers</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>TRAI 140/160 telemarketer regulation audit</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>MHA cybercrime international call center hub detection</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>One-tap official DoT Chakshu portal incident filing</span>
+            </li>
           </ul>
         </div>
 
@@ -1111,11 +1086,23 @@
           </div>
           <h3 class="tc-title">Email & SMS Phishing Engine</h3>
           <p class="tc-desc">Multi-engine analysis for inbox threats. Connect via privacy-preserving Gmail OAuth (label-only model) or instant scan. Resolves deep URL redirect chains, analyzes domain age (RDAP), flags typosquatting and homoglyphs, and sandboxes documents with YARA.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">Gmail OAuth Label-Only</li>
-            <li class="tc-tag">Instant Smishing Scan</li>
-            <li class="tc-tag">PDF / DOCX Malware YARA</li>
-            <li class="tc-tag">Redirect Chain Tracer</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Privacy-first Gmail OAuth with label-only inbox model</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Instant SMS phishing & suspicious short-link audit</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>PDF and DOCX document sandboxing with YARA</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Deep redirect-chain & domain age (RDAP) analysis</span>
+            </li>
           </ul>
         </div>
 
@@ -1126,11 +1113,23 @@
           </div>
           <h3 class="tc-title">Assistive Touch Floating Shield</h3>
           <p class="tc-desc">A floating obsidian glass orb on mobile that stays accessible across any app. Inspect suspicious links, scan payment QRs, or profile an incoming caller without ever switching away from messaging, social, or banking applications.</p>
-          <ul class="tc-tags">
-            <li class="tc-tag highlight">System Floating Shield</li>
-            <li class="tc-tag">Instant Link Verification</li>
-            <li class="tc-tag">Quick Forensic Notepad</li>
-            <li class="tc-tag">Obsidian Glass UI</li>
+          <ul class="tc-features">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Persistent floating overlay across banking & messaging apps</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Instant link safety preview before navigation</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Quick forensic incident notepad with encrypted storage</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Obsidian Nocturne interface optimized for low distraction</span>
+            </li>
           </ul>
         </div>
       </div>
@@ -1178,8 +1177,8 @@
               Request Mobile Access
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
-            <a class="btn-ghost" href="#architecture">
-              Explore Architecture
+            <a class="btn-ghost" href="#pipeline">
+              View Detection Pipeline
             </a>
           </div>
         </div>
@@ -1197,66 +1196,6 @@
             </a>
             <div style="font-size:0.75rem; color:var(--dim); margin-top:6px;">Early invites rolled out weekly</div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── SECTION: WHY DIFFERENT / CORE ARCHITECTURE ── -->
-  <section class="content-section" id="architecture">
-    <div class="section-inner">
-      <div data-anim>
-        <div class="section-label">Core Engineering</div>
-        <h2 class="section-title">Built with local-first precision.<br><em>How the hybrid engine operates.</em></h2>
-        <p class="section-body">Cloud-only scanners force you to upload sensitive communications to third-party servers. SafeMail X AI is architected from the ground up to analyze threats locally on your device or private infrastructure.</p>
-      </div>
-
-      <div class="how-circle-stage" data-anim style="transition-delay:.12s">
-        <svg class="how-circle-svg" viewBox="0 0 180 180">
-          <circle cx="90" cy="90" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2" stroke-dasharray="6 8" />
-          <circle class="how-chain-pulse" cx="90" cy="90" r="88" fill="none" stroke="var(--cyan)" stroke-width="4" stroke-linecap="round" stroke-dasharray="30 600" />
-        </svg>
-
-        <div class="data-beam beam-1"></div>
-        <div class="data-beam beam-2"></div>
-        <div class="data-beam beam-3"></div>
-        <div class="data-beam beam-4"></div>
-
-        <div class="how-circle-center">
-          <img src="/images/new-logo.png" alt="SafeMail X AI" />
-        </div>
-
-        <div class="how-card">
-          <div class="how-card-num">01 / HYBRID AI</div>
-          <div class="how-card-icon icon-cyan">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </div>
-          <div class="how-card-title">Ensemble Detection</div>
-          <div class="how-card-body">Heuristic rules, scikit-learn TF-IDF models, and Qwen3-8B thinking LLM working as a coordinated multi-tier pipeline.</div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">02 / FORENSICS</div>
-          <div class="how-card-icon icon-amber">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-          </div>
-          <div class="how-card-title">Payload Forensics</div>
-          <div class="how-card-body">Multi-decoder QR preprocessing (ZXing + pyzbar + OpenCV) handles glare, angles, and camera photos effortlessly.</div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">03 / PRIVACY</div>
-          <div class="how-card-icon icon-red">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          </div>
-          <div class="how-card-title">Zero Data Retention</div>
-          <div class="how-card-body">All parsing occurs in volatile memory. No audio, no demographic records, and no credentials ever persist in databases.</div>
-        </div>
-        <div class="how-card">
-          <div class="how-card-num">04 / EVIDENCE</div>
-          <div class="how-card-icon icon-green">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <div class="how-card-title">Forensic Audit Reports</div>
-          <div class="how-card-body">Generates comprehensive evidence packs and PDF reports documenting every red flag and regulatory citation.</div>
         </div>
       </div>
     </div>
@@ -1383,7 +1322,7 @@
       <span class="footer-copy">&copy; 2026 SafeMail X AI. Threat intelligence & identity protection.</span>
       <div class="footer-links">
         <a href="#threats">Threat Vectors</a>
-        <a href="#architecture">Architecture</a>
+        <a href="#pipeline">Defense Pipeline</a>
         <a href="/privacy.html">Privacy Policy</a>
         <a href="/terms.html">Terms of Service</a>
       </div>
