@@ -920,6 +920,46 @@
     .field-input:focus { border-color: rgba(138,143,240,.5); background: rgba(59,65,191,.04); }
     .hero-scrim { background: linear-gradient(to bottom, rgba(1,1,4,.82) 0%, transparent 20%, transparent 75%, rgba(1,1,4,1) 100%), linear-gradient(to right, rgba(1,1,4,.68) 0%, transparent 20%, transparent 80%, rgba(1,1,4,.68) 100%); }
     #hero-video { filter: saturate(.72) hue-rotate(12deg); }
+
+    /* Ordered product story: hero, verdict pipeline, engine layers, then coverage. */
+    #hero-sequence { height: 100svh; min-height: 42rem; }
+    #hero-stage { position: relative; height: 100%; }
+    /* The old dots described the former in-hero card sequence. They would now
+       report the wrong step, so the ordered page flow is the single progress cue. */
+    #chapter-dots { display: none !important; }
+    #engine-layers { position: relative; z-index: 10; padding: 2rem; }
+    .engine-layers-inner { width: min(1140px, 100%); margin: 0 auto; }
+    .engine-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+    #engine-layers .pipeline-card {
+      position: relative !important;
+      inset: auto !important;
+      display: flex !important;
+      width: auto !important;
+      max-width: none !important;
+      min-height: 100%;
+      margin: 0 !important;
+      opacity: 1;
+      transform: none;
+    }
+    #engine-layers .pipeline-bottom-bar {
+      position: relative;
+      right: auto;
+      bottom: auto;
+      left: auto;
+      display: flex !important;
+      width: 100%;
+      margin-top: 1.25rem;
+      transform: none;
+    }
+    @media (max-width: 900px) {
+      #hero-sequence { height: 100svh !important; min-height: 38rem !important; }
+      #hero-stage { position: relative !important; height: 100% !important; min-height: 0 !important; }
+      #engine-layers { padding: 1.2rem; }
+      .engine-card-grid { grid-template-columns: 1fr; gap: 1rem; }
+      #engine-layers .pipeline-card { right: auto !important; bottom: auto !important; left: auto !important; padding: 1.1rem !important; }
+      #engine-layers .pipeline-bottom-bar { flex-direction: column; align-items: stretch; gap: .9rem; padding: 1.1rem; }
+      #engine-layers .pl-feature { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -1448,8 +1488,35 @@
     // Keep the same looping hero video on phones. The mobile CSS only reduces
     // its opacity and reframes it; it does not replace the desktop experience.
 
-    // One shared hero timeline keeps the copy, cards, and support bar in a
-    // predictable order on both desktop and mobile.
+    // Put the product explanation in the same order on every screen:
+    // hero, five-stage verdict, the three engine layers, then broader coverage.
+    const heroSequence = document.getElementById('hero-sequence');
+    const pipelineSection = document.getElementById('pipeline');
+    const engineCards = ['overlay-l1', 'overlay-l2', 'overlay-l3']
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+    const engineSummary = document.getElementById('overlay-bottom');
+
+    if (heroSequence && pipelineSection && engineCards.length === 3) {
+      const engineSection = document.createElement('section');
+      engineSection.id = 'engine-layers';
+      engineSection.className = 'content-section';
+
+      const engineInner = document.createElement('div');
+      engineInner.className = 'engine-layers-inner';
+      const engineGrid = document.createElement('div');
+      engineGrid.className = 'engine-card-grid';
+      engineCards.forEach((card) => engineGrid.append(card));
+      engineInner.append(engineGrid);
+      if (engineSummary) engineInner.append(engineSummary);
+      engineSection.append(engineInner);
+
+      heroSequence.insertAdjacentElement('afterend', engineSection);
+      heroSequence.insertAdjacentElement('afterend', pipelineSection);
+    }
+
+    // The hero itself gets a light entrance only. Its content now leaves
+    // naturally as the reader reaches the next section.
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
     // ── Pipeline timeline animation ─────────────────────────────────
@@ -1536,26 +1603,43 @@
       });
     }
 
-    const heroFlow = gsap.timeline({
-      scrollTrigger: {
-        trigger: '#hero-sequence',
-        start: 'top top',
-        end: 'bottom bottom',
-        scrub: 0.65,
-      }
-    });
+    if (engineCards.length) {
+      // On phones these cards form a reading list. Keep them visible as soon
+      // as their section arrives so a fast swipe can never catch a blank card.
+      if (isMobile) {
+        gsap.set(engineCards, { autoAlpha: 1, y: 0 });
+        if (engineSummary) gsap.set(engineSummary, { autoAlpha: 1, y: 0 });
+      } else {
+        gsap.set(engineCards, { autoAlpha: 0, y: 34 });
+        gsap.to(engineCards, {
+          autoAlpha: 1,
+          y: 0,
+          stagger: 0.16,
+          duration: 0.55,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: '#engine-layers',
+            start: 'top 72%',
+            once: true,
+          }
+        });
 
-    heroFlow
-      .to('#hero-copy', { opacity: 0, y: -30, duration: 0.12, ease: 'none' }, 0.08)
-      .to('#scroll-cue', { opacity: 0, duration: 0.08, ease: 'none' }, 0.08)
-      .fromTo('#overlay-l1', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.22)
-      .to('#overlay-l1', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.36)
-      .fromTo('#overlay-l2', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.36)
-      .to('#overlay-l2', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.50)
-      .fromTo('#overlay-l3', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.50)
-      .to('#overlay-l3', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.64)
-      .fromTo('#overlay-bottom', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.64)
-      .to('#overlay-bottom', { opacity: 0, y: 20, duration: 0.08, ease: 'power2.in' }, 0.84);
+        if (engineSummary) {
+          gsap.set(engineSummary, { autoAlpha: 0, y: 20 });
+          gsap.to(engineSummary, {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.45,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: '#engine-layers',
+              start: 'top 52%',
+              once: true,
+            }
+          });
+        }
+      }
+    }
 
     // Reveal on scroll
     const revObs = new IntersectionObserver(entries => {

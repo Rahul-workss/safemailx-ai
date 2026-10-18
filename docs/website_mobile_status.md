@@ -25,6 +25,31 @@ The first release made the phone hero too different from desktop by pausing the 
 
 The production website already worked on laptop screens, but its animated hero and information panels could feel crowded on a phone. This patch keeps the existing website, wording, animation, and visual identity, while giving narrow screens more breathing room.
 
+## Product-flow reorder — ready for deployment
+
+The product story now follows the same clear order on desktop and phone:
+
+1. **Main message:** “Stop scams before they cost you.”
+2. **Five stages, one conclusive verdict:** the complete scan and verdict timeline.
+3. **The three protection engines:** Heuristic & Rule Engine, ML & Telecom Intel, and Qwen3-8B Thinking AI.
+4. **The remaining product sections:** the multi-channel summary, attack vectors, mobile client, access form, and footer.
+
+### What changed technically, in plain language
+
+- The hero is now one screen tall rather than a long, pinned scroll sequence. This means the next section arrives naturally after one deliberate scroll instead of requiring several swipes.
+- The verdict timeline is placed immediately below the hero on every screen size.
+- The three engine cards have their own section immediately after the timeline. On larger screens they make one gentle left-to-right entrance. On phones they are immediately readable in a normal top-to-bottom list, so a fast swipe cannot land on a card that is still animating.
+- Large screens display the three engine cards side by side. Phones display the same cards one per row, with the same text and visual style.
+- The old side chapter dots were removed because they described the previous card order and would have given misleading progress information.
+- No public wording, waitlist form, backend call, mobile app feature, or Railway service was changed.
+
+### Checks completed before release
+
+- [x] Production entry page build completes successfully with `npm run build`.
+- [x] The source change passes `git diff --check`.
+- [x] Phone browser review confirms the hero leads into the five-stage verdict and then into the engine summary before the attack-vector section.
+- [x] The desktop entrance is tied to its section entering the screen. Phone cards do not wait for a transition, so they cannot compete with fast touch scrolling or replay while the reader is moving through the page.
+
 ## Changes made
 
 - Added safe-area spacing for phones with a status bar or screen cutout.
