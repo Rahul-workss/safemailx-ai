@@ -19,6 +19,7 @@ The first release made the phone hero too different from desktop by pausing the 
 - The secondary bottom feature bar remains hidden on phones because it is redundant with the animated cards.
 - The desktop wording is unchanged, and the accent palette is aligned to the app dashboard: black, deep indigo, restrained violet, frost text, emerald status, and minimal cyan.
 - The hero scroll choreography now uses one shared timeline: hero copy exits, layer 1 appears, layer 2 appears, layer 3 appears, and the supporting bar follows without competing triggers.
+- The hero scroll runway was reduced from 260vh/220vh to 170vh/160vh (desktop/phone), so the next page section arrives after roughly one to two viewport movements instead of four to five.
 
 ## What this release fixes
 
