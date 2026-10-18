@@ -709,66 +709,97 @@
         animation: none !important;
       }
 
-      /* ── 3. FIX BLANK SPACE: eliminate sticky 160vh scroll void on mobile ── */
+      /* ── 3. Keep the desktop hero experience on mobile, with a shorter scroll runway. ── */
       #hero-sequence {
-        height: auto !important;
-        min-height: auto !important;
+        height: 220vh !important;
+        min-height: 220vh !important;
         position: relative !important;
         padding-bottom: 0 !important;
       }
       #hero-stage {
-        position: relative !important;
-        top: auto !important;
-        height: auto !important;
-        min-height: calc(100vh - 68px) !important;
-        padding: 5rem 1rem 3.5rem 1rem !important;
+        position: sticky !important;
+        top: 0 !important;
+        height: 100svh !important;
+        min-height: 0 !important;
+        padding: 0.7rem !important;
         overflow: hidden !important;
         display: flex !important;
-        flex-direction: column !important;
         justify-content: center !important;
         background: #070c15 url('/BG_SEC.png') center top / cover no-repeat !important;
       }
       #hero-copy {
-        position: relative !important;
-        top: auto !important;
-        left: auto !important;
-        transform: none !important;
-        width: 100% !important;
+        position: absolute !important;
+        top: calc(4.2rem + env(safe-area-inset-top)) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min(100% - 1.4rem, 34rem) !important;
         max-width: 640px !important;
         padding: 0 !important;
-        margin: 0 auto !important;
+        margin: 0 !important;
         opacity: 1 !important;
       }
       #hero-video {
+        display: block !important;
+        opacity: 0.38 !important;
+        object-fit: cover !important;
+        object-position: center center !important;
+      }
+      .pipeline-card {
+        display: flex !important;
+        top: auto !important;
+        right: .7rem !important;
+        bottom: 15% !important;
+        left: .7rem !important;
+        width: auto !important;
+        max-width: none !important;
+        margin-left: 0 !important;
+        padding: 1rem !important;
+        gap: 10px !important;
+        opacity: 0 !important;
+        transform: none !important;
+      }
+      .pipeline-bottom-bar {
         display: none !important;
       }
-      .pipeline-card,
-      .pipeline-bottom-bar,
       #scroll-cue {
-        display: none !important;
+        display: flex !important;
+        bottom: max(1rem, env(safe-area-inset-bottom)) !important;
       }
+
+      /* The cards remain one-at-a-time in the same animated slot as desktop. */
+      .pipeline-card .pc-name { font-size: 1rem; }
+      .pipeline-card .pc-list li { font-size: .72rem; }
+      .pipeline-card .pc-num { font-size: 1.55rem; }
+      .pipeline-card .pc-icon { width: 24px; height: 24px; }
+
+      /* The video remains visible while the desktop scroll controller runs. */
+      .hero-scrim { background: linear-gradient(to bottom, rgba(7,12,21,.78), transparent 24%, rgba(7,12,21,.88) 100%); }
+      .hero-grid { opacity: .55; }
 
       /* ── 4. Threat grid — single column on phone ── */
       .threat-grid { grid-template-columns: 1fr; gap: 1.2rem; }
 
-      /* ── 5. Hero metrics — stack vertically ── */
-      .hero-metrics { flex-direction: column; gap: 8px; }
-      .metric-cell { width: 100%; padding: 0.9rem; }
+      /* ── 5. Hero metrics — compact row, like desktop ── */
+      .hero-metrics { flex-direction: row; gap: 5px; }
+      .metric-cell { width: auto; min-width: 0; padding: 0.7rem 0.35rem; }
 
       /* ── 6. Hero copy sizing ── */
-      .hero-text-glass { padding: 2.2rem 1.2rem; border-radius: 20px; }
+      .hero-text-glass { padding: 1.6rem 0.9rem 1.35rem; border-radius: 18px; }
       .hero-h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.1; color: #ffffff !important; }
       .hero-sub { font-size: 0.92rem; line-height: 1.6; color: rgba(226, 232, 240, 0.8) !important; }
 
       /* ── 7. Hero kicker — narrower screens ── */
       .hero-kicker {
         font-size: 0.62rem;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.045em;
         padding: 6px 10px;
         gap: 6px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow: hidden;
+        white-space: nowrap;
         justify-content: center;
       }
+      .kicker-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       /* ── 8. Hero action buttons — full width on small screens ── */
       .hero-actions { flex-direction: column; align-items: center; gap: 10px; }
@@ -803,10 +834,6 @@
       .nav-brand-text { font-size: .86rem; white-space: nowrap; }
       .btn-nav-cta { padding: 7px 11px; font-size: .68rem; white-space: nowrap; }
 
-      #hero-stage {
-        min-height: calc(100svh - 58px);
-        padding: calc(4.2rem + env(safe-area-inset-top)) .7rem 2.4rem !important;
-      }
       .hero-text-glass { margin-bottom: 1rem; padding: 1.5rem .85rem 1.35rem; border-radius: 17px; }
       .hero-kicker {
         width: 100%;
@@ -1385,32 +1412,15 @@
 
     const isMobile = window.innerWidth <= 900;
 
-    // ── Mobile: pause video to avoid 11.6MB streaming lag ──────────
-    if (isMobile) {
-      const vid = document.getElementById('hero-video');
-      if (vid) {
-        vid.pause();
-        vid.removeAttribute('autoplay');
-        vid.style.display = 'none';
-      }
-      // Kill expensive will-change hints on mobile
-      document.querySelectorAll('[style*="will-change"]').forEach(el => {
-        el.style.willChange = 'auto';
-      });
-    }
+    // Keep the same looping hero video on phones. The mobile CSS only reduces
+    // its opacity and reframes it; it does not replace the desktop experience.
 
-    // ── Hero copy fade-out on scroll (Desktop only) ──────────────────
-    if (!isMobile) {
-      gsap.to('#hero-copy',{opacity:0,y:-30,
-        scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
-      gsap.to('#scroll-cue',{opacity:0,
-        scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
-      gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
-    } else {
-      // Mobile: hero text stays 100% visible, natural flow without fading into void
-      gsap.set('#hero-copy', { opacity: 1, y: 0, clearProps: 'opacity,transform' });
-      gsap.set('#hero-copy > *', { opacity: 1, y: 0, clearProps: 'opacity,transform' });
-    }
+    // Keep the same scroll-linked hero copy and cue fade on every viewport.
+    gsap.to('#hero-copy',{opacity:0,y:-30,
+      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
+    gsap.to('#scroll-cue',{opacity:0,
+      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
+    gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
     // ── Pipeline timeline animation ─────────────────────────────────
     const tlNodes = gsap.utils.toArray('.tl-node');
@@ -1501,7 +1511,7 @@
     // On desktop: animated via matchMedia.
     let mm = gsap.matchMedia();
 
-    mm.add("(min-width: 901px)", () => {
+    mm.add("(min-width: 0px)", () => {
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=15% top', end:'top+=25% top', scrub:.6 } })
         .fromTo('#overlay-l1', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
       gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=65% top', end:'top+=75% top', scrub:.6 } })

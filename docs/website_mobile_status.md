@@ -8,6 +8,16 @@ Last updated: 2026-10-18
 
 **Live verification:** HTTP 200 confirmed after deployment, and the live HTML contains the new `Production phone polish` mobile rules. No form was submitted.
 
+### Follow-up correction after visual review
+
+The first release made the phone hero too different from desktop by pausing the video, hiding the animated pipeline cards, and collapsing the sticky hero into a static block. That did not match the intended experience, so the follow-up keeps the desktop composition and animation on phones:
+
+- The looping hero video remains enabled on mobile.
+- The sticky hero and scroll runway remain active, with a shorter mobile runway.
+- The three pipeline cards remain available and animate one-at-a-time in a shared mobile slot instead of being removed.
+- The hero copy, buttons, and metrics are only scaled/repositioned to avoid overlap.
+- The secondary bottom feature bar remains hidden on phones because it is redundant with the animated cards.
+
 ## What this release fixes
 
 The production website already worked on laptop screens, but its animated hero and information panels could feel crowded on a phone. This patch keeps the existing website, wording, animation, and visual identity, while giving narrow screens more breathing room.
