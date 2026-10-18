@@ -791,14 +791,65 @@
       #chapter-dots { display: none; }
     }
 
+    /* Production phone polish: keep the existing visual system, but prevent the
+       hero header, kicker, metrics, and glass panel from crowding narrow screens. */
+    @media (max-width: 600px) {
+      nav {
+        height: calc(58px + env(safe-area-inset-top));
+        padding: env(safe-area-inset-top) .7rem 0;
+      }
+      .nav-brand { gap: 8px; min-width: 0; }
+      .nav-logo-img { width: 30px; height: 30px; }
+      .nav-brand-text { font-size: .86rem; white-space: nowrap; }
+      .btn-nav-cta { padding: 7px 11px; font-size: .68rem; white-space: nowrap; }
+
+      #hero-stage {
+        min-height: calc(100svh - 58px);
+        padding: calc(4.2rem + env(safe-area-inset-top)) .7rem 2.4rem !important;
+      }
+      .hero-text-glass { margin-bottom: 1rem; padding: 1.5rem .85rem 1.35rem; border-radius: 17px; }
+      .hero-kicker {
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 1.05rem;
+        padding: 6px 7px;
+        gap: 5px;
+        flex-wrap: nowrap;
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: .49rem;
+        letter-spacing: .045em;
+      }
+      .kicker-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .46rem; }
+      .hero-h1 { font-size: clamp(2.05rem, 10vw, 2.8rem); line-height: 1.02; }
+      .hero-sub { margin-top: .9rem; font-size: .84rem; line-height: 1.55; }
+      .hero-actions { gap: 8px; margin-top: 1.2rem; }
+      .btn-primary, .btn-ghost { max-width: none; padding: 11px 12px; font-size: .8rem; }
+
+      .hero-metrics { flex-direction: row; gap: 5px; }
+      .metric-cell { min-width: 0; padding: .7rem .28rem; border-radius: 11px; }
+      .metric-val { font-size: .85rem; white-space: nowrap; }
+      .metric-desc { font-size: .43rem; line-height: 1.25; letter-spacing: .01em; }
+    }
+
     /* Extra overrides for very small phones (< 480px) */
     @media (max-width: 480px) {
       .hero-h1 { font-size: clamp(1.8rem, 8.5vw, 2.4rem); }
       .section-title { font-size: clamp(1.7rem, 7vw, 2.4rem); }
       .as-features { grid-template-columns: 1fr; }
       .threat-card { padding: 1.6rem; }
-      nav { padding: 0 1rem; height: 60px; }
-      .nav-brand-text { font-size: 0.95rem; }
+      nav { padding: env(safe-area-inset-top) 1rem 0; height: calc(60px + env(safe-area-inset-top)); }
+      .nav-brand-text { font-size: 0.86rem; }
+    }
+
+    @media (max-width: 380px) {
+      nav { padding: env(safe-area-inset-top) .55rem 0; height: calc(56px + env(safe-area-inset-top)); }
+      .nav-brand-text { font-size: .78rem; }
+      .btn-nav-cta { padding-inline: 8px; font-size: .62rem; }
+      .hero-kicker { font-size: .43rem; }
+      .hero-kicker .kicker-sub { display: none; }
+      .metric-val { font-size: .76rem; }
+      .metric-desc { font-size: .39rem; }
     }
   </style>
 </head>
