@@ -25,7 +25,7 @@ The first release made the phone hero too different from desktop by pausing the 
 
 The production website already worked on laptop screens, but its animated hero and information panels could feel crowded on a phone. This patch keeps the existing website, wording, animation, and visual identity, while giving narrow screens more breathing room.
 
-## Product-flow reorder and scroll choreography — ready for deployment
+## Product-flow reorder — ready for deployment
 
 The product story now follows the same clear order on desktop and phone:
 
@@ -37,9 +37,9 @@ The product story now follows the same clear order on desktop and phone:
 ### What changed technically, in plain language
 
 - The hero is now one screen tall rather than a long, pinned scroll sequence. This means the next section arrives naturally after one deliberate scroll instead of requiring several swipes.
-- The verdict timeline is placed immediately below the hero on every screen size and remains a five-stage scroll sequence. Its introduction fades away, each stage takes the center in turn, then the outcome details appear.
-- The three engine cards have their own scroll sequence immediately after the timeline. Each card enters, remains readable, then moves away before the next card appears. The multi-channel summary appears only after the third card.
-- Desktop and phone use the same order and pacing model. The phone version has a slightly longer scroll area because one card or verdict stage is deliberately shown at a time on a narrow screen.
+- The verdict timeline is placed immediately below the hero on every screen size.
+- The three engine cards have their own section immediately after the timeline. On larger screens they make one gentle left-to-right entrance. On phones they are immediately readable in a normal top-to-bottom list, so a fast swipe cannot land on a card that is still animating.
+- Large screens display the three engine cards side by side. Phones display the same cards one per row, with the same text and visual style.
 - The old side chapter dots were removed because they described the previous card order and would have given misleading progress information.
 - No public wording, waitlist form, backend call, mobile app feature, or Railway service was changed.
 
@@ -47,8 +47,8 @@ The product story now follows the same clear order on desktop and phone:
 
 - [x] Production entry page build completes successfully with `npm run build`.
 - [x] The source change passes `git diff --check`.
-- [x] Source review confirms the hero leads into the five-stage verdict, then the three engine cards, then the attack-vector section.
-- [x] Both product sequences are tied directly to scroll progress. Earlier text is animated away before the next stage/card appears, avoiding the previous all-at-once layout.
+- [x] Phone browser review confirms the hero leads into the five-stage verdict and then into the engine summary before the attack-vector section.
+- [x] The desktop entrance is tied to its section entering the screen. Phone cards do not wait for a transition, so they cannot compete with fast touch scrolling or replay while the reader is moving through the page.
 
 ## Changes made
 
