@@ -927,37 +927,73 @@
     /* The old dots described the former in-hero card sequence. They would now
        report the wrong step, so the ordered page flow is the single progress cue. */
     #chapter-dots { display: none !important; }
-    #engine-layers { position: relative; z-index: 10; padding: 2rem; }
-    .engine-layers-inner { width: min(1140px, 100%); margin: 0 auto; }
-    .engine-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+    /* Both product explanations are deliberate scroll stories. At any moment
+       there is one active idea on screen, rather than a wall of competing text. */
+    #pipeline { height: 250svh; min-height: 54rem; }
+    #pipeline .section-inner {
+      position: sticky; top: 0; box-sizing: border-box; height: 100svh;
+      display: flex; flex-direction: column; justify-content: center;
+      overflow: hidden;
+    }
+    #pipeline .section-inner > [data-anim] {
+      position: absolute; top: 50%; right: 1.25rem; left: 1.25rem; z-index: 2;
+    }
+    #pipeline .timeline-row {
+      width: min(460px, 100%); height: 17rem; margin: 1.5rem auto 0;
+      display: block; padding: 0;
+    }
+    #pipeline .tl-line { display: none; }
+    #pipeline .tl-node {
+      position: absolute; top: 0; left: 50%; width: min(360px, 100%);
+      opacity: 0; transform: translateX(-50%); pointer-events: none;
+    }
+    #pipeline .tl-features-bar {
+      position: absolute; right: auto; bottom: clamp(1rem, 7vh, 4rem); left: 50%;
+      width: min(760px, calc(100% - 4rem)); opacity: 0;
+      transform: translateX(50%);
+    }
+    #engine-layers { position: relative; z-index: 10; height: 220svh; min-height: 50rem; padding: 0; }
+    .engine-layers-inner {
+      position: sticky; top: 0; box-sizing: border-box; width: min(1140px, 100%);
+      height: 100svh; margin: 0 auto; display: flex; align-items: center;
+      justify-content: center; overflow: hidden;
+    }
+    .engine-card-grid { position: relative; width: min(680px, calc(100% - 3rem)); height: min(31rem, 65svh); }
     #engine-layers .pipeline-card {
-      position: relative !important;
-      inset: auto !important;
+      position: absolute !important;
+      top: 50% !important; right: auto !important; bottom: auto !important; left: 50% !important;
       display: flex !important;
-      width: auto !important;
-      max-width: none !important;
-      min-height: 100%;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: auto;
       margin: 0 !important;
-      opacity: 1;
-      transform: none;
+      opacity: 0;
+      visibility: hidden;
     }
     #engine-layers .pipeline-bottom-bar {
-      position: relative;
-      right: auto;
-      bottom: auto;
+      position: absolute;
+      right: 50%;
+      bottom: clamp(1rem, 7vh, 4rem);
       left: auto;
       display: flex !important;
-      width: 100%;
-      margin-top: 1.25rem;
-      transform: none;
+      width: min(980px, calc(100% - 4rem));
+      margin: 0;
+      opacity: 0;
+      visibility: hidden;
     }
     @media (max-width: 900px) {
       #hero-sequence { height: 100svh !important; min-height: 38rem !important; }
       #hero-stage { position: relative !important; height: 100% !important; min-height: 0 !important; }
-      #engine-layers { padding: 1.2rem; }
-      .engine-card-grid { grid-template-columns: 1fr; gap: 1rem; }
-      #engine-layers .pipeline-card { right: auto !important; bottom: auto !important; left: auto !important; padding: 1.1rem !important; }
-      #engine-layers .pipeline-bottom-bar { flex-direction: column; align-items: stretch; gap: .9rem; padding: 1.1rem; }
+      #pipeline { height: 290svh; min-height: 58rem; }
+      #pipeline .section-inner { padding: 5.5rem 1.2rem 1.25rem; }
+      #pipeline .timeline-row { height: 19rem; margin-top: 1rem; }
+      #pipeline .tl-node { width: min(280px, 100%); }
+      #pipeline .tl-features-bar { bottom: 1rem; width: calc(100% - 2.4rem); padding: 1rem; }
+      #engine-layers { height: 250svh; min-height: 56rem; }
+      .engine-layers-inner { padding: 4.6rem 1.2rem 1rem; }
+      .engine-card-grid { width: 100%; height: min(28rem, 62svh); }
+      #engine-layers .pipeline-card { padding: 1.1rem !important; }
+      #engine-layers .pipeline-bottom-bar { flex-direction: column; align-items: stretch; gap: .9rem; width: calc(100% - 2.4rem); padding: 1.1rem; }
       #engine-layers .pl-feature { width: 100%; }
     }
   </style>
@@ -1519,125 +1555,62 @@
     // naturally as the reader reaches the next section.
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
-    // ── Pipeline timeline animation ─────────────────────────────────
+    // ── Product-story scroll choreography ───────────────────────────
+    // One stage/card is readable at a time. This applies to touch screens
+    // as well as desktop, so a fast swipe never leaves several panels piled up.
     const tlNodes = gsap.utils.toArray('.tl-node');
-    const tlContainer = document.querySelector('.timeline-row');
     const tlFeaturesBar = document.querySelector('.tl-features-bar');
+    const pipelineIntro = pipelineSection?.querySelector('.section-inner > [data-anim]');
 
-    if (tlNodes.length && tlContainer && tlFeaturesBar) {
-      if (!isMobile) {
-        gsap.set(tlNodes, { opacity: 0.35, filter: 'grayscale(1) brightness(0.6)' });
-        gsap.set(tlFeaturesBar, { opacity: 0, y: 30 });
+    if (pipelineSection && tlNodes.length && tlFeaturesBar && pipelineIntro) {
+      gsap.set(pipelineIntro, { autoAlpha: 1, yPercent: -50, y: 0 });
+      gsap.set(tlNodes, { autoAlpha: 0, y: 28, scale: 0.97 });
+      gsap.set(tlFeaturesBar, { autoAlpha: 0, xPercent: -50, y: 20 });
 
-        const pipelineTl = gsap.timeline({
-          scrollTrigger: {
-            trigger: '#pipeline',
-            start: 'top 55%',
-            end: 'bottom 85%',
-            scrub: 0.5,
-          }
-        });
-
-        pipelineTl.to(tlContainer, { '--tl-progress': '100%', ease: 'none', duration: 1 }, 0);
-
-        tlNodes.forEach((node, i) => {
-          pipelineTl.to(node, {
-            opacity: 1,
-            filter: 'grayscale(0) brightness(1)',
-            duration: 0.1,
-            ease: 'power1.inOut'
-          }, i * 0.25 - 0.05);
-        });
-
-        pipelineTl.to(tlFeaturesBar, {
-          opacity: 1,
-          y: 0,
-          duration: 0.2,
-          ease: 'power2.out'
-        }, 1.0);
-      } else {
-        // Mobile: just show everything visible immediately
-        gsap.set(tlNodes, { opacity: 1, filter: 'none' });
-        gsap.set(tlFeaturesBar, { opacity: 1, y: 0 });
-        gsap.set(tlContainer, { '--tl-progress': '100%' });
-      }
-    }
-
-    // ── Chapter dots (desktop only) ─────────────────────────────────
-    const chapterDots = document.getElementById('chapter-dots');
-    if (chapterDots && !isMobile) {
-      const dotWraps = chapterDots.querySelectorAll('.ch-dot-wrap');
-      const dots     = chapterDots.querySelectorAll('.ch-dot');
-
-      ScrollTrigger.create({
-        trigger: '#hero-sequence', start: 'top+=5% top',
-        onEnter:     () => chapterDots.classList.add('visible'),
-        onLeaveBack: () => chapterDots.classList.remove('visible'),
-      });
-      ScrollTrigger.create({
-        trigger: '#threats', start: 'top top',
-        onEnter:     () => chapterDots.classList.remove('visible'),
-        onLeaveBack: () => chapterDots.classList.add('visible'),
-      });
-
-      function setChapter(n) {
-        dots.forEach((d,i)    => { d.classList.toggle('active', i===n); });
-        dotWraps.forEach((w,i) => { w.classList.toggle('active', i===n); });
-      }
-
-      let chapBreaks = [0, 0.22, 0.28, 0.34, 0.90];
-      window.addEventListener('resize', () => {
-        chapBreaks = window.innerWidth <= 900
-          ? [0, 0.25, 0.48, 0.71, 0.92]
-          : [0, 0.15, 0.25, 0.35, 0.80];
-      });
-
-      ScrollTrigger.create({
-        trigger: '#hero-sequence', start: 'top top', end: 'bottom bottom',
-        onUpdate: (self) => {
-          const p = self.progress;
-          let ch = 0;
-          chapBreaks.forEach((b,i) => { if(p >= b) ch = i; });
-          setChapter(ch);
+      const pipelineTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: pipelineSection,
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: isMobile ? 0.16 : 0.3,
+          invalidateOnRefresh: true,
         }
       });
+
+      pipelineTl.to(pipelineIntro, { autoAlpha: 0, y: -20, duration: 0.16, ease: 'power1.inOut' }, 0.08);
+      tlNodes.forEach((node, i) => {
+        const at = 0.24 + (i * 0.16);
+        if (i > 0) {
+          pipelineTl.to(tlNodes[i - 1], { autoAlpha: 0, y: -28, scale: 0.98, duration: 0.1, ease: 'power1.in' }, at - 0.03);
+        }
+        pipelineTl.to(node, { autoAlpha: 1, y: 0, scale: 1, duration: 0.1, ease: 'power2.out' }, at);
+      });
+      pipelineTl
+        .to(tlNodes[tlNodes.length - 1], { autoAlpha: 0, y: -24, duration: 0.1, ease: 'power1.in' }, 1.05)
+        .to(tlFeaturesBar, { autoAlpha: 1, y: 0, duration: 0.14, ease: 'power2.out' }, 1.13);
     }
 
     if (engineCards.length) {
-      // On phones these cards form a reading list. Keep them visible as soon
-      // as their section arrives so a fast swipe can never catch a blank card.
-      if (isMobile) {
-        gsap.set(engineCards, { autoAlpha: 1, y: 0 });
-        if (engineSummary) gsap.set(engineSummary, { autoAlpha: 1, y: 0 });
-      } else {
-        gsap.set(engineCards, { autoAlpha: 0, y: 34 });
-        gsap.to(engineCards, {
-          autoAlpha: 1,
-          y: 0,
-          stagger: 0.16,
-          duration: 0.55,
-          ease: 'power2.out',
-          scrollTrigger: {
-            trigger: '#engine-layers',
-            start: 'top 72%',
-            once: true,
-          }
-        });
+      gsap.set(engineCards, { autoAlpha: 0, xPercent: -50, yPercent: -50, y: 30, scale: 0.97 });
+      if (engineSummary) gsap.set(engineSummary, { autoAlpha: 0, xPercent: 50, y: 20 });
 
-        if (engineSummary) {
-          gsap.set(engineSummary, { autoAlpha: 0, y: 20 });
-          gsap.to(engineSummary, {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.45,
-            ease: 'power2.out',
-            scrollTrigger: {
-              trigger: '#engine-layers',
-              start: 'top 52%',
-              once: true,
-            }
-          });
+      const enginesTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: '#engine-layers',
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: isMobile ? 0.16 : 0.3,
+          invalidateOnRefresh: true,
         }
+      });
+
+      engineCards.forEach((card, i) => {
+        const at = 0.16 + (i * 0.25);
+        enginesTl.to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.12, ease: 'power2.out' }, at);
+        enginesTl.to(card, { autoAlpha: 0, y: -30, scale: 0.98, duration: 0.11, ease: 'power1.in' }, at + 0.16);
+      });
+      if (engineSummary) {
+        enginesTl.to(engineSummary, { autoAlpha: 1, y: 0, duration: 0.14, ease: 'power2.out' }, 0.98);
       }
     }
 
