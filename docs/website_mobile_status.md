@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-18
 
+## Release status
+
+**Deployed:** Yes — GitHub `main` commit `8d9f084` was published through the connected Vercel deployment serving `https://safemailx-ai.tech/`.
+
+**Live verification:** HTTP 200 confirmed after deployment, and the live HTML contains the new `Production phone polish` mobile rules. No form was submitted.
+
 ## What this release fixes
 
 The production website already worked on laptop screens, but its animated hero and information panels could feel crowded on a phone. This patch keeps the existing website, wording, animation, and visual identity, while giving narrow screens more breathing room.
