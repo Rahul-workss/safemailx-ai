@@ -755,8 +755,8 @@
         margin-left: 0 !important;
         padding: 1rem !important;
         gap: 10px !important;
-        opacity: 0 !important;
-        transform: none !important;
+        opacity: 0;
+        transform: none;
       }
       .pipeline-bottom-bar {
         display: none !important;
@@ -1448,11 +1448,8 @@
     // Keep the same looping hero video on phones. The mobile CSS only reduces
     // its opacity and reframes it; it does not replace the desktop experience.
 
-    // Keep the same scroll-linked hero copy and cue fade on every viewport.
-    gsap.to('#hero-copy',{opacity:0,y:-30,
-      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=16% top',scrub:true}});
-    gsap.to('#scroll-cue',{opacity:0,
-      scrollTrigger:{trigger:'#hero-sequence',start:'top top',end:'top+=18% top',scrub:true}});
+    // One shared hero timeline keeps the copy, cards, and support bar in a
+    // predictable order on both desktop and mobile.
     gsap.from('#hero-copy > *',{opacity:0,y:26,stagger:.1,duration:.9,ease:'power3.out',delay:.25});
 
     // ── Pipeline timeline animation ─────────────────────────────────
@@ -1539,35 +1536,26 @@
       });
     }
 
-    // ── Scroll overlay cards (desktop only) ────────────────────────
-    // On mobile: overlay cards are hidden (display:none via CSS).
-    // On desktop: animated via matchMedia.
-    let mm = gsap.matchMedia();
-
-    mm.add("(min-width: 0px)", () => {
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=15% top', end:'top+=25% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=65% top', end:'top+=75% top', scrub:.6 } })
-        .fromTo('#overlay-l1', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
-
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=25% top', end:'top+=35% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=65% top', end:'top+=75% top', scrub:.6 } })
-        .fromTo('#overlay-l2', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
-
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=35% top', end:'top+=45% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:0, y:24}, {opacity:1, y:0, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=75% top', end:'top+=85% top', scrub:.6 } })
-        .fromTo('#overlay-l3', {opacity:1, y:0}, {opacity:0, y:-18, ease:'power2.in', immediateRender:false});
-
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=40% top', end:'top+=55% top', scrub:.6 } })
-        .fromTo('#overlay-bottom', {opacity:0, y:20}, {opacity:1, y:0, ease:'power2.out'});
-      gsap.timeline({ scrollTrigger: { trigger:'#hero-sequence', start:'top+=75% top', end:'top+=85% top', scrub:.6 } })
-        .fromTo('#overlay-bottom', {opacity:1, y:0}, {opacity:0, y:20, ease:'power2.in', immediateRender:false});
+    const heroFlow = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#hero-sequence',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 0.65,
+      }
     });
 
-    // Mobile: skip overlay card scroll-sync. Cards hidden via CSS.
-    // This removes ~6 unnecessary ScrollTrigger instances from mobile.
+    heroFlow
+      .to('#hero-copy', { opacity: 0, y: -30, duration: 0.12, ease: 'none' }, 0.08)
+      .to('#scroll-cue', { opacity: 0, duration: 0.08, ease: 'none' }, 0.08)
+      .fromTo('#overlay-l1', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.22)
+      .to('#overlay-l1', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.36)
+      .fromTo('#overlay-l2', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.36)
+      .to('#overlay-l2', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.50)
+      .fromTo('#overlay-l3', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.50)
+      .to('#overlay-l3', { opacity: 0, y: -18, duration: 0.06, ease: 'power2.in' }, 0.64)
+      .fromTo('#overlay-bottom', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.12, ease: 'power2.out' }, 0.64)
+      .to('#overlay-bottom', { opacity: 0, y: 20, duration: 0.08, ease: 'power2.in' }, 0.84);
 
     // Reveal on scroll
     const revObs = new IntersectionObserver(entries => {
