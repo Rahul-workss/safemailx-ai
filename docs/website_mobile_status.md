@@ -17,6 +17,7 @@ The first release made the phone hero too different from desktop by pausing the 
 - The three pipeline cards remain available and animate one-at-a-time in a shared mobile slot instead of being removed.
 - The hero copy, buttons, and metrics are only scaled/repositioned to avoid overlap.
 - The secondary bottom feature bar remains hidden on phones because it is redundant with the animated cards.
+- The desktop wording is unchanged, and the accent palette is aligned to the app dashboard: black, deep indigo, restrained violet, frost text, emerald status, and minimal cyan.
 
 ## What this release fixes
 
