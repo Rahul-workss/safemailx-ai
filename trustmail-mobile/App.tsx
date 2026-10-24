@@ -1041,13 +1041,17 @@ function App() {
               {activeTab === "qr" && (
                 <QRScannerScreen onClose={() => switchTab("dashboard")} />
               )}
-              {activeTab === "subscription" && (
-                <SubscriptionScreen onClose={() => switchTab("settings")} />
-              )}
             </Animated.View>
           </ScrollView>
           <BottomNavBar active={activeTab} onSwitch={switchTab} bottomInset={insets.bottom} />
         </>
+      )}
+
+      {/* ── Subscription Modal Screen ── */}
+      {activeTab === "subscription" && (
+        <View style={[StyleSheet.absoluteFillObject, { zIndex: 9990, elevation: 9990, backgroundColor: C.bg }]}>
+          <SubscriptionScreen onClose={() => switchTab("settings")} />
+        </View>
       )}
 
       {/* ── Toast ── */}

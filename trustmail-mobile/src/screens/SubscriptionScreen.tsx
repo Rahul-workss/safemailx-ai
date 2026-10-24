@@ -5,6 +5,13 @@
  * States: PLAN_SELECT → PROCESSING → SUCCESS | ERROR
  * Payments: Razorpay web checkout on Android (expo-web-browser deep-link flow)
  *            Placeholder on iOS (Apple IAP to be wired separately)
+ *
+ * HOOKS & RUNTIME SAFETY:
+ * 1. Constant hook call counts across all renders and subcomponents.
+ * 2. Feature animation values pre-allocated as a single stable ref array.
+ * 3. Particle and dot animations pre-allocated as stable ref arrays.
+ * 4. Defensive fallbacks for all data objects (features, price, plan).
+ * 5. Native driver consistency across all animated styles.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -31,10 +38,13 @@ import * as WebBrowser from 'expo-web-browser';
 
 const { width: SW } = Dimensions.get('window');
 
-// ─── Plan data ────────────────────────────────────────────────────────────────
-type PlanKey = 'free' | 'shield' | 'pro';
+// Pre-allocate up to 16 features for any plan — avoids hook loops & array overflow
+const MAX_FEATURES = 16;
 
-const PLANS: Record<PlanKey, {
+// ─── Plan data ────────────────────────────────────────────────────────────────
+export type PlanKey = 'free' | 'shield' | 'pro';
+
+export interface PlanData {
   label: string;
   price: string;
   priceNote: string;
@@ -43,7 +53,9 @@ const PLANS: Record<PlanKey, {
   accentColor: string;
   glowColor: string;
   icon: string;
-}> = {
+}
+
+const PLANS: Record<PlanKey, PlanData> = {
   free: {
     label: 'Free',
     price: '₹0',
@@ -101,59 +113,67 @@ type ScreenState = 'PLAN_SELECT' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface SubscriptionScreenProps {
   onClose: () => void;
-  /** Which plan the user currently has */
   currentPlan?: PlanKey;
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: SubscriptionScreenProps) {
   const insets = useSafeAreaInsets();
-  const [selectedPlan, setSelectedPlan] = useState<PlanKey>(currentPlan === 'free' ? 'shield' : currentPlan);
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey>(
+    currentPlan === 'free' ? 'shield' : currentPlan
+  );
   const [screenState, setScreenState] = useState<ScreenState>('PLAN_SELECT');
   const [errorMsg, setErrorMsg] = useState('');
 
   // ── Entry animations ──────────────────────────────────────────────────────
-  const overlayAnim   = useRef(new Animated.Value(0)).current;
-  const headerAnim    = useRef(new Animated.Value(0)).current;
-  const toggleAnim    = useRef(new Animated.Value(0)).current;
-  const cardAnim      = useRef(new Animated.Value(0)).current;
-  const btnAnim       = useRef(new Animated.Value(0)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  const headerAnim  = useRef(new Animated.Value(0)).current;
+  const toggleAnim  = useRef(new Animated.Value(0)).current;
+  const cardSlideX  = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const btnAnim     = useRef(new Animated.Value(0)).current;
 
-  // ── Card swap animation ───────────────────────────────────────────────────
-  const cardSlideX = useRef(new Animated.Value(0)).current;
-  const cardOpacity = useRef(new Animated.Value(1)).current;
-
-  // ── Processing pulse ──────────────────────────────────────────────────────
+  // ── Processing pulse & dots ───────────────────────────────────────────────
   const pulsAnim = useRef(new Animated.Value(1)).current;
-  const dotAnims = [
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-    useRef(new Animated.Value(0.3)).current,
-  ];
+  const dotAnims = useRef([
+    new Animated.Value(0.3),
+    new Animated.Value(0.3),
+    new Animated.Value(0.3),
+  ]).current;
 
-  // ── Success ───────────────────────────────────────────────────────────────
-  const shieldScale   = useRef(new Animated.Value(0)).current;
-  const shieldGlow    = useRef(new Animated.Value(0)).current;
-  const successText   = useRef(new Animated.Value(0)).current;
-  const successBtn    = useRef(new Animated.Value(0)).current;
-  const particles     = Array.from({ length: 8 }, () => ({
-    x: useRef(new Animated.Value(0)).current,
-    y: useRef(new Animated.Value(0)).current,
-    op: useRef(new Animated.Value(0)).current,
-  }));
+  // ── Success state animations ──────────────────────────────────────────────
+  const shieldScale = useRef(new Animated.Value(0)).current;
+  const shieldGlow  = useRef(new Animated.Value(0)).current;
+  const successText = useRef(new Animated.Value(0)).current;
+  const successBtn  = useRef(new Animated.Value(0)).current;
 
-  // ── Entry animation sequence ──────────────────────────────────────────────
+  // Pre-allocated particles (exactly 8, stable ref array)
+  const particles = useRef(
+    Array.from({ length: 8 }, () => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      op: new Animated.Value(0),
+    }))
+  ).current;
+
+  // Race condition guard for rapid plan switching
+  const isSwappingRef = useRef(false);
+
+  // ── Entry animation on mount ──────────────────────────────────────────────
   useEffect(() => {
-    Animated.stagger(70, [
-      Animated.timing(overlayAnim, { toValue: 1, duration: 280, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    Animated.stagger(60, [
+      Animated.timing(overlayAnim, { toValue: 1, duration: 260, easing: Easing.out(Easing.ease), useNativeDriver: true }),
       Animated.spring(headerAnim,  { toValue: 1, damping: 20, stiffness: 180, useNativeDriver: true }),
       Animated.spring(toggleAnim,  { toValue: 1, damping: 18, stiffness: 160, useNativeDriver: true }),
-      Animated.spring(cardAnim,    { toValue: 1, damping: 15, stiffness: 140, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(cardOpacity, { toValue: 1, duration: 240, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.spring(cardSlideX,  { toValue: 0, damping: 18, stiffness: 180, useNativeDriver: true }),
+      ]),
       Animated.timing(btnAnim,     { toValue: 1, duration: 220, easing: Easing.out(Easing.ease), useNativeDriver: true }),
     ]).start();
   }, []);
 
-  // ── Processing animations ─────────────────────────────────────────────────
+  // ── Processing loop ───────────────────────────────────────────────────────
   useEffect(() => {
     if (screenState !== 'PROCESSING') return;
     const pulseLoop = Animated.loop(
@@ -172,18 +192,19 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
     );
     pulseLoop.start();
     dotLoop.start();
-    return () => { pulseLoop.stop(); dotLoop.stop(); };
+    return () => {
+      pulseLoop.stop();
+      dotLoop.stop();
+    };
   }, [screenState]);
 
-  // ── Success animations ────────────────────────────────────────────────────
+  // ── Success burst animations ──────────────────────────────────────────────
   useEffect(() => {
     if (screenState !== 'SUCCESS') return;
-
-    // Particle burst
     const angles = [0, 45, 90, 135, 180, 225, 270, 315];
     const particleAnims = particles.map((p, i) => {
       const angle = (angles[i] * Math.PI) / 180;
-      const dist = 55 + Math.random() * 25;
+      const dist = 55 + (i % 3) * 12;
       return Animated.parallel([
         Animated.timing(p.x, { toValue: Math.cos(angle) * dist, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         Animated.timing(p.y, { toValue: Math.sin(angle) * dist, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -194,17 +215,11 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
       ]);
     });
 
-    Animated.sequence([
-      // 1. Particle burst
-      Animated.parallel(particleAnims),
-      // 2. Shield bounces in (overshoot)
-      Animated.spring(shieldScale, { toValue: 1.2, damping: 5, stiffness: 300, useNativeDriver: true }),
-    ]).start(() => {
-      // 3. Settle
+    Animated.parallel(particleAnims).start();
+    Animated.spring(shieldScale, { toValue: 1.15, damping: 5, stiffness: 300, useNativeDriver: true }).start(() => {
       Animated.spring(shieldScale, { toValue: 1, damping: 12, useNativeDriver: true }).start();
     });
 
-    // Glow + text + button staggered
     Animated.stagger(180, [
       Animated.timing(shieldGlow,  { toValue: 1, duration: 500, useNativeDriver: false }),
       Animated.timing(successText, { toValue: 1, duration: 320, easing: Easing.out(Easing.ease), useNativeDriver: true }),
@@ -212,56 +227,55 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
     ]).start();
   }, [screenState]);
 
-  // ── Plan card swap ────────────────────────────────────────────────────────
-  function handleSelectPlan(plan: PlanKey) {
-    if (plan === selectedPlan) return;
-    const goingRight = ['free', 'shield', 'pro'].indexOf(plan) > ['free', 'shield', 'pro'].indexOf(selectedPlan);
-    const exitDir = goingRight ? -SW * 0.6 : SW * 0.6;
-    const enterDir = goingRight ? SW * 0.6 : -SW * 0.6;
+  // ── Plan card swap with race condition guard ──────────────────────────────
+  function handleSelectPlan(nextPlan: PlanKey) {
+    if (nextPlan === selectedPlan || isSwappingRef.current) return;
+    isSwappingRef.current = true;
+
+    const order: PlanKey[] = ['free', 'shield', 'pro'];
+    const goingRight = order.indexOf(nextPlan) > order.indexOf(selectedPlan);
+    const exitDir  = goingRight ? -SW * 0.5 : SW * 0.5;
+    const enterDir = goingRight ?  SW * 0.5 : -SW * 0.5;
 
     Animated.parallel([
-      Animated.timing(cardSlideX, { toValue: exitDir, duration: 180, easing: Easing.in(Easing.ease), useNativeDriver: true }),
-      Animated.timing(cardOpacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(cardSlideX,  { toValue: exitDir, duration: 150, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 0,       duration: 130, useNativeDriver: true }),
     ]).start(() => {
-      setSelectedPlan(plan);
+      setSelectedPlan(nextPlan);
       cardSlideX.setValue(enterDir);
       Animated.parallel([
-        Animated.spring(cardSlideX,  { toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true }),
-        Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      ]).start();
+        Animated.spring(cardSlideX,  { toValue: 0, damping: 18, stiffness: 220, useNativeDriver: true }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+      ]).start(() => {
+        isSwappingRef.current = false;
+      });
     });
   }
 
   // ── Payment flow ──────────────────────────────────────────────────────────
   async function handleSubscribe() {
-    if (selectedPlan === 'free') { onClose(); return; }
+    if (selectedPlan === 'free') {
+      onClose();
+      return;
+    }
     setScreenState('PROCESSING');
-
     try {
       if (Platform.OS === 'ios') {
-        // iOS: Apple In-App Purchase — placeholder until StoreKit is wired
         setTimeout(() => {
           setErrorMsg('iOS in-app purchase coming soon. Use Android for now.');
           setScreenState('ERROR');
         }, 1500);
         return;
       }
-
-      // Android: Razorpay web checkout
       const order = await createSubscriptionOrder(selectedPlan);
-      const checkoutUrl = order.checkout_url;
-
-      // Open Razorpay hosted checkout
       const result = await WebBrowser.openAuthSessionAsync(
-        checkoutUrl,
+        order.checkout_url,
         'safemailx://payment-callback'
       );
-
       if (result.type === 'success' && result.url) {
         const parsed = Linking.parse(result.url);
         const paymentId = parsed.queryParams?.razorpay_payment_id as string | undefined;
-        const signature = parsed.queryParams?.razorpay_signature as string | undefined;
-
+        const signature = parsed.queryParams?.razorpay_signature  as string | undefined;
         if (paymentId && signature) {
           const verified = await verifySubscriptionPayment(order.order_id, paymentId, signature);
           if (verified) {
@@ -272,7 +286,6 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
         setErrorMsg('Payment verification failed. Contact support if amount was deducted.');
         setScreenState('ERROR');
       } else {
-        // User cancelled or dismissed
         setScreenState('PLAN_SELECT');
       }
     } catch (err: any) {
@@ -281,36 +294,63 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
     }
   }
 
-  const plan = PLANS[selectedPlan];
+  // Defensive plan lookup
+  const currentPlanData = PLANS[selectedPlan] || PLANS.shield;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  if (screenState === 'PROCESSING') return <ProcessingState pulsAnim={pulsAnim} dotAnims={dotAnims} />;
-  if (screenState === 'SUCCESS')    return <SuccessState plan={plan} shieldScale={shieldScale} shieldGlow={shieldGlow} successText={successText} successBtn={successBtn} particles={particles} onClose={onClose} />;
-  if (screenState === 'ERROR')      return <ErrorState message={errorMsg} onRetry={() => setScreenState('PLAN_SELECT')} onClose={onClose} />;
+  if (screenState === 'PROCESSING') {
+    return <ProcessingState pulsAnim={pulsAnim} dotAnims={dotAnims} insetsTop={insets.top} />;
+  }
+  if (screenState === 'SUCCESS') {
+    return (
+      <SuccessState
+        plan={currentPlanData}
+        shieldScale={shieldScale}
+        shieldGlow={shieldGlow}
+        successText={successText}
+        successBtn={successBtn}
+        particles={particles}
+        onClose={onClose}
+        insetsTop={insets.top}
+      />
+    );
+  }
+  if (screenState === 'ERROR') {
+    return (
+      <ErrorState
+        message={errorMsg}
+        onRetry={() => setScreenState('PLAN_SELECT')}
+        onClose={onClose}
+        insetsTop={insets.top}
+      />
+    );
+  }
 
   // ─── PLAN_SELECT ──────────────────────────────────────────────────────────
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <TmBgOverlay opacity={overlayAnim} />
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* ── Header ── */}
+        {/* Header */}
         <Animated.View style={[styles.headerRow, {
           opacity: headerAnim,
           transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
         }]}>
           <View style={styles.headerSpacer} />
           <Text style={styles.eyebrow}>UPGRADE YOUR SHIELD</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          >
             <Ionicons name="close" size={20} color={C.frost3} />
           </TouchableOpacity>
         </Animated.View>
 
-        {/* ── Title ── */}
+        {/* Title */}
         <Animated.Text style={[styles.title, {
           opacity: headerAnim,
           transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
@@ -318,34 +358,30 @@ export default function SubscriptionScreen({ onClose, currentPlan = 'free' }: Su
           Full Protection,{'\n'}Zero Compromise
         </Animated.Text>
 
-        {/* ── Plan Toggle ── */}
-        <Animated.View style={[{
+        {/* Plan Toggle */}
+        <Animated.View style={{
           opacity: toggleAnim,
           transform: [{ translateY: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
-        }]}>
+        }}>
           <PlanToggle selected={selectedPlan} onSelect={handleSelectPlan} currentPlan={currentPlan} />
         </Animated.View>
 
-        {/* ── Plan Card ── */}
+        {/* Plan Card (Pure native opacity & translate) */}
         <Animated.View style={{
-          opacity: Animated.multiply(cardAnim, cardOpacity),
-          transform: [
-            { translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-            { translateX: cardSlideX },
-          ],
+          opacity: cardOpacity,
+          transform: [{ translateX: cardSlideX }],
         }}>
-          <PlanCard plan={plan} planKey={selectedPlan} />
+          <PlanCard plan={currentPlanData} planKey={selectedPlan} />
         </Animated.View>
 
-        {/* ── Spacer ── */}
         <View style={{ height: 24 }} />
 
-        {/* ── CTA Button ── */}
+        {/* CTA */}
         <Animated.View style={{
           opacity: btnAnim,
           transform: [{ translateY: btnAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
         }}>
-          <SubscribeButton plan={plan} planKey={selectedPlan} onPress={handleSubscribe} />
+          <SubscribeButton plan={currentPlanData} planKey={selectedPlan} onPress={handleSubscribe} />
           <Text style={styles.trustLine}>
             🔒  Secure payment · No ads · Cancel anytime
           </Text>
@@ -376,11 +412,9 @@ function TmBgOverlay({ opacity }: { opacity: Animated.Value }) {
   );
 }
 
-// ─── Plan toggle pill row ─────────────────────────────────────────────────────
+// ─── Plan toggle ──────────────────────────────────────────────────────────────
 function PlanToggle({ selected, onSelect, currentPlan }: {
-  selected: PlanKey;
-  onSelect: (p: PlanKey) => void;
-  currentPlan: PlanKey;
+  selected: PlanKey; onSelect: (p: PlanKey) => void; currentPlan: PlanKey;
 }) {
   const plans: PlanKey[] = ['free', 'shield', 'pro'];
   return (
@@ -388,47 +422,53 @@ function PlanToggle({ selected, onSelect, currentPlan }: {
       <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFillObject} />
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.30)' }]} />
       <View style={toggle.inner}>
-        {plans.map(p => (
-          <PlanPill
-            key={p}
-            planKey={p}
-            selected={selected === p}
-            isCurrent={currentPlan === p}
-            label={PLANS[p].label}
-            accentColor={PLANS[p].accentColor}
-            onPress={() => onSelect(p)}
-          />
-        ))}
+        {plans.map(p => {
+          const item = PLANS[p];
+          return (
+            <PlanPill
+              key={p}
+              planKey={p}
+              selected={selected === p}
+              isCurrent={currentPlan === p}
+              label={item ? item.label : p}
+              accentColor={item ? item.accentColor : C.frost4}
+              onPress={() => onSelect(p)}
+            />
+          );
+        })}
       </View>
     </View>
   );
 }
 
+// ─── Individual toggle pill (Single stable spring hook) ───────────────────────
 function PlanPill({ planKey, selected, isCurrent, label, accentColor, onPress }: {
   planKey: PlanKey; selected: boolean; isCurrent: boolean;
   label: string; accentColor: string; onPress: () => void;
 }) {
-  const scaleAnim = useRef(new Animated.Value(selected ? 1.04 : 1)).current;
-  const glowAnim  = useRef(new Animated.Value(selected ? 1 : 0)).current;
+  const scaleAnim = useRef(new Animated.Value(selected ? 1.03 : 1)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: selected ? 1.04 : 1, damping: 16, useNativeDriver: true }),
-      Animated.timing(glowAnim,  { toValue: selected ? 1 : 0, duration: 200, useNativeDriver: false }),
-    ]).start();
+    Animated.spring(scaleAnim, {
+      toValue: selected ? 1.03 : 1,
+      damping: 16,
+      stiffness: 250,
+      useNativeDriver: true,
+    }).start();
   }, [selected]);
 
-  const bgColor = glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.0)', `${accentColor}22`] });
-  const borderColor = glowAnim.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.0)', accentColor] });
-
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={{ flex: 1 }}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={{ flex: 1 }}>
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         {selected ? (
           <LinearGradient
-            colors={planKey === 'pro'
-              ? ['rgba(232,168,76,0.30)', 'rgba(232,168,76,0.12)']
-              : ['rgba(90,96,216,0.38)', 'rgba(59,65,191,0.20)']}
+            colors={
+              planKey === 'pro'
+                ? ['rgba(232,168,76,0.32)', 'rgba(232,168,76,0.12)']
+                : planKey === 'free'
+                ? ['rgba(131,128,140,0.35)', 'rgba(131,128,140,0.15)']
+                : ['rgba(90,96,216,0.40)', 'rgba(59,65,191,0.20)']
+            }
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[toggle.pill, { borderColor: accentColor, borderWidth: 1.5 }]}
           >
@@ -436,10 +476,10 @@ function PlanPill({ planKey, selected, isCurrent, label, accentColor, onPress }:
             {isCurrent && <View style={[toggle.currentDot, { backgroundColor: accentColor }]} />}
           </LinearGradient>
         ) : (
-          <Animated.View style={[toggle.pill, { backgroundColor: bgColor, borderColor, borderWidth: 1 }]}>
+          <View style={[toggle.pill, toggle.pillInactive]}>
             <Text style={[toggle.pillText, { color: C.frost4 }]}>{label}</Text>
             {isCurrent && <View style={[toggle.currentDot, { backgroundColor: C.frost4 }]} />}
-          </Animated.View>
+          </View>
         )}
       </Animated.View>
     </TouchableOpacity>
@@ -453,13 +493,8 @@ const toggle = StyleSheet.create({
     borderColor: 'rgba(242,234,253,0.08)',
     overflow: 'hidden',
     marginBottom: 20,
-    marginHorizontal: 0,
   },
-  inner: {
-    flexDirection: 'row',
-    padding: 6,
-    gap: 6,
-  },
+  inner: { flexDirection: 'row', padding: 6, gap: 6 },
   pill: {
     flex: 1,
     paddingVertical: 10,
@@ -469,31 +504,38 @@ const toggle = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 42,
   },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    textAlign: 'center',
+  pillInactive: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  currentDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 3,
-  },
+  pillText: { fontSize: 13, fontWeight: '600', letterSpacing: 0.2, textAlign: 'center' },
+  currentDot: { width: 4, height: 4, borderRadius: 2, marginTop: 3 },
 });
 
-// ─── Plan card ────────────────────────────────────────────────────────────────
-function PlanCard({ plan, planKey }: { plan: typeof PLANS[PlanKey]; planKey: PlanKey }) {
-  // Stagger feature rows
-  const featureAnims = plan.features.map(() => useRef(new Animated.Value(0)).current);
+// ─── Plan card (100% Hooks-rule safe with preallocated ref array) ─────────────
+function PlanCard({ plan, planKey }: { plan: PlanData; planKey: PlanKey }) {
+  // Exactly 1 stable useRef hook holding an array of Animated values
+  const featureAnims = useRef(
+    Array.from({ length: MAX_FEATURES }, () => new Animated.Value(0))
+  ).current;
+
+  const features = plan?.features || [];
+
   useEffect(() => {
-    const anims = featureAnims.map(a => {
-      a.setValue(0);
-      return Animated.timing(a, { toValue: 1, duration: 260, easing: Easing.out(Easing.ease), useNativeDriver: true });
-    });
-    Animated.stagger(45, anims).start();
-  }, [planKey]);
+    // Reset all anim values
+    featureAnims.forEach(a => a.setValue(0));
+    // Animate only the active features for this plan
+    const active = featureAnims.slice(0, features.length);
+    Animated.stagger(40, active.map(a =>
+      Animated.timing(a, {
+        toValue: 1,
+        duration: 250,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      })
+    )).start();
+  }, [planKey, features.length]);
 
   const isUpgrade = planKey !== 'free';
 
@@ -503,23 +545,14 @@ function PlanCard({ plan, planKey }: { plan: typeof PLANS[PlanKey]; planKey: Pla
       shadowColor: isUpgrade ? plan.accentColor : '#000',
       shadowOpacity: isUpgrade ? 0.35 : 0.5,
     }]}>
-      {/* Frosted blur */}
       <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFillObject} />
-
-      {/* Dark glass fill */}
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.38)' }]} />
-
-      {/* Diagonal specular sheen */}
       <LinearGradient
         colors={['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.01)', 'rgba(255,255,255,0.0)', 'rgba(255,255,255,0.03)']}
         start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
-
-      {/* Crystal top lip shimmer */}
       <View style={card.shimmer} />
-
-      {/* Accent top strip for paid plans */}
       {isUpgrade && (
         <LinearGradient
           colors={[plan.accentColor, 'transparent']}
@@ -528,11 +561,13 @@ function PlanCard({ plan, planKey }: { plan: typeof PLANS[PlanKey]; planKey: Pla
         />
       )}
 
-      {/* Content */}
       <View style={card.content}>
-        {/* Icon + plan name row */}
+        {/* Icon + plan name */}
         <View style={card.titleRow}>
-          <View style={[card.iconWrap, { backgroundColor: `${plan.accentColor}18`, borderColor: `${plan.accentColor}30` }]}>
+          <View style={[card.iconWrap, {
+            backgroundColor: `${plan.accentColor}18`,
+            borderColor:     `${plan.accentColor}30`,
+          }]}>
             <Ionicons name={plan.icon as any} size={22} color={plan.accentColor} />
           </View>
           <View style={{ flex: 1 }}>
@@ -560,23 +595,33 @@ function PlanCard({ plan, planKey }: { plan: typeof PLANS[PlanKey]; planKey: Pla
         />
 
         {/* Feature list */}
-        {plan.features.map((feature, i) => (
-          <Animated.View
-            key={feature}
-            style={[card.featureRow, {
-              opacity: featureAnims[i],
-              transform: [{ translateX: featureAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
-            }]}
-          >
-            <Ionicons
-              name={planKey === 'free' ? 'remove-outline' : 'checkmark-circle'}
-              size={16}
-              color={planKey === 'free' ? C.frost4 : C.emerald}
-              style={{ marginTop: 1 }}
-            />
-            <Text style={[card.featureText, planKey === 'free' && { color: C.frost4 }]}>{feature}</Text>
-          </Animated.View>
-        ))}
+        {features.map((feature, i) => {
+          const anim = featureAnims[i] || featureAnims[0];
+          return (
+            <Animated.View
+              key={`${planKey}-${i}`}
+              style={[card.featureRow, {
+                opacity: anim,
+                transform: [{
+                  translateX: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-14, 0],
+                  }),
+                }],
+              }]}
+            >
+              <Ionicons
+                name={planKey === 'free' ? 'remove-outline' : 'checkmark-circle'}
+                size={16}
+                color={planKey === 'free' ? C.frost4 : C.emerald}
+                style={{ marginTop: 1 }}
+              />
+              <Text style={[card.featureText, planKey === 'free' && { color: C.frost4 }]}>
+                {feature}
+              </Text>
+            </Animated.View>
+          );
+        })}
       </View>
     </View>
   );
@@ -591,40 +636,13 @@ const card = StyleSheet.create({
     shadowRadius: 24,
     elevation: 10,
   },
-  shimmer: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 1.2,
-    backgroundColor: 'rgba(255,255,255,0.32)',
-  },
-  accentStrip: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-  },
-  content: {
-    padding: 20,
-    paddingTop: 22,
-    gap: 0,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 18,
-  },
-  iconWrap: {
-    width: 44, height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  planName: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  planDesc: {
-    fontSize: 11,
-    color: C.frost4,
-    marginTop: 2,
-  },
+  shimmer: { position: 'absolute', top: 0, left: 0, right: 0, height: 1.2, backgroundColor: 'rgba(255,255,255,0.32)' },
+  accentStrip: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
+  content: { padding: 20, paddingTop: 22 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  iconWrap: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  planName: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
+  planDesc: { fontSize: 11, color: C.frost4, marginTop: 2 },
   bestValueBadge: {
     backgroundColor: 'rgba(232,168,76,0.18)',
     borderWidth: 1,
@@ -633,59 +651,24 @@ const card = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  bestValueText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: C.gold,
-    letterSpacing: 0.8,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginBottom: 16,
-  },
-  price: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  priceNote: {
-    fontSize: 13,
-    color: C.frost4,
-    fontWeight: '400',
-  },
-  divider: {
-    height: 1,
-    marginBottom: 16,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: 6,
-  },
-  featureText: {
-    flex: 1,
-    fontSize: 14,
-    color: C.frost2,
-    lineHeight: 20,
-    fontWeight: '400',
-  },
+  bestValueText: { fontSize: 9, fontWeight: '800', color: C.gold, letterSpacing: 0.8 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 16 },
+  price: { fontSize: 34, fontWeight: '700', letterSpacing: -0.5 },
+  priceNote: { fontSize: 13, color: C.frost4, fontWeight: '400' },
+  divider: { height: 1, marginBottom: 16 },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 6 },
+  featureText: { flex: 1, fontSize: 14, color: C.frost2, lineHeight: 20, fontWeight: '400' },
 });
 
 // ─── Subscribe button ─────────────────────────────────────────────────────────
 function SubscribeButton({ plan, planKey, onPress }: {
-  plan: typeof PLANS[PlanKey]; planKey: PlanKey; onPress: () => void;
+  plan: PlanData; planKey: PlanKey; onPress: () => void;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pi = () => Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true }).start();
   const po = () => Animated.spring(scaleAnim, { toValue: 1,    useNativeDriver: true }).start();
 
-  const label = planKey === 'free'
-    ? 'Continue with Free'
-    : `Subscribe · ${plan.price}/year`;
-
+  const label = planKey === 'free' ? 'Continue with Free' : `Subscribe · ${plan?.price || '₹0'}/year`;
   const gradColors: [string, string, string] = planKey === 'pro'
     ? ['#e8a84c', '#b07830', '#2c2e6e']
     : ['#5a60d8', '#3b41bf', '#151538'];
@@ -693,11 +676,7 @@ function SubscribeButton({ plan, planKey, onPress }: {
   return (
     <Pressable onPressIn={pi} onPressOut={po} onPress={onPress}>
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <LinearGradient
-          colors={gradColors}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={btn.gradient}
-        >
+        <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={btn.gradient}>
           <Ionicons
             name={planKey === 'free' ? 'arrow-forward' : 'shield-checkmark'}
             size={17}
@@ -726,36 +705,23 @@ const btn = StyleSheet.create({
     shadowRadius: 22,
     elevation: 10,
   },
-  label: {
-    color: C.frost,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  label: { color: C.frost, fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
 });
 
 // ─── Processing state ─────────────────────────────────────────────────────────
-function ProcessingState({ pulsAnim, dotAnims }: {
-  pulsAnim: Animated.Value;
-  dotAnims: Animated.Value[];
+function ProcessingState({ pulsAnim, dotAnims, insetsTop }: {
+  pulsAnim: Animated.Value; dotAnims: Animated.Value[]; insetsTop: number;
 }) {
-  const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.root, styles.centeredState, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['rgba(59,65,191,0.15)', 'transparent']}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.root, styles.centeredState, { paddingTop: insetsTop }]}>
+      <LinearGradient colors={['rgba(59,65,191,0.15)', 'transparent']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
       <Animated.View style={[proc.logoWrap, { transform: [{ scale: pulsAnim }] }]}>
         <Ionicons name="shield-half-outline" size={52} color={C.violetGlow} />
         <View style={proc.logoGlow} />
       </Animated.View>
       <Text style={proc.title}>Completing your subscription…</Text>
       <View style={proc.dots}>
-        {dotAnims.map((d, i) => (
-          <Animated.View key={i} style={[proc.dot, { opacity: d }]} />
-        ))}
+        {dotAnims.map((d, i) => <Animated.View key={i} style={[proc.dot, { opacity: d }]} />)}
       </View>
       <Text style={proc.sub}>Please wait — do not close the app</Text>
     </View>
@@ -764,57 +730,55 @@ function ProcessingState({ pulsAnim, dotAnims }: {
 
 const proc = StyleSheet.create({
   logoWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
-  logoGlow: {
-    position: 'absolute', width: 100, height: 100, borderRadius: 50,
-    backgroundColor: 'rgba(90,96,216,0.25)',
-  },
+  logoGlow: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(90,96,216,0.25)' },
   title: { color: C.frost, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 20 },
   dots: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  dot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: C.violetGlow,
-  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.violetGlow },
   sub: { color: C.frost4, fontSize: 12, textAlign: 'center' },
 });
 
 // ─── Success state ────────────────────────────────────────────────────────────
-function SuccessState({ plan, shieldScale, shieldGlow, successText, successBtn, particles, onClose }: {
-  plan: typeof PLANS[PlanKey];
+function SuccessState({
+  plan,
+  shieldScale,
+  shieldGlow,
+  successText,
+  successBtn,
+  particles,
+  onClose,
+  insetsTop,
+}: {
+  plan: PlanData;
   shieldScale: Animated.Value;
   shieldGlow: Animated.Value;
   successText: Animated.Value;
   successBtn: Animated.Value;
   particles: { x: Animated.Value; y: Animated.Value; op: Animated.Value }[];
   onClose: () => void;
+  insetsTop: number;
 }) {
-  const insets = useSafeAreaInsets();
-  const glowRadius = shieldGlow.interpolate({ inputRange: [0, 1], outputRange: [0, 60] });
-
   return (
-    <View style={[styles.root, styles.centeredState, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['rgba(111,217,184,0.12)', 'transparent']}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.root, styles.centeredState, { paddingTop: insetsTop }]}>
+      <LinearGradient colors={['rgba(111,217,184,0.12)', 'transparent']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
 
-      {/* Particle layer */}
-      <View style={success.particleOrigin} pointerEvents="none">
-        {particles.map((p, i) => (
-          <Animated.View
-            key={i}
-            style={[success.particle, {
+      {/* Shield + Particles Container */}
+      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 28, height: 120 }}>
+        {/* Particles centered at the shield icon */}
+        <View style={success.particleOrigin} pointerEvents="none">
+          {particles.map((p, i) => (
+            <Animated.View key={i} style={[success.particle, {
               opacity: p.op,
               transform: [{ translateX: p.x }, { translateY: p.y }],
               backgroundColor: i % 2 === 0 ? C.emerald : C.violetGlow,
-            }]}
-          />
-        ))}
-      </View>
+            }]} />
+          ))}
+        </View>
 
-      {/* Shield icon */}
-      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-        <Animated.View style={[success.glowRing, { width: glowRadius, height: glowRadius, borderRadius: 60 }]} />
+        <Animated.View style={[success.glowRing, {
+          width: shieldGlow.interpolate({ inputRange: [0, 1], outputRange: [0, 130] }),
+          height: shieldGlow.interpolate({ inputRange: [0, 1], outputRange: [0, 130] }),
+          borderRadius: 65,
+        }]} />
         <Animated.View style={{ transform: [{ scale: shieldScale }] }}>
           <View style={success.shieldWrap}>
             <Ionicons name="shield-checkmark" size={56} color={C.emerald} />
@@ -823,8 +787,11 @@ function SuccessState({ plan, shieldScale, shieldGlow, successText, successBtn, 
       </View>
 
       {/* Text */}
-      <Animated.View style={{ opacity: successText, transform: [{ translateY: successText.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>
-        <Text style={success.title}>{plan.label} Activated</Text>
+      <Animated.View style={{
+        opacity: successText,
+        transform: [{ translateY: successText.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+      }}>
+        <Text style={success.title}>{plan?.label || 'Shield'} Activated</Text>
         <Text style={success.sub}>Your device is now fully protected.{'\n'}Stay safe out there.</Text>
       </Animated.View>
 
@@ -834,11 +801,7 @@ function SuccessState({ plan, shieldScale, shieldGlow, successText, successBtn, 
         transform: [{ translateY: successBtn.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
       }]}>
         <Pressable onPress={onClose}>
-          <LinearGradient
-            colors={['#6fd9b8', '#3a9e7f', '#1a4d3f']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={btn.gradient}
-          >
+          <LinearGradient colors={['#6fd9b8', '#3a9e7f', '#1a4d3f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={btn.gradient}>
             <Ionicons name="checkmark-circle" size={18} color="#fff" style={{ marginRight: 8 }} />
             <Text style={btn.label}>Continue</Text>
           </LinearGradient>
@@ -849,76 +812,40 @@ function SuccessState({ plan, shieldScale, shieldGlow, successText, successBtn, 
 }
 
 const success = StyleSheet.create({
-  particleOrigin: {
-    position: 'absolute',
-    top: '38%',
-    left: '50%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  particle: {
-    position: 'absolute',
-    width: 7, height: 7, borderRadius: 4,
-  },
-  glowRing: {
-    position: 'absolute',
-    backgroundColor: 'rgba(111,217,184,0.20)',
-  },
+  particleOrigin: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  particle: { position: 'absolute', width: 7, height: 7, borderRadius: 4 },
+  glowRing: { position: 'absolute', backgroundColor: 'rgba(111,217,184,0.20)' },
   shieldWrap: {
     width: 100, height: 100, borderRadius: 50,
     backgroundColor: 'rgba(111,217,184,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(111,217,184,0.30)',
+    borderWidth: 1, borderColor: 'rgba(111,217,184,0.30)',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.emerald,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 10,
+    shadowColor: C.emerald, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 24, elevation: 10,
   },
-  title: {
-    color: C.frost,
-    fontSize: 26,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 10,
-    letterSpacing: 0.2,
-  },
-  sub: {
-    color: C.frost3,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  btnWrap: {
-    marginTop: 36,
-    width: SW - 64,
-  },
+  title: { color: C.frost, fontSize: 26, fontWeight: '700', textAlign: 'center', marginBottom: 10, letterSpacing: 0.2 },
+  sub: { color: C.frost3, fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  btnWrap: { marginTop: 36, width: SW - 64 },
 });
 
 // ─── Error state ──────────────────────────────────────────────────────────────
-function ErrorState({ message, onRetry, onClose }: {
-  message: string; onRetry: () => void; onClose: () => void;
+function ErrorState({ message, onRetry, onClose, insetsTop }: {
+  message: string; onRetry: () => void; onClose: () => void; insetsTop: number;
 }) {
-  const insets = useSafeAreaInsets();
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 8,  duration: 70, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  8, duration: 70, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -8, duration: 70, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6,  duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  6, duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0,  duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  0, duration: 50, useNativeDriver: true }),
     ]).start();
   }, []);
 
   return (
-    <View style={[styles.root, styles.centeredState, { paddingTop: insets.top, paddingHorizontal: 32 }]}>
-      <LinearGradient
-        colors={['rgba(224,138,174,0.10)', 'transparent']}
-        start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.root, styles.centeredState, { paddingTop: insetsTop, paddingHorizontal: 32 }]}>
+      <LinearGradient colors={['rgba(224,138,174,0.10)', 'transparent']} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
       <Animated.View style={[err.iconWrap, { transform: [{ translateX: shakeAnim }] }]}>
         <Ionicons name="alert-circle" size={52} color={C.rose} />
       </Animated.View>
@@ -944,53 +871,25 @@ const err = StyleSheet.create({
   message: { color: C.frost3, fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   actions: { width: '100%', gap: 12 },
   retryBtn: { width: '100%' },
-  retryGrad: {
-    borderRadius: 14, paddingVertical: 15, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(242,234,253,0.16)',
-  },
+  retryGrad: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(242,234,253,0.16)' },
   retryText: { color: C.frost, fontSize: 15, fontWeight: '700' },
-  cancelBtn: {
-    alignItems: 'center', paddingVertical: 12,
-    borderWidth: 1, borderColor: 'rgba(242,234,253,0.10)', borderRadius: 14,
-  },
+  cancelBtn: { alignItems: 'center', paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(242,234,253,0.10)', borderRadius: 14 },
   cancelText: { color: C.frost4, fontSize: 14, fontWeight: '500' },
 });
 
 // ─── Root stylesheet ──────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  centeredState: {
+  root: { flex: 1, backgroundColor: C.bg },
+  centeredState: { alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  headerSpacer: { width: 32 },
+  eyebrow: { color: C.frost4, fontSize: 10, fontWeight: '600', letterSpacing: 2.5, textAlign: 'center', flex: 1 },
+  closeBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 40,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  eyebrow: {
-    color: C.frost4,
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 2.5,
-    textAlign: 'center',
-    flex: 1,
-  },
-  closeBtn: {
-    width: 32, height: 32,
-    alignItems: 'center', justifyContent: 'center',
     borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
