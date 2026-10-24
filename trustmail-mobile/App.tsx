@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SafeMail X Mobile — Indigo Nocturne UI
  * Pixel-perfect React Native port of the Lovable luxury-app-glow design.
  */
@@ -62,9 +62,10 @@ import { C, colors, verdictColor } from "./src/theme";
 import CallAnalyzerScreen from "./src/screens/CallAnalyzerScreen";
 import QRScannerScreen from "./src/screens/QRScannerScreen";
 import AssistiveTouch from "./src/components/AssistiveTouch";
+import SubscriptionScreen from "./src/screens/SubscriptionScreen";
 const { width: SW } = Dimensions.get("window");
 
-type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help" | "qr";
+type Tab = "dashboard" | "scans" | "new" | "reports" | "settings" | "privacy" | "help" | "qr" | "subscription";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component<
@@ -1039,6 +1040,9 @@ function App() {
               </View>
               {activeTab === "qr" && (
                 <QRScannerScreen onClose={() => switchTab("dashboard")} />
+              )}
+              {activeTab === "subscription" && (
+                <SubscriptionScreen onClose={() => switchTab("settings")} />
               )}
             </Animated.View>
           </ScrollView>
@@ -2901,6 +2905,23 @@ function SettingsScreen({ health, email, password, apiUrl, authState, gmailState
       </TmCard>
 
 
+
+
+      <Eyebrow label="Subscription" />
+      <TmCard style={{ marginBottom: 16 }}>
+        <Pressable onPress={() => onSwitchTab?.("subscription")} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 16, justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(90,96,216,0.15)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(90,96,216,0.30)" }}>
+              <Ionicons name="shield-half-outline" size={18} color={C.violetSoft} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: C.frost }}>Manage Subscription</Text>
+              <Text style={{ fontSize: 10, color: C.frost4, marginTop: 2 }}>Upgrade to Shield or Shield Pro</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={C.frost4} />
+        </Pressable>
+      </TmCard>
 
       {/* Notification Preferences */}
       <Eyebrow label="Preferences" />
