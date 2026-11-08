@@ -21,6 +21,8 @@ from utils.config import (
     LLM_PROVIDER,
     LLM_TIMEOUT,
     LM_STUDIO_AUTO_CONTEXT,
+    TEMP_CONSERVATIVE,
+    TEMP_THINKING,
 )
 import logging as _logging
 _llc_logger = _logging.getLogger(__name__)
@@ -434,8 +436,7 @@ def run_llm_analysis(
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_msg},
         ],
-        "temperature": 0.1,
-        "top_p": 0.8,
+        **( TEMP_THINKING if _live_cfg["thinking"] else TEMP_CONSERVATIVE ),
         "max_tokens": _live_cfg["max_tokens"],
         "stream": False,
     }
@@ -443,7 +444,7 @@ def run_llm_analysis(
     # LLM_ENABLE_THINKING=false in .env disables this for Qwen 2.5 rollback.
     # Both values are read live from .env so changes take effect without restart.
     # Enable Qwen 3 chain-of-thought reasoning.
-    # chat_template_kwargs is LM Studio specific — skip for cloud providers.
+    # chat_template_kwargs is LM Studio specific ï¿½ skip for cloud providers.
     # Cloud-hosted Qwen models handle thinking internally or via model selection.
     if _live_cfg["thinking"] and LLM_PROVIDER == "lmstudio":
         payload["chat_template_kwargs"] = {"enable_thinking": True}

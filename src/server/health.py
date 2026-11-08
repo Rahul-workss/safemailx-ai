@@ -6,15 +6,49 @@ from utils.config import TESSERACT_CMD, is_configured_secret
 
 
 def check_llm_health() -> tuple[str, dict]:
+    """
+    Provider-aware LLM health check.
+
+    - cloudflare: validate API key + model are configured; skip network call
+      (Cloudflare Workers AI has no lightweight probe endpoint and billing
+      only triggers on actual inference calls).
+    - lmstudio / local: check /v1/models as before.
+    """
     start = time.time()
     try:
-        from utils.config import LLM_BASE_URL
+        from utils.config import LLM_BASE_URL, LLM_API_KEY, LLM_PROVIDER
         from engines.llm_analyzer import _get_live_config
         live = _get_live_config()
-        # Use /v1/models (lightweight GET) instead of a chat completion.
-        # A completion ping causes JIT model loading, can trigger 400 errors with Qwen 3
-        # thinking mode, and is slow. The models endpoint only checks connectivity
-        # and tells us which model is actually loaded right now.
+
+        provider = LLM_PROVIDER.lower()
+
+        # ── Cloud providers: config-only check ───────────────────────────────
+        # Cloudflare Workers AI (and similar) don't expose a cheap probe
+        # endpoint.  We confirm the credentials are set and return "online"
+        # so the health page doesn't mislead operators.
+        if provider in {"cloudflare", "groq", "openrouter", "openai"}:
+            latency = int((time.time() - start) * 1000)
+            if not LLM_API_KEY:
+                return "degraded", {
+                    "error": "LLM_API_KEY not configured",
+                    "provider": provider,
+                    "latency_ms": latency,
+                }
+            if not LLM_BASE_URL:
+                return "degraded", {
+                    "error": "LLM_BASE_URL not configured",
+                    "provider": provider,
+                    "latency_ms": latency,
+                }
+            return "online", {
+                "provider": provider,
+                "model": live["model"],
+                "thinking": live["thinking"],
+                "max_tokens": live["max_tokens"],
+                "latency_ms": latency,
+            }
+
+        # ── Local / LM Studio: probe /v1/models ──────────────────────────────
         models_url = LLM_BASE_URL.replace("/v1/chat/completions", "/v1/models")
         response = requests.get(models_url, timeout=5)
         latency = int((time.time() - start) * 1000)
@@ -23,7 +57,6 @@ def check_llm_health() -> tuple[str, dict]:
         loaded = [m.get("id", "") for m in response.json().get("data", [])]
         if live["model"] in loaded:
             return "online", {"latency_ms": latency, "model": live["model"], "loaded_models": loaded}
-        # LM Studio is reachable but expected model not loaded yet
         return "degraded", {
             "error": "expected_model_not_loaded",
             "expected": live["model"],
