@@ -88,8 +88,11 @@ def run_quantized_slm(channel: str, target_content: str, features: dict) -> dict
             "max_tokens": 150
         }
         try:
-            from utils.config import LLM_BASE_URL
-            resp = requests.post(LLM_BASE_URL, json=payload, timeout=3.0)
+            from utils.config import LLM_BASE_URL, LLM_API_KEY
+            _headers = {"Content-Type": "application/json"}
+            if LLM_API_KEY:
+                _headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+            resp = requests.post(LLM_BASE_URL, json=payload, headers=_headers, timeout=3.0)
             resp.raise_for_status()
             msg = resp.json()["choices"][0]["message"]
             raw = msg.get("content", "")

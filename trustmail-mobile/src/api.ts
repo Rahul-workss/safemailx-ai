@@ -1,8 +1,8 @@
 import { loadRefreshToken, loadSession, saveSession, triggerSessionExpired } from "./session";
 
-// Railway is the production API. The OAuth callback and one-use code exchange
-// must use this same host; its Google redirect URI is configured in Railway.
-const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai-production.up.railway.app";
+// Render is the production API. The OAuth callback and one-use code exchange
+// must use this same host; its Google redirect URI is configured in Render.
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || "https://safemailx-ai.onrender.com";
 let apiBaseUrl = configuredApiBaseUrl;
 
 let accessToken = "";

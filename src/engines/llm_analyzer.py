@@ -17,6 +17,7 @@ from utils.config import (
     LLM_MAX_CONTEXT_TOKENS,
     LLM_MAX_OUTPUT_TOKENS,
     LLM_MODEL,
+    LLM_API_KEY,
     LLM_PROVIDER,
     LLM_TIMEOUT,
     LM_STUDIO_AUTO_CONTEXT,
@@ -441,8 +442,14 @@ def run_llm_analysis(
     # Enable Qwen 3 chain-of-thought reasoning via LM Studio chat_template_kwargs.
     # LLM_ENABLE_THINKING=false in .env disables this for Qwen 2.5 rollback.
     # Both values are read live from .env so changes take effect without restart.
-    if _live_cfg["thinking"]:
+    # Enable Qwen 3 chain-of-thought reasoning.
+    # chat_template_kwargs is LM Studio specific — skip for cloud providers.
+    # Cloud-hosted Qwen models handle thinking internally or via model selection.
+    if _live_cfg["thinking"] and LLM_PROVIDER == "lmstudio":
         payload["chat_template_kwargs"] = {"enable_thinking": True}
+    elif not _live_cfg["thinking"]:
+        # Non-thinking mode uses fewer output tokens (no think block overhead)
+        payload["max_tokens"] = min(payload["max_tokens"], 700)
 
 
     import threading
@@ -485,7 +492,11 @@ def run_llm_analysis(
         t.start()
 
         try:
+            _headers = {"Content-Type": "application/json"}
+            if LLM_API_KEY:
+                _headers["Authorization"] = f"Bearer {LLM_API_KEY}"
             resp = requests.post(LLM_BASE_URL, json=payload,
+                                 headers=_headers,
                                  timeout=LLM_TIMEOUT)
             if _is_context_error(resp):
                 print("[LLM] Context limit hit; retrying with shorter excerpts.")
@@ -504,6 +515,7 @@ def run_llm_analysis(
                     resp = requests.post(
                         LLM_BASE_URL,
                         json=shorter_payload,
+                        headers=_headers,
                         timeout=LLM_TIMEOUT,
                     )
                     if not _is_context_error(resp):

@@ -36,6 +36,9 @@ LM_STUDIO_EMAIL_CHAR_LIMIT = int(os.getenv("LM_STUDIO_EMAIL_CHAR_LIMIT", "120000
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "lmstudio").strip().lower()
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", LM_STUDIO_URL).strip()
 LLM_MODEL = os.getenv("LLM_MODEL", LM_STUDIO_MODEL).strip()
+# API key for remote LLM providers (Cloudflare Workers AI, Groq, OpenRouter, etc.)
+# Not needed for local LM Studio. Set via LLM_API_KEY env var.
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", str(LM_STUDIO_TIMEOUT)))
 LLM_MAX_CONTEXT_TOKENS = int(os.getenv("LLM_MAX_CONTEXT_TOKENS", str(LM_STUDIO_MAX_CONTEXT_TOKENS)))
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", str(LM_STUDIO_MAX_OUTPUT_TOKENS)))

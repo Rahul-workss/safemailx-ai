@@ -78,12 +78,14 @@ def _get_llm_cfg():
     except Exception:
         pass
     try:
-        from utils.config import LLM_BASE_URL, LLM_MODEL, LLM_ENABLE_THINKING
+        from utils.config import LLM_BASE_URL, LLM_MODEL, LLM_ENABLE_THINKING, LLM_API_KEY, LLM_PROVIDER
         return {"base_url": LLM_BASE_URL, "model": LLM_MODEL,
-                "thinking": LLM_ENABLE_THINKING, "max_tokens": 2500}
+                "thinking": LLM_ENABLE_THINKING, "max_tokens": 2500,
+                "api_key": LLM_API_KEY, "provider": LLM_PROVIDER}
     except Exception:
         return {"base_url": "http://127.0.0.1:1234/v1/chat/completions",
-                "model": "qwen3-8b", "thinking": True, "max_tokens": 2500}
+                "model": "qwen3-8b", "thinking": True, "max_tokens": 2500,
+                "api_key": "", "provider": "lmstudio"}
 
 
 def _call_qwen3(user_message, timeout=120):
@@ -99,10 +101,15 @@ def _call_qwen3(user_message, timeout=120):
         "max_tokens":  cfg["max_tokens"],
         "stream":      False,
     }
-    if cfg["thinking"]:
+    # Only add chat_template_kwargs for LM Studio; cloud providers ignore/reject it
+    if cfg["thinking"] and cfg.get("provider", "lmstudio") == "lmstudio":
         payload["chat_template_kwargs"] = {"enable_thinking": True}
+    _headers = {"Content-Type": "application/json"}
+    _api_key = cfg.get("api_key", "")
+    if _api_key:
+        _headers["Authorization"] = f"Bearer {_api_key}"
     try:
-        resp = requests.post(cfg["base_url"], json=payload, timeout=timeout)
+        resp = requests.post(cfg["base_url"], json=payload, headers=_headers, timeout=timeout)
         resp.raise_for_status()
         msg     = resp.json()["choices"][0]["message"]
         content = (msg.get("content", "") or "").strip()
