@@ -13,7 +13,7 @@
 import { loadSession } from '../session';
 
 // Re-uses the same base URL as the rest of the app
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://safemailx-ai-production.up.railway.app';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://safemailx-ai.onrender.com';
 
 export type PlanKey = 'shield' | 'pro';
 

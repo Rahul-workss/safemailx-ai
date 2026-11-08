@@ -41,11 +41,17 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Native Android Project (Prebuild)
+        env:
+          EXPO_PUBLIC_API_BASE_URL: https://safemailx-ai.onrender.com
         run: npx expo prebuild --platform android --no-install
 
       - name: Restore stable debug keystore (fixes Google Sign-In SHA-1)
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+          if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+          elif [ -f "debug.keystore" ]; then
+            cp debug.keystore android/app/debug.keystore
+          fi
 
       - name: Enable AndroidX and Jetifier
         run: |
@@ -99,6 +105,7 @@ jobs:
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+          EXPO_PUBLIC_API_BASE_URL: https://safemailx-ai.onrender.com
         run: |
           ./gradlew assembleDebug \
             --no-daemon \

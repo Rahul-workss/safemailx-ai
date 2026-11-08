@@ -67,12 +67,18 @@ jobs:
 
       # ── 6. Expo Prebuild ─────────────────────────────────────────────────
       - name: Generate Native Android Project
+        env:
+          EXPO_PUBLIC_API_BASE_URL: https://safemailx-ai.onrender.com
         run: npx expo prebuild --platform android --no-install
 
       # ── 7. Keystore ──────────────────────────────────────────────────────
       - name: Restore stable debug keystore
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+          if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > android/app/debug.keystore
+          elif [ -f "debug.keystore" ]; then
+            cp debug.keystore android/app/debug.keystore
+          fi
 
       # ── 8. CRITICAL: Inject abiFilters into generated build.gradle ───────
       # expo prebuild generates android/app/build.gradle fresh every time.
@@ -155,6 +161,7 @@ jobs:
         working-directory: trustmail-mobile/android
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dorg.gradle.parallel=false -Dorg.gradle.daemon=false"
+          EXPO_PUBLIC_API_BASE_URL: https://safemailx-ai.onrender.com
         run: |
           ./gradlew assembleRelease \
             --no-daemon \
