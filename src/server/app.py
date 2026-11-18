@@ -471,7 +471,14 @@ def reset_password(payload: ResetPasswordRequest):
     return {"status": "Password has been successfully reset"}
 
 
+@app.get("/", include_in_schema=False)
+@app.head("/", include_in_schema=False)
+def root_ping():
+    return {"status": "ok", "service": "safemailx-ai"}
+
+
 @app.get("/api/health", response_model=HealthResponse)
+@app.head("/api/health", include_in_schema=False)
 def health():
     redis_status = "online" if scan_queue.ping() else "offline"
     database_status = "online" if repository.ping() else "offline"
