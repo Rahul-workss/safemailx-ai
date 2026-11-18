@@ -872,16 +872,33 @@ def gmail_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depends
             history_id = svc.users().getProfile(userId="me").execute().get("historyId")
         except RuntimeError as exc:
             if "could not be refreshed" in str(exc).lower():
+                logger.warning("Gmail protection enable failed: token refresh required")
                 raise HTTPException(status_code=409, detail="gmail_reauth_required") from exc
+            logger.warning("Gmail protection enable failed: service setup error (%s)", type(exc).__name__)
             raise HTTPException(status_code=502, detail="gmail_protection_setup_failed") from exc
         except HTTPException:
             raise
         except Exception as exc:
-            # Keep provider response bodies and mailbox details out of API logs
-            # and client messages; the app can still present a useful retry hint.
+            # Log only the exception type and provider status. Do not log provider
+            # response bodies, OAuth credentials, or mailbox content.
+            provider_status = getattr(getattr(exc, "resp", None), "status", None)
+            logger.warning(
+                "Gmail protection enable failed: error_type=%s provider_status=%s",
+                type(exc).__name__, provider_status or "unknown",
+            )
+            if provider_status in (401, 403):
+                raise HTTPException(status_code=409, detail="gmail_access_denied") from exc
+            if provider_status == 429:
+                raise HTTPException(status_code=503, detail="gmail_rate_limited") from exc
+            if isinstance(provider_status, int) and provider_status >= 500:
+                raise HTTPException(status_code=503, detail="gmail_provider_unavailable") from exc
             raise HTTPException(status_code=502, detail="gmail_protection_setup_failed") from exc
         if not history_id: raise HTTPException(status_code=502, detail="gmail_sync_baseline_failed")
-    repository.set_gmail_protection(uid, payload.enabled, history_id)
+    try:
+        repository.set_gmail_protection(uid, payload.enabled, history_id)
+    except Exception as exc:
+        logger.warning("Gmail protection preference save failed: error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="gmail_protection_storage_failed") from exc
     return {"enabled": payload.enabled}
 
 

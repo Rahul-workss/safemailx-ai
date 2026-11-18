@@ -644,6 +644,10 @@ async function automaticProtectionError(provider: "Gmail" | "Outlook", response:
   if (detail.endsWith("_not_connected")) return `Connect your ${provider} account first.`;
   if (detail.endsWith("_reauth_required")) return `Reconnect your ${provider} account, then try again.`;
   if (detail === "gmail_labels_unavailable") return "Gmail labels are temporarily unavailable. Please try again later.";
+  if (detail === "gmail_access_denied") return "Google denied a Gmail permission needed for protection. Reconnect Gmail and try again.";
+  if (detail === "gmail_rate_limited") return "Gmail is rate-limiting requests. Wait a minute, then try again.";
+  if (detail === "gmail_provider_unavailable") return "Gmail is temporarily unavailable. Please try again shortly.";
+  if (detail === "gmail_protection_storage_failed") return "SafeMailX could not save this setting. Please try again shortly.";
   if (detail === "gmail_labels_not_initialized" || detail === "outlook_categories_not_initialized") {
     return `Finish ${provider} label setup, then try again.`;
   }
