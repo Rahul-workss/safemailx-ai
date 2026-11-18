@@ -1,0 +1,48 @@
+name: Keep Render Alive
+
+# Pings the backend every 10 minutes to prevent Render free-tier spin-down.
+# GitHub Actions cron minimum is every 5 minutes; 10 is enough since Render
+# spins down only after 15 minutes of ZERO traffic.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # Every 10 minutes, 24/7
+  workflow_dispatch:          # Allow manual trigger for testing
+
+jobs:
+  ping:
+    name: Ping Render Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping health endpoint
+        run: |
+          echo "Pinging https://safemailx-ai.onrender.com/api/health ..."
+          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" \
+            --max-time 60 \
+            --retry 3 \
+            --retry-delay 10 \
+            --retry-connrefused \
+            https://safemailx-ai.onrender.com/api/health)
+
+          echo "HTTP Status: $RESPONSE"
+          cat /tmp/health.json
+          echo ""
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "ERROR: Backend returned HTTP $RESPONSE"
+            exit 1
+          fi
+
+          API=$(python3 -c "import json; d=json.load(open('/tmp/health.json')); print(d.get('api','?'))")
+          LLM=$(python3 -c "import json; d=json.load(open('/tmp/health.json')); print(d.get('llm','?'))")
+          DB=$(python3 -c "import json; d=json.load(open('/tmp/health.json')); print(d.get('database','?'))")
+          echo "api=$API | llm=$LLM | database=$DB"
+
+          if [ "$API" != "online" ]; then
+            echo "ERROR: API is not online"
+            exit 1
+          fi
+
+          echo "Backend is alive and healthy."
