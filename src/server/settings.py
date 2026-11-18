@@ -80,6 +80,23 @@ FEATURE_TELEGRAM_BOT_ENABLED = os.getenv("FEATURE_TELEGRAM_BOT_ENABLED", "false"
     "1", "true", "yes", "on"
 }
 
+# ── Microsoft Outlook / Office 365 integration ────────────────────────────────
+OUTLOOK_CLIENT_ID     = os.getenv("OUTLOOK_CLIENT_ID", "").strip()
+OUTLOOK_CLIENT_SECRET = os.getenv("OUTLOOK_CLIENT_SECRET", "").strip()
+OUTLOOK_TENANT_ID     = os.getenv("OUTLOOK_TENANT_ID", "common").strip() or "common"
+OUTLOOK_REDIRECT_URI  = os.getenv(
+    "OUTLOOK_REDIRECT_URI",
+    "http://127.0.0.1:8080/api/outlook/oauth/callback",
+)
+OUTLOOK_POLL_INTERVAL_SECONDS = int(os.getenv("OUTLOOK_POLL_INTERVAL_SECONDS", "60"))
+FEATURE_OUTLOOK_ENABLED = os.getenv("FEATURE_OUTLOOK_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+OUTLOOK_AUTO_POLL_ENABLED = os.getenv("OUTLOOK_AUTO_POLL_ENABLED", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+RATE_LIMIT_OUTLOOK = os.getenv("RATE_LIMIT_OUTLOOK", "20/minute")
+
 
 def validate_security_settings() -> None:
     """Fail closed for production-shaped deployments with unsafe secrets/config."""
@@ -107,3 +124,12 @@ def validate_security_settings() -> None:
             "SMTP_HOST and SMTP_FROM_EMAIL are required in production "
             "to deliver password reset emails"
         )
+    if FEATURE_OUTLOOK_ENABLED:
+        if not OUTLOOK_CLIENT_ID:
+            raise RuntimeError("OUTLOOK_CLIENT_ID is required when FEATURE_OUTLOOK_ENABLED=true")
+        if not OUTLOOK_CLIENT_SECRET:
+            raise RuntimeError("OUTLOOK_CLIENT_SECRET is required when FEATURE_OUTLOOK_ENABLED=true")
+        if not OUTLOOK_REDIRECT_URI.startswith("https://"):
+            raise RuntimeError(
+                "OUTLOOK_REDIRECT_URI must use https:// in production when FEATURE_OUTLOOK_ENABLED=true"
+            )

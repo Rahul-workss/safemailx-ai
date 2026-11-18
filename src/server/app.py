@@ -102,6 +102,30 @@ try:
 except ImportError:
     SIGNIN_CREDENTIALS_PATH = None
 
+# Outlook / Office 365 integration
+try:
+    from server.settings import (
+        FEATURE_OUTLOOK_ENABLED,
+        OUTLOOK_AUTO_POLL_ENABLED,
+        OUTLOOK_CLIENT_ID,
+        OUTLOOK_REDIRECT_URI,
+    )
+    from server.outlook_oauth import (
+        OutlookReauthRequired,
+        build_outlook_authorization_url,
+        decrypt_token_blob,
+        encrypt_token_blob,
+        exchange_code_for_outlook_token,
+        fetch_account_email,
+    )
+    _OUTLOOK_AVAILABLE = True
+except ImportError:
+    FEATURE_OUTLOOK_ENABLED = False
+    OUTLOOK_AUTO_POLL_ENABLED = False
+    OUTLOOK_CLIENT_ID = ""
+    OUTLOOK_REDIRECT_URI = ""
+    _OUTLOOK_AVAILABLE = False
+
 # Feature 5: Adaptive Trust Baseline
 try:
     from utils.config import FEATURE_ADAPTIVE_TRUST_ENABLED, ADAPTIVE_TRUST_MIN_SCANS
@@ -209,6 +233,16 @@ def startup_event():
         daemon=True,
         name="gmail-watcher",
     ).start()
+
+    # -- Outlook auto-poller (only when both flags are on) --
+    if FEATURE_OUTLOOK_ENABLED and OUTLOOK_AUTO_POLL_ENABLED:
+        from server.outlook_watcher import run_outlook_auto_poller
+        threading.Thread(
+            target=_resilient_thread("OutlookPoller", run_outlook_auto_poller),
+            daemon=True,
+            name="outlook-poller",
+        ).start()
+        print("[APP] Outlook auto-poller thread started.")
 
     # -- Keep-alive self-ping (prevents Render free-tier sleep) --
     def _keep_alive_ping():
@@ -820,13 +854,197 @@ def gmail_run_once(_auth=Depends(require_auth)):
         count = 0
     except RefreshError as exc:
         repository.delete_gmail_token(user_id)
-        raise HTTPException(status_code=401, detail="Gmail connection expired. Please reconnect.") from exc
+        raise HTTPException(status_code=409, detail="gmail_reauth_required") from exc
     except Exception as exc:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=502, detail=f"Gmail polling failed: {exc}") from exc
     return {"status": "ok", "enqueued": count, "scanned_label": "SafeMail X Scan"}
 
+
+# ─────────────────────────── Outlook / Office 365 ────────────────────────────
+
+def _require_outlook_enabled():
+    """Return 404 when the Outlook feature flag is off."""
+    if not FEATURE_OUTLOOK_ENABLED:
+        raise HTTPException(status_code=404, detail="Outlook integration is not enabled")
+
+
+@app.get("/api/outlook/oauth/status")
+def outlook_oauth_status(_auth=Depends(require_auth)):
+    if not FEATURE_OUTLOOK_ENABLED:
+        return {"enabled": False, "connected": False, "status": "disabled"}
+    user_id = _user_id(_auth)
+    conn = repository.get_outlook_connection(user_id)
+    if not conn:
+        return {
+            "enabled": True,
+            "connected": False,
+            "account_email": None,
+            "status": "not_connected",
+            "categories_ready": False,
+        }
+    return {
+        "enabled": True,
+        "connected": True,
+        "account_email": conn.get("account_email"),
+        "status": conn.get("status", "active"),
+        "categories_ready": bool(conn.get("categories_ready")),
+    }
+
+
+@app.get("/api/outlook/oauth/start")
+def outlook_oauth_start(request: Request, return_url: str | None = Query(None), _auth=Depends(require_auth)):
+    _require_outlook_enabled()
+    return_url = _safe_oauth_return_url(return_url)
+    configured_host = urlparse(OUTLOOK_REDIRECT_URI).hostname if OUTLOOK_REDIRECT_URI else None
+    if configured_host in {None, "127.0.0.1", "localhost"}:
+        redirect_uri = str(request.base_url).rstrip("/") + "/api/outlook/oauth/callback"
+    else:
+        redirect_uri = OUTLOOK_REDIRECT_URI
+    state = create_signed_token({
+        "sub": _auth.get("sub", "local"),
+        "uid": _user_id(_auth),
+        "oauth_redirect_uri": redirect_uri,
+        "purpose": "outlook",
+        "return_url": return_url,
+    })
+    authorization_url = build_outlook_authorization_url(state, redirect_uri=redirect_uri)
+    return {"authorization_url": authorization_url, "redirect_uri": redirect_uri}
+
+
+@app.get("/api/outlook/oauth/callback")
+def outlook_oauth_callback(
+    state: str = Query(...),
+    code: str | None = Query(None),
+    error: str | None = Query(None),
+):
+    _require_outlook_enabled()
+    payload = verify_access_token(state)
+    if not consume_oauth_state(payload):
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+    if payload.get("purpose") != "outlook":
+        raise HTTPException(status_code=400, detail="Invalid OAuth state purpose")
+
+    deep_link_base = _safe_oauth_return_url(payload.get("return_url"))
+    join_char = "&" if "?" in deep_link_base else "?"
+    user_id = payload.get("uid")
+    redirect_uri = payload.get("oauth_redirect_uri") or OUTLOOK_REDIRECT_URI
+
+    if error or not code:
+        from fastapi.responses import HTMLResponse
+        err_param = error or "access_denied"
+        error_link = f"{deep_link_base}{join_char}error={err_param}&service=outlook"
+        safe_error_link = html_escape(error_link, quote=True)
+        html = (
+            "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>SafeMail X Outlook</title>"
+            f"<meta http-equiv=\"refresh\" content=\"2;url={safe_error_link}\"></head>"
+            "<body style=\"font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#fff;\">"
+            "<h2>Outlook connection cancelled.</h2><p>Returning to app...</p>"
+            f"<script>setTimeout(()=>window.location.href=\'{safe_error_link}\',500)</script>"
+            "</body></html>"
+        )
+        return HTMLResponse(content=html)
+
+    try:
+        token = exchange_code_for_outlook_token(code, redirect_uri=redirect_uri)
+    except Exception as exc:
+        logger.warning("Outlook token exchange failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Outlook OAuth token exchange failed") from exc
+
+    account_email = ""
+    try:
+        account_email = fetch_account_email(token["access_token"])
+    except Exception:
+        pass
+
+    repository.store_outlook_token(user_id, encrypt_token_blob(token), account_email or None)
+
+    exchange_code = create_oauth_exchange_code(
+        account_email or user_id,
+        user_id,
+        "Outlook User",
+        durable_store=repository.store_oauth_exchange_code,
+    )
+    deep_link_url = (
+        f"{deep_link_base}{join_char}"
+        + urlencode({"code": exchange_code, "status": "connected", "service": "outlook"})
+    )
+    from fastapi.responses import HTMLResponse
+    safe_deep_link_url = html_escape(deep_link_url, quote=True)
+    html = (
+        "<!DOCTYPE html><html><head><meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+        "<title>SafeMail X Outlook</title>"
+        f"<meta http-equiv=\"refresh\" content=\"3;url={safe_deep_link_url}\">"
+        "<style>body{font-family:-apple-system,sans-serif;text-align:center;padding:60px;"
+        "background:#0f172a;color:#e2e8f0}h2{color:#818cf8}p{color:#94a3b8}</style>"
+        "</head><body>"
+        "<h2>Outlook Connected!</h2>"
+        "<p>Your Outlook inbox is now linked to SafeMail X AI.</p>"
+        "<p>Returning to the app...</p>"
+        f"<script>setTimeout(()=>window.location.href=\'{safe_deep_link_url}\',1000)</script>"
+        "</body></html>"
+    )
+    return HTMLResponse(content=html)
+
+
+@app.post("/api/outlook/categories/ensure")
+def outlook_categories_ensure(_auth=Depends(require_auth)):
+    _require_outlook_enabled()
+    user_id = _user_id(_auth)
+    conn = repository.get_outlook_connection(user_id)
+    if not conn:
+        raise HTTPException(status_code=409, detail="outlook_not_connected")
+    if conn.get("status") == "reauth_required":
+        raise HTTPException(status_code=409, detail="outlook_reauth_required")
+    try:
+        from server.outlook_graph import GraphClient
+        from server.outlook_categories import ensure_safemailx_categories
+        client = GraphClient(user_id, repository)
+        result = ensure_safemailx_categories(client)
+        repository.set_outlook_categories_ready(user_id, True)
+        return {"status": "ok", "categories": result}
+    except OutlookReauthRequired:
+        raise HTTPException(status_code=409, detail="outlook_reauth_required")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Category setup failed: {exc}") from exc
+
+
+@app.post("/api/outlook/run-once")
+def outlook_run_once(_auth=Depends(require_auth)):
+    _require_outlook_enabled()
+    user_id = _user_id(_auth)
+    conn = repository.get_outlook_connection(user_id)
+    if not conn:
+        raise HTTPException(status_code=409, detail="outlook_not_connected")
+    if conn.get("status") == "reauth_required":
+        raise HTTPException(status_code=409, detail="outlook_reauth_required")
+    try:
+        from server.outlook_watcher import enqueue_labeled_outlook_messages
+        count = enqueue_labeled_outlook_messages(
+            user_id=user_id,
+            repository=repository,
+            scan_queue=scan_queue,
+        )
+    except OutlookReauthRequired:
+        raise HTTPException(status_code=409, detail="outlook_reauth_required")
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=502, detail=f"Outlook polling failed: {exc}") from exc
+    return {"status": "ok", "enqueued": count, "scanned_category": "SafeMail X Scan"}
+
+
+@app.delete("/api/outlook/oauth/disconnect")
+def outlook_oauth_disconnect(_auth=Depends(require_auth)):
+    _require_outlook_enabled()
+    user_id = _user_id(_auth)
+    repository.delete_outlook_token(user_id)
+    return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/api/settings", response_model=SettingsResponse)
 def get_settings(_auth=Depends(require_auth)):

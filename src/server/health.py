@@ -81,6 +81,13 @@ def check_ocr_health() -> str:
 
 def build_health(redis_status: str = "unknown", database_status: str = "online") -> dict:
     llm_status, _ = check_llm_health()
+    from server.settings import FEATURE_OUTLOOK_ENABLED, OUTLOOK_AUTO_POLL_ENABLED
+    if not FEATURE_OUTLOOK_ENABLED:
+        outlook_watcher_status = "disabled"
+    elif OUTLOOK_AUTO_POLL_ENABLED:
+        outlook_watcher_status = "auto"
+    else:
+        outlook_watcher_status = "manual"
     return {
         "api": "online",
         "database": database_status,
@@ -88,4 +95,5 @@ def build_health(redis_status: str = "unknown", database_status: str = "online")
         "ocr": check_ocr_health(),
         "llm": llm_status,
         "gmail_watcher": "configured",
+        "outlook_watcher": outlook_watcher_status,
     }

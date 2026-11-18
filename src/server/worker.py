@@ -107,6 +107,67 @@ def process_scan_job(
                     )
                     print(f"[WORKER] Sent Gmail reply for scan {result['id']} to {reply_to}")
             return result
+        elif job_type == "outlook_category_message":
+            conn = repository.get_outlook_connection(user_id)
+            if not conn:
+                raise RuntimeError("Outlook is not connected")
+            message_id = job.get("outlook_message_id")
+            if not message_id:
+                raise RuntimeError("Missing Outlook message id")
+            from server.outlook_graph import GraphClient, GraphError
+            from server.outlook_categories import set_message_category
+            from utils.outlook_parser import parse_mime_message
+            from utils.content_processor import clean_extracted_text
+            client = GraphClient(user_id, repository)
+            raw_mime = client.get_mime(message_id)
+            parsed = parse_mime_message(raw_mime)
+            body = clean_extracted_text(parsed.get("body", "")) or (
+                "Outlook category-selected message contained no extractable text."
+            )
+            attachments = parsed.get("attachments") or None
+            result = service.run_manual_text_scan(
+                subject=parsed.get("subject", "Outlook category scan"),
+                sender=parsed.get("sender", "outlook_category_app"),
+                body=body,
+                scan_mode=job.get("scan_mode", "balanced"),
+                scan_id=scan_id,
+                user_id=user_id,
+                attachments=attachments,
+                link_details_override=parsed.get("links"),
+                source_type="email",
+                metadata={
+                    "source": "outlook_category_app",
+                    "outlook": {
+                        "source": "outlook_category_app",
+                        "permission": "user_applied_category",
+                        "privacy_mode": "category_only",
+                        "message_id": message_id,
+                        "attachment_count": len(parsed.get("attachments") or []),
+                        "image_count": len(parsed.get("images") or []),
+                    },
+                },
+                security_headers_override=parsed.get("security_headers") or {},
+                auth_context_override="original_headers",
+                original_sender_override=parsed.get("sender"),
+            )
+            verdict = result.get("final_label", "failed")
+            verdict_key = {
+                "legitimate": "safe",
+                "suspicious": "suspicious",
+                "phishing": "phishing",
+            }.get(verdict, "failed")
+            try:
+                set_message_category(client, message_id, verdict_key)
+            except Exception as cat_exc:
+                print(f"[WORKER] Non-fatal: could not set Outlook category for {message_id}: {cat_exc}")
+            print(f"[WORKER] Completed Outlook category scan {result['id']}")
+            send_push_notifications(
+                repository.list_push_tokens(user_id=user_id),
+                title="SafeMail X Outlook scan complete",
+                body=f"{result['subject']}: {result['final_label']}",
+                data={"scan_id": result["id"], "final_label": result["final_label"]},
+            )
+            return result
         elif job_type == "gmail_label_message":
             token_blob = repository.get_gmail_token(user_id)
             if not token_blob:
@@ -183,6 +244,15 @@ def process_scan_job(
                     apply_result_label(gmail_service, job["gmail_message_id"], "failed", label_ids)
             except Exception as label_exc:
                 print(f"[WORKER] Failed to apply Gmail failure label: {label_exc}")
+        # Outlook: best-effort failure category on exception
+        if job and job.get("type") == "outlook_category_message" and job.get("outlook_message_id"):
+            try:
+                from server.outlook_graph import GraphClient
+                from server.outlook_categories import set_message_category
+                _oc = GraphClient(job.get("user_id", "local"), repository)
+                set_message_category(_oc, job["outlook_message_id"], "failed")
+            except Exception as _oexc:
+                print(f"[WORKER] Non-fatal: could not set Outlook failure category: {_oexc}")
         # IMPORTANT: Do NOT re-raise here — caller may be a daemon thread.
         # Re-raising would kill the thread and prevent future scans from processing.
         return None

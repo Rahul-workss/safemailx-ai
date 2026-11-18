@@ -113,6 +113,18 @@ class ScanRepository:
                         )
                         """
                     )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS outlook_tokens (
+                            user_id           TEXT PRIMARY KEY,
+                            token_blob        TEXT NOT NULL,
+                            account_email     TEXT,
+                            status            TEXT NOT NULL DEFAULT 'active',
+                            categories_ready  INTEGER NOT NULL DEFAULT 0,
+                            updated_at        TIMESTAMPTZ NOT NULL
+                        )
+                        """
+                    )
                 else:
                     conn.execute(
                         """
@@ -170,6 +182,18 @@ class ScanRepository:
                             name TEXT NOT NULL,
                             expires_at TEXT NOT NULL,
                             created_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    conn.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS outlook_tokens (
+                            user_id           TEXT PRIMARY KEY,
+                            token_blob        TEXT NOT NULL,
+                            account_email     TEXT,
+                            status            TEXT NOT NULL DEFAULT 'active',
+                            categories_ready  INTEGER NOT NULL DEFAULT 0,
+                            updated_at        TEXT NOT NULL
                         )
                         """
                     )
@@ -576,6 +600,110 @@ class ScanRepository:
     def list_gmail_user_ids(self) -> list[str]:
         with self._db() as conn:
             rows = conn.execute("SELECT user_id FROM gmail_tokens ORDER BY updated_at DESC").fetchall()
+        return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
+
+    # ── Outlook / Office 365 token methods ───────────────────────────────────
+
+    def store_outlook_token(
+        self,
+        user_id: str,
+        token_blob: str,
+        account_email: str | None = None,
+    ) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            if self.is_postgres:
+                conn.execute(
+                    """
+                    INSERT INTO outlook_tokens
+                        (user_id, token_blob, account_email, status, categories_ready, updated_at)
+                    VALUES (%s, %s, %s, 'active', 0, %s)
+                    ON CONFLICT (user_id) DO UPDATE
+                    SET token_blob = EXCLUDED.token_blob,
+                        account_email = COALESCE(EXCLUDED.account_email, outlook_tokens.account_email),
+                        status = 'active',
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    (user_id, token_blob, account_email, updated_at),
+                )
+            else:
+                conn.execute(
+                    f"""
+                    INSERT INTO outlook_tokens
+                        (user_id, token_blob, account_email, status, categories_ready, updated_at)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, 'active', 0, {placeholder})
+                    ON CONFLICT(user_id) DO UPDATE
+                    SET token_blob = excluded.token_blob,
+                        account_email = COALESCE(excluded.account_email, outlook_tokens.account_email),
+                        status = 'active',
+                        updated_at = excluded.updated_at
+                    """,
+                    (user_id, token_blob, account_email, updated_at),
+                )
+
+    def update_outlook_token_blob(self, user_id: str, token_blob: str) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"UPDATE outlook_tokens SET token_blob = {placeholder}, updated_at = {placeholder} WHERE user_id = {placeholder}",
+                (token_blob, updated_at, user_id),
+            )
+
+    def get_outlook_connection(self, user_id: str) -> dict | None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            if not self.is_postgres:
+                conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                f"SELECT * FROM outlook_tokens WHERE user_id = {placeholder}",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        # Normalize categories_ready to bool
+        d["categories_ready"] = bool(d.get("categories_ready"))
+        return d
+
+    def set_outlook_status(self, user_id: str, status: str) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"UPDATE outlook_tokens SET status = {placeholder}, updated_at = {placeholder} WHERE user_id = {placeholder}",
+                (status, updated_at, user_id),
+            )
+
+    def set_outlook_categories_ready(self, user_id: str, ready: bool) -> None:
+        updated_at = datetime.now(timezone.utc).isoformat()
+        value = ready if self.is_postgres else (1 if ready else 0)
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"UPDATE outlook_tokens SET categories_ready = {placeholder}, updated_at = {placeholder} WHERE user_id = {placeholder}",
+                (value, updated_at, user_id),
+            )
+
+    def delete_outlook_token(self, user_id: str) -> None:
+        placeholder = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(
+                f"DELETE FROM outlook_tokens WHERE user_id = {placeholder}",
+                (user_id,),
+            )
+
+    def list_outlook_user_ids(self, active_only: bool = True) -> list[str]:
+        with self._db() as conn:
+            if active_only:
+                rows = conn.execute(
+                    "SELECT user_id FROM outlook_tokens WHERE status = 'active' ORDER BY updated_at DESC"
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT user_id FROM outlook_tokens ORDER BY updated_at DESC"
+                ).fetchall()
         return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
 
     def create_password_reset_token(self, token: str, user_id: str, expires_at: str) -> None:

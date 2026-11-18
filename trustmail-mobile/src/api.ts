@@ -172,6 +172,7 @@ export type Health = {
   ocr: string;
   llm: string;
   gmail_watcher: string;
+  outlook_watcher?: string;
 };
 
 export type ScanSummary = {
@@ -263,6 +264,14 @@ export type GmailStatus = {
   scan_label: string;
   queued_label: string;
   result_labels: Record<string, string>;
+};
+
+export type OutlookStatus = {
+  enabled: boolean;
+  connected: boolean;
+  account_email: string | null;
+  status: string;          // "active" | "reauth_required" | "not_connected" | "disabled"
+  categories_ready: boolean;
 };
 
 export type NotificationPreferences = {
@@ -830,4 +839,61 @@ export async function translateText(text: string, targetLang: string): Promise<s
   } catch (error) {
     return text;
   }
+}
+
+// ── Outlook / Office 365 API ──────────────────────────────────────────────────
+
+export async function fetchOutlookStatus(): Promise<OutlookStatus> {
+  const response = await apiFetch('/api/outlook/oauth/status', {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Outlook status check failed');
+  return response.json();
+}
+
+export async function startOutlookOAuth(returnUrl?: string): Promise<string> {
+  const url = returnUrl
+    ? `/api/outlook/oauth/start?return_url=${encodeURIComponent(returnUrl)}`
+    : '/api/outlook/oauth/start';
+  const response = await apiFetch(url, { headers: authHeaders() });
+  if (!response.ok) throw new Error('Outlook OAuth start failed');
+  const payload = await response.json();
+  // Backend returns "authorization_url" (not "auth_url")
+  return payload.authorization_url;
+}
+
+export async function ensureOutlookCategories(): Promise<Record<string, string>> {
+  const response = await apiFetch('/api/outlook/categories/ensure', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}',
+  }, 20000);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Outlook category setup failed');
+  }
+  const payload = await response.json();
+  return payload.categories;
+}
+
+export async function runOutlookScan(): Promise<{ status: string; enqueued: number; scanned_category: string }> {
+  const response = await apiFetch('/api/outlook/run-once', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}',
+  }, 20000);
+  if (response.status === 409) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'outlook_reauth_required');
+  }
+  if (!response.ok) throw new Error('Outlook scan failed');
+  return response.json();
+}
+
+export async function disconnectOutlook(): Promise<void> {
+  const response = await apiFetch('/api/outlook/oauth/disconnect', {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Outlook disconnect failed');
 }

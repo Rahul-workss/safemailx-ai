@@ -19,6 +19,7 @@ from server.settings import (
     RATE_LIMIT_DEFAULT,
     RATE_LIMIT_GMAIL,
     RATE_LIMIT_INSTANT_SCAN,
+    RATE_LIMIT_OUTLOOK,
     RATE_LIMIT_SCANS,
     REDIS_URL,
     SAFEMAILX_PRODUCTION,
@@ -172,6 +173,8 @@ def _rule_for_path(path: str) -> str:
         return RATE_LIMIT_SCANS
     if path.startswith("/api/gmail"):
         return RATE_LIMIT_GMAIL
+    if path.startswith("/api/outlook"):
+        return RATE_LIMIT_OUTLOOK
     return RATE_LIMIT_DEFAULT
 
 

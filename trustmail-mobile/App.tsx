@@ -52,7 +52,9 @@ import {
   uploadScreenshot, scanUrl, fetchNotificationPreferences,
   saveNotificationPreferences, NotificationPreferences,
   InstantScanResult, scanInstantFile, submitScanFeedback,
-  UnauthorizedError, NetworkError, exchangeOAuthCode, logoutSession
+  UnauthorizedError, NetworkError, exchangeOAuthCode, logoutSession,
+  OutlookStatus, fetchOutlookStatus, startOutlookOAuth,
+  ensureOutlookCategories, runOutlookScan, disconnectOutlook
 } from "./src/api";
 import {
   saveSession, loadSession, clearSession,
@@ -334,6 +336,7 @@ function App() {
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const [authState, setAuthState] = useState("Local mode");
   const [gmailState, setGmailState] = useState("not checked");
+  const [outlook, setOutlook] = useState<OutlookStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -518,7 +521,12 @@ function App() {
 
       const callbackError = typeof params.error === "string" ? params.error : "";
       if (callbackError) {
-        showToast("Google sign-in was cancelled or could not be completed.");
+        const svc = typeof params.service === "string" ? params.service : "";
+        if (svc === "outlook") {
+          showToast("Outlook sign-in was cancelled.");
+        } else {
+          showToast("Google sign-in was cancelled or could not be completed.");
+        }
         return;
       }
 
@@ -544,11 +552,15 @@ function App() {
             showToast(`Gmail connected for ${emailVal}!`, "success");
           } else if (params.service === "backup") {
             showToast(`Backup activated for ${emailVal}!`, "success");
+          } else if (params.service === "outlook") {
+            showToast("Outlook connected!", "success");
+            refreshOutlookStatus();
           } else {
             showToast(`Welcome back, ${emailVal}!`, "success");
           }
           refresh();
           refreshGmailStatus();
+          if (params.service !== "outlook") refreshOutlookStatus();
           oauthCodeCompletedRef.current.add(code);
         } catch (error: any) {
           // Do not turn every backend/network failure into an "expired" link.
@@ -699,7 +711,7 @@ function App() {
     try {
       const tokens = await login(email.trim(), password); setPassword("");
       await saveSession(tokens.accessToken, email.trim(), tokens.refreshToken || null); // persist to encrypted storage
-      setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
+      setAuthState("Signed in"); await refresh(); await refreshGmailStatus(); refreshOutlookStatus();
       setActiveTab("dashboard");
       showToast("Signed in successfully", "success");
     } catch (e: any) { setAuthState("Local mode"); showToast(e?.name === "NetworkError" || e?.message?.includes("timed out") || e?.message?.includes("failed") ? "Connection timed out. Please try again." : "Invalid email or password"); }
@@ -728,7 +740,7 @@ function App() {
     try {
       const tokens = await register(email.trim(), registerName.trim(), password, registerOtp.trim());
       await saveSession(tokens.accessToken, email.trim(), tokens.refreshToken || null); // persist to encrypted storage
-      setAuthState("Signed in"); await refresh(); await refreshGmailStatus();
+      setAuthState("Signed in"); await refresh(); await refreshGmailStatus(); refreshOutlookStatus();
       setActiveTab("dashboard");
       setRegisterStep("none");
       showToast("Account created successfully", "success");
@@ -747,6 +759,7 @@ function App() {
     setScans([]);
     setHealth(null);
     setGmailState("not checked");
+    setOutlook(null);
     setGoogleBackupUser(null);
     setGoogleBackupSyncTime(null);
     setRegisterStep("none");
@@ -791,6 +804,73 @@ function App() {
       }
     }
     catch { setGmailState("sign in required"); }
+  }
+
+  async function refreshOutlookStatus() {
+    try {
+      const status = await fetchOutlookStatus();
+      setOutlook(status);
+    } catch {
+      // Backend may not have Outlook enabled yet — keep null
+    }
+  }
+
+  async function connectOutlook() {
+    setBusy(true);
+    try {
+      const returnUrl = Linking.createURL("oauth-callback");
+      const url = await startOutlookOAuth(returnUrl);
+      Linking.openURL(url);
+      showToast("Outlook sign-in opened...", "success");
+    } catch (e: any) {
+      showToast(e.message || "Failed to start Outlook sign-in");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setupOutlookCategories() {
+    setBusy(true);
+    try {
+      await ensureOutlookCategories();
+      await refreshOutlookStatus();
+      showToast("Outlook categories ready!", "success");
+    } catch (e: any) {
+      showToast(e.message || "Category setup failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRunOutlookScan() {
+    setBusy(true);
+    try {
+      const r = await runOutlookScan();
+      showToast(`${r.enqueued} message(s) queued from Outlook`, "success");
+      await refresh();
+    } catch (e: any) {
+      if (e.message?.includes("reauth")) {
+        showToast("Outlook session expired. Please reconnect.");
+        setOutlook(prev => prev ? { ...prev, status: "reauth_required" } : prev);
+      } else {
+        showToast(e.message || "Outlook scan failed");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisconnectOutlook() {
+    setBusy(true);
+    try {
+      await disconnectOutlook();
+      setOutlook(null);
+      showToast("Outlook disconnected", "success");
+    } catch (e: any) {
+      showToast(e.message || "Disconnect failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function connectGmail() {
@@ -994,6 +1074,11 @@ function App() {
                 <UnifiedScanScreen
                   gmailState={gmailState} busy={busy}
                   onConnectGmail={connectGmail} onRefreshGmail={refreshGmailStatus}
+                  outlook={outlook}
+                  onConnectOutlook={connectOutlook}
+                  onSetupOutlookCategories={setupOutlookCategories}
+                  onRunOutlookScan={handleRunOutlookScan}
+                  onDisconnectOutlook={handleDisconnectOutlook}
                   onSetupGmailLabels={setupGmailLabels} onRunGmailScan={runGmailScan}
                   smsText={smsText} setSmsText={setSmsText}
                   smsSender={smsSender} setSmsSender={setSmsSender}
@@ -2296,12 +2381,18 @@ function SecurityBulletin() {
 // ─── Unified Scan Screen ─────────────────────────────────────────────────────────
 function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
+  outlook, onConnectOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
   manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
 }: {
   gmailState: string; busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
+  outlook?: OutlookStatus | null;
+  onConnectOutlook?: () => void;
+  onSetupOutlookCategories?: () => void;
+  onRunOutlookScan?: () => void;
+  onDisconnectOutlook?: () => void;
   onSetupGmailLabels: () => void; onRunGmailScan: () => void;
   smsText: string; setSmsText: (v: string) => void;
   smsSender: string; setSmsSender: (v: string) => void;
@@ -2342,6 +2433,89 @@ function UnifiedScanScreen({
     }
   }, [inlineResult]);
   
+  // ── OutlookCard ───────────────────────────────────────────────────────
+  function OutlookCard() {
+    if (!outlook?.enabled) return null;
+    const connected = outlook.connected && outlook.status === "active";
+    const needsReauth = outlook.status === "reauth_required";
+    const ready = connected && outlook.categories_ready;
+
+    return (
+      <TmCard style={{ marginBottom: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          <Ionicons name="mail-outline" size={20} color={C.violetGlow} style={{ marginRight: 8 }} />
+          <Text style={[S.frost, { fontWeight: "700", fontSize: 15 }]}>Outlook / Office 365</Text>
+        </View>
+        {!connected && !needsReauth && (
+          <>
+            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
+              Connect your work Outlook account to scan emails tagged "SafeMail X Scan".
+            </Text>
+            <Pressable
+              onPress={onConnectOutlook}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Connect Outlook</Text>
+            </Pressable>
+          </>
+        )}
+        {needsReauth && (
+          <>
+            <Text style={[S.muted, { marginBottom: 8, fontSize: 13, color: C.rose }]}>
+              Outlook session expired. Please reconnect.
+            </Text>
+            <Pressable
+              onPress={onConnectOutlook}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.rose, borderRadius: 8 }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reconnect Outlook</Text>
+            </Pressable>
+          </>
+        )}
+        {connected && !ready && (
+          <>
+            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
+              Connected as {outlook.account_email}. Set up Outlook categories to start scanning.
+            </Text>
+            <Pressable
+              onPress={onSetupOutlookCategories}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8, marginBottom: 8 }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Setup Categories</Text>
+            </Pressable>
+            <Pressable
+              onPress={onDisconnectOutlook}
+              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}
+            >
+              <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 12 }}>Disconnect</Text>
+            </Pressable>
+          </>
+        )}
+        {ready && (
+          <>
+            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
+              ✓ Connected: {outlook.account_email}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              <Pressable
+                onPress={onRunOutlookScan}
+                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Scan Now</Text>
+              </Pressable>
+              <Pressable
+                onPress={onDisconnectOutlook}
+                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}
+              >
+                <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 12 }}>Disconnect</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </TmCard>
+    );
+  }
+
   const connected = gmailState.toLowerCase() !== "not connected" && gmailState.toLowerCase() !== "sign in required";
   const hasLabels = gmailState.toLowerCase().includes("labels ready");
   const busy = appBusy || localBusy;
@@ -2493,6 +2667,7 @@ function UnifiedScanScreen({
           )}
         </TmCard>
       )}
+      <OutlookCard />
 
       {mode === "sms" && (
         <TmCard style={{ padding: 24 }}>

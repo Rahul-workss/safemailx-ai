@@ -98,6 +98,7 @@ class HealthResponse(BaseModel):
     ocr: str
     llm: str
     gmail_watcher: str
+    outlook_watcher: str = "disabled"
 
 
 class ReadinessItem(BaseModel):
