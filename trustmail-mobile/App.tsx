@@ -2435,10 +2435,14 @@ function UnifiedScanScreen({
   
   // ── OutlookCard ───────────────────────────────────────────────────────
   function OutlookCard() {
-    if (!outlook?.enabled) return null;
-    const connected = outlook.connected && outlook.status === "active";
-    const needsReauth = outlook.status === "reauth_required";
-    const ready = connected && outlook.categories_ready;
+    // Always render the card — hidden only when backend explicitly says disabled
+    // and outlook state has loaded. While null (loading), show skeleton.
+    if (outlook !== null && outlook!.enabled === false) return null;
+
+    const connected = outlook?.connected && outlook?.status === "active";
+    const needsReauth = outlook?.status === "reauth_required";
+    const ready = connected && outlook?.categories_ready;
+    const isLoading = outlook === null;
 
     return (
       <TmCard style={{ marginBottom: 16 }}>
@@ -2446,7 +2450,10 @@ function UnifiedScanScreen({
           <Ionicons name="mail-outline" size={20} color={C.violetGlow} style={{ marginRight: 8 }} />
           <Text style={[S.frost, { fontWeight: "700", fontSize: 15 }]}>Outlook / Office 365</Text>
         </View>
-        {!connected && !needsReauth && (
+        {isLoading && (
+          <Text style={[S.muted, { fontSize: 13 }]}>Checking Outlook status...</Text>
+        )}
+        {!isLoading && !connected && !needsReauth && (
           <>
             <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
               Connect your work Outlook account to scan emails tagged "SafeMail X Scan".
@@ -2459,7 +2466,7 @@ function UnifiedScanScreen({
             </Pressable>
           </>
         )}
-        {needsReauth && (
+        {!isLoading && needsReauth && (
           <>
             <Text style={[S.muted, { marginBottom: 8, fontSize: 13, color: C.rose }]}>
               Outlook session expired. Please reconnect.
@@ -2472,10 +2479,10 @@ function UnifiedScanScreen({
             </Pressable>
           </>
         )}
-        {connected && !ready && (
+        {!isLoading && connected && !ready && (
           <>
             <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
-              Connected as {outlook.account_email}. Set up Outlook categories to start scanning.
+              Connected as {outlook?.account_email}. Set up Outlook categories to start scanning.
             </Text>
             <Pressable
               onPress={onSetupOutlookCategories}
@@ -2491,10 +2498,10 @@ function UnifiedScanScreen({
             </Pressable>
           </>
         )}
-        {ready && (
+        {!isLoading && ready && (
           <>
             <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
-              ✓ Connected: {outlook.account_email}
+              ✓ Connected: {outlook?.account_email}
             </Text>
             <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
               <Pressable
