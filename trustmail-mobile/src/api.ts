@@ -634,8 +634,24 @@ export async function fetchGmailOAuthStatus(): Promise<GmailStatus> {
 
 export async function setGmailAutomaticProtection(enabled: boolean): Promise<boolean> {
   const r = await apiFetch('/api/gmail/automatic-protection', {method:'PATCH', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify({enabled})});
-  if (!r.ok) throw new Error('Could not update Gmail protection');
+  if (!r.ok) throw new Error(await automaticProtectionError('Gmail', r));
   return Boolean((await r.json()).enabled);
+}
+
+async function automaticProtectionError(provider: "Gmail" | "Outlook", response: Response): Promise<string> {
+  const payload = await response.json().catch(() => ({})) as { detail?: unknown };
+  const detail = typeof payload.detail === "string" ? payload.detail : "";
+  if (detail.endsWith("_not_connected")) return `Connect your ${provider} account first.`;
+  if (detail.endsWith("_reauth_required")) return `Reconnect your ${provider} account, then try again.`;
+  if (detail === "gmail_labels_unavailable") return "Gmail labels are temporarily unavailable. Please try again later.";
+  if (detail === "gmail_labels_not_initialized" || detail === "outlook_categories_not_initialized") {
+    return `Finish ${provider} label setup, then try again.`;
+  }
+  if (detail.endsWith("_setup_failed") || detail.endsWith("_baseline_failed")) {
+    return `Could not prepare ${provider} protection. Check the connection and try again.`;
+  }
+  if (response.status >= 500) return `${provider} protection is temporarily unavailable. Please try again.`;
+  return `Could not update ${provider} protection (${response.status}).`;
 }
 
 export async function startGmailOAuth(returnUrl?: string): Promise<string> {
@@ -861,7 +877,7 @@ export async function fetchOutlookStatus(): Promise<OutlookStatus> {
 
 export async function setOutlookAutomaticProtection(enabled: boolean): Promise<boolean> {
   const r = await apiFetch('/api/outlook/automatic-protection', {method:'PATCH', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify({enabled})});
-  if (!r.ok) throw new Error('Could not update Outlook protection');
+  if (!r.ok) throw new Error(await automaticProtectionError('Outlook', r));
   return Boolean((await r.json()).enabled);
 }
 

@@ -849,12 +849,37 @@ def gmail_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depends
     if not token: raise HTTPException(status_code=409, detail="gmail_not_connected")
     history_id = None
     if payload.enabled:
-        from server.gmail_labels import SAFEMAILX_LABELS, list_gmail_labels
-        svc = build_gmail_service_from_blob(token, repository=repository, user_id=uid)
-        available={x.get("name") for x in list_gmail_labels(svc)}
-        if not set(SAFEMAILX_LABELS.values()).issubset(available):
-            raise HTTPException(status_code=409, detail="gmail_labels_not_initialized")
-        history_id = svc.users().getProfile(userId="me").execute().get("historyId")
+        # The mobile UI's label-ready flag is a local cache and can outlive an
+        # account switch. Reconcile labels for the currently connected account
+        # here so stale client state cannot make protection impossible to turn on.
+        # Only create missing SafeMailX labels; do not rename or delete labels.
+        try:
+            svc = build_gmail_service_from_blob(token, repository=repository, user_id=uid)
+            if not SAFEMAILX_LABELS:
+                raise HTTPException(status_code=503, detail="gmail_labels_unavailable")
+            from server.gmail_labels import list_gmail_labels
+            available = {label.get("name") for label in list_gmail_labels(svc)}
+            for label_name in SAFEMAILX_LABELS.values():
+                if label_name not in available:
+                    svc.users().labels().create(
+                        userId="me",
+                        body={
+                            "name": label_name,
+                            "labelListVisibility": "labelShow",
+                            "messageListVisibility": "show",
+                        },
+                    ).execute()
+            history_id = svc.users().getProfile(userId="me").execute().get("historyId")
+        except RuntimeError as exc:
+            if "could not be refreshed" in str(exc).lower():
+                raise HTTPException(status_code=409, detail="gmail_reauth_required") from exc
+            raise HTTPException(status_code=502, detail="gmail_protection_setup_failed") from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            # Keep provider response bodies and mailbox details out of API logs
+            # and client messages; the app can still present a useful retry hint.
+            raise HTTPException(status_code=502, detail="gmail_protection_setup_failed") from exc
         if not history_id: raise HTTPException(status_code=502, detail="gmail_sync_baseline_failed")
     repository.set_gmail_protection(uid, payload.enabled, history_id)
     return {"enabled": payload.enabled}
