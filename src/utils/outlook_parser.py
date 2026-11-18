@@ -21,6 +21,7 @@ import re
 from email.message import EmailMessage
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger("outlook_parser")
 
@@ -31,29 +32,48 @@ class _TextExtractor(HTMLParser):
     def __init__(self):
         super().__init__()
         self._parts: list[str] = []
-        self._links: list[str] = []
+        self._links: list[dict[str, Any]] = []
         self._images: list[str] = []
+        self._current_href: str | None = None
+        self._current_anchor: list[str] = []
 
     def handle_data(self, data: str) -> None:
         stripped = data.strip()
         if stripped:
             self._parts.append(stripped)
+            if self._current_href:
+                self._current_anchor.append(stripped)
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         attr_dict = dict(attrs)
         if tag == "a" and "href" in attr_dict:
             href = attr_dict["href"].strip()
             if href and not href.startswith(("javascript:", "#", "mailto:")):
-                self._links.append(href)
+                self._current_href = href
+                self._current_anchor = []
         if tag == "img" and "src" in attr_dict:
             self._images.append(attr_dict["src"].strip())
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._current_href:
+            anchor_text = " ".join(self._current_anchor).strip()
+            parsed_domain = (urlparse(self._current_href).hostname or "").lower()
+            self._links.append({
+                "anchor_text": anchor_text,
+                "href": self._current_href,
+                "href_domain": parsed_domain,
+                "link_source": "raw_href",
+                "is_cta": False,
+            })
+            self._current_href = None
+            self._current_anchor = []
 
     @property
     def text(self) -> str:
         return "\n".join(self._parts)
 
 
-def _html_to_text(html: str) -> tuple[str, list[str], list[str]]:
+def _html_to_text(html: str) -> tuple[str, list[dict[str, Any]], list[str]]:
     """Return (plain_text, links, images) from an HTML fragment."""
     parser = _TextExtractor()
     try:

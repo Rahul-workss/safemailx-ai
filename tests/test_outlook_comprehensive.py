@@ -234,7 +234,8 @@ class TestOutlookMIMEParser:
         assert parsed["subject"] == "Security Notification for Your Account"
         assert "security-alerts@legit-bank.com" in parsed["sender"]
         assert "Please review your account" in parsed["body"]
-        assert "https://legit-bank.com/portal" in parsed["links"]
+        assert any(l["href"] == "https://legit-bank.com/portal" for l in parsed["links"])
+        assert any(l["anchor_text"] == "Portal" for l in parsed["links"])
         assert parsed["security_headers"]["spf"] == "pass"
         assert parsed["security_headers"]["dkim"] == "pass"
         assert parsed["security_headers"]["dmarc"] == "pass"

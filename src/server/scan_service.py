@@ -393,6 +393,8 @@ def _merge_url_details(
     merged = {detail.get("normalized_url"): detail for detail in extracted_details if detail.get("normalized_url")}
 
     for link in link_overrides:
+        if isinstance(link, str):
+            link = {"href": link}
         href = link.get("href") or link.get("normalized_url") or ""
         parsed = urlparse(href)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
