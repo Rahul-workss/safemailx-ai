@@ -45,6 +45,7 @@ from server.schemas import (
     GmailOAuthStartResponse,
     GmailOAuthStatusResponse,
     GmailLabelsResponse,
+    AutomaticProtectionUpdate,
     HealthResponse,
     InstantEmailScanRequest,
     LoginRequest,
@@ -235,7 +236,7 @@ def startup_event():
     ).start()
 
     # -- Outlook auto-poller (only when both flags are on) --
-    if FEATURE_OUTLOOK_ENABLED and OUTLOOK_AUTO_POLL_ENABLED:
+    if FEATURE_OUTLOOK_ENABLED:
         from server.outlook_watcher import run_outlook_auto_poller
         threading.Thread(
             target=_resilient_thread("OutlookPoller", run_outlook_auto_poller),
@@ -828,7 +829,8 @@ def gmail_connect(_auth=Depends(require_auth)):
 
 @app.get("/api/gmail/oauth/status", response_model=GmailOAuthStatusResponse)
 def gmail_oauth_status(_auth=Depends(require_auth)):
-    token = repository.get_gmail_token(_user_id(_auth))
+    uid = _user_id(_auth)
+    token = repository.get_gmail_token(uid)
     connected = token is not None
     return GmailOAuthStatusResponse(
         connected=connected,
@@ -836,7 +838,26 @@ def gmail_oauth_status(_auth=Depends(require_auth)):
         scan_label="SafeMail X Scan",
         queued_label="SafeMail X Queued",
         result_labels={"safe": "SafeMail X Safe", "suspicious": "SafeMail X Suspicious", "phishing": "SafeMail X Phishing", "failed": "SafeMail X Failed"}
+        ,auto_protect=bool(repository.get_gmail_protection(uid).get("auto_protect"))
     )
+
+
+@app.patch("/api/gmail/automatic-protection")
+def gmail_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depends(require_auth)):
+    uid = _user_id(_auth)
+    token = repository.get_gmail_token(uid)
+    if not token: raise HTTPException(status_code=409, detail="gmail_not_connected")
+    history_id = None
+    if payload.enabled:
+        from server.gmail_labels import SAFEMAILX_LABELS, list_gmail_labels
+        svc = build_gmail_service_from_blob(token, repository=repository, user_id=uid)
+        available={x.get("name") for x in list_gmail_labels(svc)}
+        if not set(SAFEMAILX_LABELS.values()).issubset(available):
+            raise HTTPException(status_code=409, detail="gmail_labels_not_initialized")
+        history_id = svc.users().getProfile(userId="me").execute().get("historyId")
+        if not history_id: raise HTTPException(status_code=502, detail="gmail_sync_baseline_failed")
+    repository.set_gmail_protection(uid, payload.enabled, history_id)
+    return {"enabled": payload.enabled}
 
 
 
@@ -890,6 +911,7 @@ def outlook_oauth_status(_auth=Depends(require_auth)):
             "account_email": None,
             "status": "not_connected",
             "categories_ready": False,
+            "auto_protect": False,
         }
     return {
         "enabled": True,
@@ -897,7 +919,31 @@ def outlook_oauth_status(_auth=Depends(require_auth)):
         "account_email": conn.get("account_email"),
         "status": conn.get("status", "active"),
         "categories_ready": bool(conn.get("categories_ready")),
+        "auto_protect": bool(conn.get("auto_protect")),
     }
+
+
+@app.patch("/api/outlook/automatic-protection")
+def outlook_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depends(require_auth)):
+    _require_outlook_enabled()
+    uid = _user_id(_auth)
+    conn = repository.get_outlook_connection(uid)
+    if not conn: raise HTTPException(status_code=409, detail="outlook_not_connected")
+    if payload.enabled and not conn.get("categories_ready"):
+        raise HTTPException(status_code=409, detail="outlook_categories_not_initialized")
+    if conn.get("status") == "reauth_required":
+        raise HTTPException(status_code=409, detail="outlook_reauth_required")
+    delta_link = None
+    if payload.enabled:
+        from server.outlook_graph import GraphClient
+        client = GraphClient(uid, repository)
+        folder = client.get("/me/mailFolders/inbox?$select=id").get("id", "inbox")
+        from urllib.parse import quote
+        delta = client.get(f"/me/mailFolders/{quote(folder, safe='')}/messages/delta?$deltatoken=latest&$select=id")
+        delta_link = delta.get("@odata.deltaLink")
+        if not delta_link: raise HTTPException(status_code=502, detail="outlook_sync_baseline_failed")
+    repository.set_outlook_protection(uid, payload.enabled, delta_link)
+    return {"enabled": payload.enabled}
 
 
 @app.get("/api/outlook/oauth/start")

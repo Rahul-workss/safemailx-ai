@@ -81,6 +81,7 @@ class ScanService:
         original_sender_override: str | None = None,
         link_details_override: list[dict[str, Any]] | None = None,
         source_type: str = "text",
+        retain_content: bool = True,
     ) -> dict[str, Any]:
         target_text = clean_extracted_text(body)
         original_sender = extract_original_sender(target_text, forwarder_email=sender)
@@ -142,33 +143,46 @@ class ScanService:
             auth_context=auth_context,
             link_forensics=_build_link_forensics(source_type, url_details, original_sender),
         )
+        if not retain_content:
+            # Automatic scans retain only aggregate verdict data. Evidence
+            # fields can include message-derived keywords, domains, filenames,
+            # and model reasoning, so do not persist a filtered full report.
+            evidence = {
+                "case_id": evidence.get("case_id"),
+                "timestamp": evidence.get("timestamp"),
+                "automatic_scan": True,
+                "final_label": result.get("final_label"),
+                "final_score": result.get("final_score"),
+                "llm_used": llm_used,
+                "degraded": degraded,
+                "source_type": source_type,
+            }
         
         evidence["scan_mode"] = scan_mode
         evidence["degraded"] = degraded
-        evidence["scan_input"] = {
-            "body_text": target_text,
-            "subject": subject,
-            "sender": sender,
-        }
+        if retain_content:
+            evidence["scan_input"] = {"body_text": target_text, "subject": subject, "sender": sender}
+        else:
+            evidence["automatic_scan"] = True
         evidence["source_type"] = source_type
         if metadata:
             evidence.update(metadata)
 
-        report_json = save_json_report(evidence)
-        report_pdf = generate_pdf_report(evidence)
+        report_json = save_json_report(evidence) if retain_content else None
+        report_pdf = generate_pdf_report(evidence) if retain_content else None
 
         if scan_id:
             self.repository.complete_scan(
                 scan_id,
-                subject=subject,
-                sender=original_sender,
+                subject=subject if retain_content else "Automatically scanned email",
+                sender=original_sender if retain_content else "redacted",
                 final_label=result["final_label"],
                 final_score=result["final_score"],
                 llm_used=llm_used,
                 degraded=degraded,
                 evidence=evidence,
-                report_pdf=str(Path(report_pdf)),
-                report_json=str(Path(report_json)),
+                report_pdf=str(Path(report_pdf)) if report_pdf else None,
+                report_json=str(Path(report_json)) if report_json else None,
             )
         else:
             scan_id = self.repository.create_scan(
@@ -179,8 +193,8 @@ class ScanService:
                 llm_used=llm_used,
                 degraded=degraded,
                 evidence=evidence,
-                report_pdf=str(Path(report_pdf)),
-                report_json=str(Path(report_json)),
+                report_pdf=str(Path(report_pdf)) if report_pdf else None,
+                report_json=str(Path(report_json)) if report_json else None,
                 user_id=user_id,
             )
 

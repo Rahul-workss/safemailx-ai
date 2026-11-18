@@ -315,7 +315,54 @@ def run_gmail_watcher() -> None:
     scan_queue = ScanQueue()
     while True:
         try:
-            count = enqueue_unread_forwarded_messages(repository=repository, scan_queue=scan_queue)
+            try:
+                count = enqueue_unread_forwarded_messages(repository=repository, scan_queue=scan_queue)
+            except Exception as legacy_exc:
+                count = 0
+                print(f"[GMAIL WATCHER] legacy forwarding poll unavailable: {type(legacy_exc).__name__}")
+            # Connected-user automatic protection uses mailbox history deltas;
+            # never reads or marks the legacy forwarding mailbox messages here.
+            for uid in repository.list_gmail_protection_users():
+                svc = None
+                try:
+                    token = repository.get_gmail_token(uid)
+                    if not token: continue
+                    svc = build_gmail_service_from_blob(token, repository=repository, user_id=uid)
+                    cursor = repository.get_gmail_protection(uid).get("history_id")
+                    if not cursor: continue
+                    page = None
+                    latest = cursor
+                    while True:
+                        resp = svc.users().history().list(userId="me", startHistoryId=cursor, historyTypes=["messageAdded"], pageToken=page).execute()
+                        latest = resp.get("historyId", latest)
+                        for h in resp.get("history", []):
+                            for added in h.get("messagesAdded", []):
+                                m = added.get("message", {})
+                                mid = m.get("id")
+                                if not mid: continue
+                                meta = svc.users().messages().get(userId="me", id=mid, format="minimal").execute()
+                                if "INBOX" not in meta.get("labelIds", []): continue
+                                sid = repository.claim_automatic_scan("gmail", uid, mid)
+                                if sid:
+                                    try:
+                                        scan_queue.enqueue({"type":"gmail_automatic_message","user_id":uid,"scan_id":sid,"gmail_message_id":mid})
+                                    except Exception:
+                                        repository.release_automatic_scan_claim("gmail", uid, mid)
+                                        raise
+                        page = resp.get("nextPageToken")
+                        if not page: break
+                    if latest != cursor: repository.set_gmail_protection(uid, True, latest)
+                except Exception as auto_exc:
+                    # Gmail history cursors can expire. Establish a fresh
+                    # forward-only baseline rather than getting stuck forever.
+                    try:
+                        from googleapiclient.errors import HttpError
+                        if svc is not None and isinstance(auto_exc, HttpError) and getattr(auto_exc.resp, "status", None) == 404:
+                            current = svc.users().getProfile(userId="me").execute().get("historyId")
+                            if current: repository.set_gmail_protection(uid, True, current)
+                    except Exception:
+                        pass
+                    print(f"[GMAIL WATCHER] automatic sync failed for account {uid[:8]}: {type(auto_exc).__name__}")
             print(f"[GMAIL WATCHER] Poll complete. Enqueued {count} scan(s).")
         except KeyboardInterrupt:
             print("[GMAIL WATCHER] Shutting down gracefully.")

@@ -63,6 +63,45 @@ def process_scan_job(
     job_type = job.get("type")
 
     try:
+        if job_type in {"gmail_automatic_message", "outlook_automatic_message"}:
+            provider = "gmail" if job_type.startswith("gmail") else "outlook"
+            # OFF is authoritative even for jobs already sitting in Redis.
+            state = repository.get_gmail_protection(user_id) if provider == "gmail" else repository.get_outlook_connection(user_id) or {}
+            if not state.get("auto_protect"):
+                if scan_id: repository.fail_scan(scan_id, "automatic protection disabled")
+                return None
+            message_id = job.get("gmail_message_id") or job.get("outlook_message_id")
+            if not message_id: raise RuntimeError("Missing provider message id")
+            if provider == "gmail":
+                token_blob = repository.get_gmail_token(user_id)
+                if not token_blob: raise RuntimeError("Gmail is not connected")
+                client = build_gmail_service_from_blob(token_blob, repository=repository, user_id=user_id)
+                from server.gmail_labels import SAFEMAILX_LABELS, list_gmail_labels
+                by_name={x.get("name"):x.get("id") for x in list_gmail_labels(client)}
+                labels={key:by_name.get(name) for key,name in SAFEMAILX_LABELS.items()}
+                if not all(labels.get(key) for key in ("safe","suspicious","phishing","failed","queued")):
+                    raise RuntimeError("Gmail classification labels are not initialized")
+                msg = client.users().messages().get(userId="me", id=message_id, format="full").execute()
+                parsed = parse_email(client, message_id, msg)
+                # Recheck after network fetch to honor a concurrent OFF request.
+                if not repository.get_gmail_protection(user_id).get("auto_protect"): return None
+                result = service.run_manual_text_scan(subject=parsed.get("subject", ""), sender=parsed.get("sender", ""), body=parsed.get("body", ""), attachments=parsed.get("attachments") or None, link_details_override=parsed.get("links"), security_headers_override=parsed.get("security_headers") or {}, auth_context_override="original_headers", original_sender_override=parsed.get("sender"), source_type="email", scan_id=scan_id, user_id=user_id, retain_content=False, metadata={"source":"automatic_protection","provider":"gmail","message_id":message_id})
+                if repository.get_gmail_protection(user_id).get("auto_protect"):
+                    apply_result_label(client, message_id, result.get("final_label", "failed"), labels)
+            else:
+                conn = repository.get_outlook_connection(user_id)
+                if not conn: raise RuntimeError("Outlook is not connected")
+                from server.outlook_graph import GraphClient
+                from server.outlook_categories import set_message_category
+                from utils.outlook_parser import parse_mime_message
+                client = GraphClient(user_id, repository)
+                parsed = parse_mime_message(client.get_mime(message_id))
+                if not (repository.get_outlook_connection(user_id) or {}).get("auto_protect"): return None
+                result = service.run_manual_text_scan(subject=parsed.get("subject", ""), sender=parsed.get("sender", ""), body=parsed.get("body", ""), attachments=parsed.get("attachments") or None, link_details_override=parsed.get("links"), security_headers_override=parsed.get("security_headers") or {}, auth_context_override="original_headers", original_sender_override=parsed.get("sender"), source_type="email", scan_id=scan_id, user_id=user_id, retain_content=False, metadata={"source":"automatic_protection","provider":"outlook","message_id":message_id})
+                if (repository.get_outlook_connection(user_id) or {}).get("auto_protect"):
+                    key={"legitimate":"safe","suspicious":"suspicious","phishing":"phishing"}.get(result.get("final_label"), "failed")
+                    set_message_category(client, message_id, key)
+            return result
         if job_type == "manual_text":
             result = service.run_manual_text_scan(
                 subject=job.get("subject", "Queued SafeMail X Scan"),
@@ -235,6 +274,30 @@ def process_scan_job(
         traceback.print_exc()
         if scan_id:
             repository.fail_scan(scan_id, str(exc))
+        if job and job.get("type") in {"gmail_automatic_message", "outlook_automatic_message"}:
+            attempts = int(job.get("attempt", 0))
+            if attempts < 3:
+                retry_job = dict(job, attempt=attempts + 1)
+                try:
+                    from server.queue import ScanQueue
+                    ScanQueue().enqueue(retry_job)
+                except Exception:
+                    # Leave the claim in place; reconciliation will not create
+                    # duplicates. Surface the failed scan for explicit recovery.
+                    pass
+            else:
+                try:
+                    if job["type"] == "gmail_automatic_message" and repository.get_gmail_protection(user_id).get("auto_protect"):
+                        blob = repository.get_gmail_token(user_id)
+                        if blob:
+                            svc = build_gmail_service_from_blob(blob, repository=repository, user_id=user_id)
+                            apply_result_label(svc, job["gmail_message_id"], "failed", ensure_safemailx_label_ids(svc))
+                    elif job["type"] == "outlook_automatic_message" and (repository.get_outlook_connection(user_id) or {}).get("auto_protect"):
+                        from server.outlook_graph import GraphClient
+                        from server.outlook_categories import set_message_category
+                        set_message_category(GraphClient(user_id, repository), job["outlook_message_id"], "failed")
+                except Exception:
+                    pass
         if job and job.get("source") == "gmail_label_app" and job.get("gmail_message_id"):
             try:
                 token_blob = repository.get_gmail_token(job.get("user_id", "local"))

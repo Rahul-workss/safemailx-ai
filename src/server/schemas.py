@@ -163,6 +163,11 @@ class GmailOAuthStatusResponse(BaseModel):
     scan_label: str = ""
     queued_label: str = ""
     result_labels: dict[str, str] = {}
+    auto_protect: bool = False
+
+
+class AutomaticProtectionUpdate(BaseModel):
+    enabled: bool
 
 
 class ScanEvent(BaseModel):

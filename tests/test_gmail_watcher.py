@@ -38,6 +38,7 @@ class FakeGmailMessages:
     def __init__(self, labeled_ids=None, label_message_map=None) -> None:
         self.read_ids = []
         self.get_ids = []
+        self.get_formats = []
         self.modify_calls = []
         self.labeled_ids = labeled_ids if labeled_ids is not None else ["msg-1"]
         # Map from label_id -> list of message ids (for _count_messages_with_label)
@@ -99,6 +100,7 @@ class FakeGmailMessages:
 
     def get(self, **kwargs):
         self.get_ids.append(kwargs["id"])
+        self.get_formats.append(kwargs.get("format"))
         return FakeExecute(self.messages[kwargs["id"]])
 
     def modify(self, **kwargs):
@@ -220,7 +222,7 @@ class GmailWatcherTests(unittest.TestCase):
         self.assertEqual(queue.jobs[0]["source"], "gmail_label_app")
         self.assertEqual(queue.jobs[0]["gmail_message_id"], "msg-1")
         self.assertEqual(queue.jobs[0]["user_id"], "user-1")
-        self.assertEqual(service.users().messages().get_ids, [])
+        self.assertEqual(service.users().messages().get_formats, ["minimal"])
         self.assertEqual(
             service.users().messages().modify_calls[-1],
             {

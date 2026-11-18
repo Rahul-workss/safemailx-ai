@@ -160,20 +160,54 @@ def run_outlook_auto_poller() -> None:
         try:
             repository = ScanRepository()
             scan_queue = ScanQueue()
-            user_ids = repository.list_outlook_user_ids(active_only=True)
+            if OUTLOOK_AUTO_POLL_ENABLED:
+                user_ids = repository.list_outlook_user_ids(active_only=True)
+                for user_id in user_ids:
+                    try:
+                        count = enqueue_labeled_outlook_messages(user_id=user_id, repository=repository, scan_queue=scan_queue)
+                        if count: logger.info("[OUTLOOK POLLER] user=%s enqueued=%d", user_id, count)
+                    except Exception as exc:
+                        logger.warning("[OUTLOOK POLLER] user=%s error: %s", user_id, exc)
+                    time.sleep(0.5)
 
-            for user_id in user_ids:
+            # Per-account automatic protection is separate from the legacy
+            # user-selected category poller above.
+            for user_id in repository.list_outlook_protection_users():
                 try:
-                    count = enqueue_labeled_outlook_messages(
-                        user_id=user_id,
-                        repository=repository,
-                        scan_queue=scan_queue,
-                    )
-                    if count:
-                        logger.info("[OUTLOOK POLLER] user=%s enqueued=%d", user_id, count)
+                    conn = repository.get_outlook_connection(user_id) or {}
+                    cursor = conn.get("delta_link")
+                    if not cursor: continue
+                    client = __import__("server.outlook_graph", fromlist=["GraphClient"]).GraphClient(user_id, repository)
+                    page_url = cursor
+                    final_link = cursor
+                    while page_url:
+                        resp = client.get(page_url)
+                        for msg in resp.get("value", []):
+                            mid = msg.get("id")
+                            if not mid or "@removed" in msg: continue
+                            sid = repository.claim_automatic_scan("outlook", user_id, mid)
+                            if sid:
+                                try:
+                                    scan_queue.enqueue({"type":"outlook_automatic_message","user_id":user_id,"scan_id":sid,"outlook_message_id":mid})
+                                except Exception:
+                                    repository.release_automatic_scan_claim("outlook", user_id, mid)
+                                    raise
+                        page_url = resp.get("@odata.nextLink")
+                        final_link = resp.get("@odata.deltaLink", final_link)
+                    if final_link != cursor:
+                        repository.update_outlook_delta_link(user_id, final_link)
                 except Exception as exc:
-                    logger.warning("[OUTLOOK POLLER] user=%s error: %s", user_id, exc)
-                time.sleep(0.5)
+                    try:
+                        from server.outlook_graph import GraphError, GraphClient
+                        if isinstance(exc, GraphError) and (exc.status == 410 or exc.code.lower() in {"syncstatenotfound", "resyncrequired"}):
+                            client = GraphClient(user_id, repository)
+                            folder = client.get("/me/mailFolders/inbox?$select=id").get("id", "inbox")
+                            from urllib.parse import quote
+                            latest = client.get(f"/me/mailFolders/{quote(folder, safe='')}/messages/delta?$deltatoken=latest&$select=id").get("@odata.deltaLink")
+                            if latest: repository.update_outlook_delta_link(user_id, latest)
+                    except Exception:
+                        pass
+                    logger.warning("[OUTLOOK POLLER] automatic sync failed for account=%s error=%s", user_id[:8], type(exc).__name__)
 
         except Exception as exc:
             logger.error("[OUTLOOK POLLER] Loop error: %s", exc)

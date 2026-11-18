@@ -264,6 +264,7 @@ export type GmailStatus = {
   scan_label: string;
   queued_label: string;
   result_labels: Record<string, string>;
+  auto_protect?: boolean;
 };
 
 export type OutlookStatus = {
@@ -272,6 +273,7 @@ export type OutlookStatus = {
   account_email: string | null;
   status: string;          // "active" | "reauth_required" | "not_connected" | "disabled"
   categories_ready: boolean;
+  auto_protect?: boolean;
 };
 
 export type NotificationPreferences = {
@@ -630,6 +632,12 @@ export async function fetchGmailOAuthStatus(): Promise<GmailStatus> {
   return response.json();
 }
 
+export async function setGmailAutomaticProtection(enabled: boolean): Promise<boolean> {
+  const r = await apiFetch('/api/gmail/automatic-protection', {method:'PATCH', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify({enabled})});
+  if (!r.ok) throw new Error('Could not update Gmail protection');
+  return Boolean((await r.json()).enabled);
+}
+
 export async function startGmailOAuth(returnUrl?: string): Promise<string> {
   const url = returnUrl ? `/api/gmail/oauth/start?return_url=${encodeURIComponent(returnUrl)}` : "/api/gmail/oauth/start";
   const response = await apiFetch(url, {
@@ -849,6 +857,12 @@ export async function fetchOutlookStatus(): Promise<OutlookStatus> {
   });
   if (!response.ok) throw new Error('Outlook status check failed');
   return response.json();
+}
+
+export async function setOutlookAutomaticProtection(enabled: boolean): Promise<boolean> {
+  const r = await apiFetch('/api/outlook/automatic-protection', {method:'PATCH', headers:authHeaders({'Content-Type':'application/json'}), body:JSON.stringify({enabled})});
+  if (!r.ok) throw new Error('Could not update Outlook protection');
+  return Boolean((await r.json()).enabled);
 }
 
 export async function startOutlookOAuth(returnUrl?: string): Promise<string> {

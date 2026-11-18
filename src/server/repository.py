@@ -200,6 +200,14 @@ class ScanRepository:
                 conn.execute("UPDATE scans SET final_label = 'queued' WHERE final_label = 'pending'")
                 self._ensure_column(conn, "scans", "user_id", "TEXT NOT NULL DEFAULT 'local'")
                 self._ensure_column(conn, "push_tokens", "user_id", "TEXT NOT NULL DEFAULT 'local'")
+                for table, column, definition in (
+                    ("gmail_tokens", "auto_protect", "INTEGER NOT NULL DEFAULT 0"),
+                    ("gmail_tokens", "history_id", "TEXT"),
+                    ("outlook_tokens", "auto_protect", "INTEGER NOT NULL DEFAULT 0"),
+                    ("outlook_tokens", "delta_link", "TEXT"),
+                ):
+                    self._ensure_column(conn, table, column, definition)
+                conn.execute("CREATE TABLE IF NOT EXISTS automatic_scan_claims (provider TEXT NOT NULL, user_id TEXT NOT NULL, message_id TEXT NOT NULL, scan_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(provider, user_id, message_id))")
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS users (
@@ -602,6 +610,48 @@ class ScanRepository:
             rows = conn.execute("SELECT user_id FROM gmail_tokens ORDER BY updated_at DESC").fetchall()
         return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
 
+    def get_gmail_protection(self, user_id: str) -> dict:
+        with self._db() as conn:
+            if not self.is_postgres: conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT auto_protect, history_id FROM gmail_tokens WHERE user_id = ?" if not self.is_postgres else "SELECT auto_protect, history_id FROM gmail_tokens WHERE user_id = %s", (user_id,)).fetchone()
+        return dict(row) if row else {"auto_protect": False, "history_id": None}
+
+    def set_gmail_protection(self, user_id: str, enabled: bool, history_id: str | None = None) -> None:
+        with self._db() as conn:
+            sql = "UPDATE gmail_tokens SET auto_protect = ?, history_id = COALESCE(?, history_id) WHERE user_id = ?" if not self.is_postgres else "UPDATE gmail_tokens SET auto_protect = %s, history_id = COALESCE(%s, history_id) WHERE user_id = %s"
+            conn.execute(sql, (bool(enabled) if self.is_postgres else int(enabled), history_id, user_id))
+
+    def list_gmail_protection_users(self) -> list[str]:
+        with self._db() as conn:
+            rows = conn.execute("SELECT user_id FROM gmail_tokens WHERE auto_protect = 1").fetchall()
+        return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
+
+    def claim_automatic_scan(self, provider: str, user_id: str, message_id: str) -> str | None:
+        scan_id = self.create_queued_scan(subject=f"Automatic {provider} scan", sender="automatic_protection", user_id=user_id, evidence={"status":"queued", "source":"automatic_protection", "provider":provider})
+        try:
+            with self._db() as conn:
+                ph = "%s" if self.is_postgres else "?"
+                conn.execute(f"INSERT INTO automatic_scan_claims(provider,user_id,message_id,scan_id,created_at) VALUES ({ph},{ph},{ph},{ph},{ph})", (provider,user_id,message_id,scan_id,datetime.now(timezone.utc).isoformat()))
+            return scan_id
+        except Exception:
+            self.fail_scan(scan_id, "duplicate automatic message")
+            return None
+
+    def get_automatic_scan_claim(self, provider: str, user_id: str, message_id: str) -> bool:
+        ph = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            row=conn.execute(f"SELECT 1 FROM automatic_scan_claims WHERE provider={ph} AND user_id={ph} AND message_id={ph}",(provider,user_id,message_id)).fetchone()
+        return bool(row)
+
+    def release_automatic_scan_claim(self, provider: str, user_id: str, message_id: str) -> None:
+        ph = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            row = conn.execute(f"SELECT scan_id FROM automatic_scan_claims WHERE provider={ph} AND user_id={ph} AND message_id={ph}", (provider,user_id,message_id)).fetchone()
+            if row:
+                scan_id = row[0] if not isinstance(row, dict) else row["scan_id"]
+                conn.execute(f"DELETE FROM automatic_scan_claims WHERE provider={ph} AND user_id={ph} AND message_id={ph}", (provider,user_id,message_id))
+                conn.execute(f"UPDATE scans SET final_label='failed' WHERE id={ph}", (scan_id,))
+
     # ── Outlook / Office 365 token methods ───────────────────────────────────
 
     def store_outlook_token(
@@ -706,6 +756,21 @@ class ScanRepository:
                     "SELECT user_id FROM outlook_tokens ORDER BY updated_at DESC"
                 ).fetchall()
         return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
+
+    def set_outlook_protection(self, user_id: str, enabled: bool, delta_link: str | None = None) -> None:
+        ph = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(f"UPDATE outlook_tokens SET auto_protect={ph}, delta_link=COALESCE({ph}, delta_link) WHERE user_id={ph}", (bool(enabled) if self.is_postgres else int(enabled), delta_link, user_id))
+
+    def list_outlook_protection_users(self) -> list[str]:
+        with self._db() as conn:
+            rows=conn.execute("SELECT user_id FROM outlook_tokens WHERE status='active' AND auto_protect=1").fetchall()
+        return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
+
+    def update_outlook_delta_link(self, user_id: str, delta_link: str) -> None:
+        ph = "%s" if self.is_postgres else "?"
+        with self._db() as conn:
+            conn.execute(f"UPDATE outlook_tokens SET delta_link={ph} WHERE user_id={ph}", (delta_link,user_id))
 
     def create_password_reset_token(self, token: str, user_id: str, expires_at: str) -> None:
         created_at = datetime.now(timezone.utc).isoformat()

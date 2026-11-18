@@ -54,7 +54,8 @@ import {
   InstantScanResult, scanInstantFile, submitScanFeedback,
   UnauthorizedError, NetworkError, exchangeOAuthCode, logoutSession,
   OutlookStatus, fetchOutlookStatus, startOutlookOAuth,
-  ensureOutlookCategories, runOutlookScan, disconnectOutlook
+  ensureOutlookCategories, runOutlookScan, disconnectOutlook,
+  setGmailAutomaticProtection, setOutlookAutomaticProtection
 } from "./src/api";
 import {
   saveSession, loadSession, clearSession,
@@ -337,6 +338,7 @@ function App() {
   const [authState, setAuthState] = useState("Local mode");
   const [gmailState, setGmailState] = useState("not checked");
   const [outlook, setOutlook] = useState<OutlookStatus | null>(null);
+  const [gmailAutoProtect, setGmailAutoProtect] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -794,6 +796,7 @@ function App() {
       const status = await fetchGmailOAuthStatus();
       const labelsReady = await AsyncStorage.getItem('gmailLabelsReady');
       if (status.connected) {
+        setGmailAutoProtect(Boolean(status.auto_protect));
         if (labelsReady === 'true') {
           setGmailState("labels ready");
         } else {
@@ -812,6 +815,22 @@ function App() {
       setOutlook(status);
     } catch {
       // Backend may not have Outlook enabled yet — keep null
+    }
+  }
+
+  async function toggleProtection(provider: "gmail" | "outlook", enabled: boolean) {
+    try {
+      if (provider === "gmail") {
+        await setGmailAutomaticProtection(enabled);
+        setGmailAutoProtect(enabled);
+      } else {
+        await setOutlookAutomaticProtection(enabled);
+        await refreshOutlookStatus();
+      }
+      showToast(`Automatic ${provider === "gmail" ? "Gmail" : "Outlook"} protection ${enabled ? "enabled" : "disabled"}.`, "success");
+    } catch (e: any) {
+      showToast(e.message || "Could not update automatic protection");
+      await refreshGmailStatus(); await refreshOutlookStatus();
     }
   }
 
@@ -1080,6 +1099,8 @@ function App() {
                   onSetupOutlookCategories={setupOutlookCategories}
                   onRunOutlookScan={handleRunOutlookScan}
                   onDisconnectOutlook={handleDisconnectOutlook}
+                  gmailAutoProtect={gmailAutoProtect}
+                  onToggleProtection={toggleProtection}
                   onSetupGmailLabels={setupGmailLabels} onRunGmailScan={runGmailScan}
                   smsText={smsText} setSmsText={setSmsText}
                   smsSender={smsSender} setSmsSender={setSmsSender}
@@ -2383,6 +2404,7 @@ function SecurityBulletin() {
 function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   outlook, onConnectOutlook, onRefreshOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
+  gmailAutoProtect, onToggleProtection,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
   manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
@@ -2395,6 +2417,8 @@ function UnifiedScanScreen({
   onSetupOutlookCategories?: () => void;
   onRunOutlookScan?: () => void;
   onDisconnectOutlook?: () => void;
+  gmailAutoProtect: boolean;
+  onToggleProtection: (provider: "gmail" | "outlook", enabled: boolean) => void;
   onSetupGmailLabels: () => void; onRunGmailScan: () => void;
   smsText: string; setSmsText: (v: string) => void;
   smsSender: string; setSmsSender: (v: string) => void;
@@ -2604,6 +2628,11 @@ function UnifiedScanScreen({
           )}
         </View>
 
+        {connected && ready && <View style={{flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingTop:4}}>
+          <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Outlook emails</Text></View>
+          <Switch value={Boolean(outlook?.auto_protect)} onValueChange={v=>onToggleProtection("outlook",v)} disabled={busy} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+        </View>}
+
         {/* Action: Run Outlook Scan */}
         {connected && ready && (
           <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
@@ -2774,6 +2803,12 @@ function UnifiedScanScreen({
               )}
             </View>
 
+            {connected && hasLabels && (
+              <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingTop:4}}>
+                <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Gmail emails</Text></View>
+                <Switch value={gmailAutoProtect} onValueChange={v=>onToggleProtection("gmail",v)} disabled={busy} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+              </View>
+            )}
             {connected && hasLabels && (
               <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
                 <TmPrimaryBtn label={busy ? "Scanning Inbox..." : "Run Inbox Scan"} onPress={onRunGmailScan} disabled={busy} icon="shield-checkmark" />
