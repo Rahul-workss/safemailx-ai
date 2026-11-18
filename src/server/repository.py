@@ -678,7 +678,8 @@ class ScanRepository:
 
     def set_outlook_categories_ready(self, user_id: str, ready: bool) -> None:
         updated_at = datetime.now(timezone.utc).isoformat()
-        value = ready if self.is_postgres else (1 if ready else 0)
+        # categories_ready is INTEGER (0 or 1) in both PostgreSQL and SQLite DDL
+        value = 1 if ready else 0
         placeholder = "%s" if self.is_postgres else "?"
         with self._db() as conn:
             conn.execute(

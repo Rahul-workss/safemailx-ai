@@ -1076,6 +1076,7 @@ function App() {
                   onConnectGmail={connectGmail} onRefreshGmail={refreshGmailStatus}
                   outlook={outlook}
                   onConnectOutlook={connectOutlook}
+                  onRefreshOutlook={refreshOutlookStatus}
                   onSetupOutlookCategories={setupOutlookCategories}
                   onRunOutlookScan={handleRunOutlookScan}
                   onDisconnectOutlook={handleDisconnectOutlook}
@@ -2381,7 +2382,7 @@ function SecurityBulletin() {
 // ─── Unified Scan Screen ─────────────────────────────────────────────────────────
 function UnifiedScanScreen({
   gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
-  outlook, onConnectOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
+  outlook, onConnectOutlook, onRefreshOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
   manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
@@ -2390,6 +2391,7 @@ function UnifiedScanScreen({
   onConnectGmail: () => void; onRefreshGmail: () => void;
   outlook?: OutlookStatus | null;
   onConnectOutlook?: () => void;
+  onRefreshOutlook?: () => void;
   onSetupOutlookCategories?: () => void;
   onRunOutlookScan?: () => void;
   onDisconnectOutlook?: () => void;
@@ -2435,89 +2437,183 @@ function UnifiedScanScreen({
   
   // ── OutlookCard ───────────────────────────────────────────────────────
   function OutlookCard() {
-    // Always render the card — hidden only when backend explicitly says disabled
-    // and outlook state has loaded. While null (loading), show skeleton.
     if (outlook !== null && outlook!.enabled === false) return null;
 
-    const connected = outlook?.connected && outlook?.status === "active";
+    const connected = Boolean(outlook?.connected && outlook?.status === "active");
     const needsReauth = outlook?.status === "reauth_required";
-    const ready = connected && outlook?.categories_ready;
-    const isLoading = outlook === null;
+    const ready = Boolean(connected && outlook?.categories_ready);
+    const busy = appBusy || localBusy;
 
     return (
-      <TmCard style={{ marginBottom: 16 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-          <Ionicons name="mail-outline" size={20} color={C.violetGlow} style={{ marginRight: 8 }} />
-          <Text style={[S.frost, { fontWeight: "700", fontSize: 15 }]}>Outlook / Office 365</Text>
+      <TmCard style={{ padding: 24, gap: 16 }}>
+        {/* Subtle Provider Header */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="logo-windows" size={15} color="#0078D4" />
+            <Text style={{ fontSize: 12, fontWeight: "700", color: C.frost3, letterSpacing: 0.8 }}>
+              MICROSOFT OUTLOOK
+            </Text>
+          </View>
+          {outlook?.account_email ? (
+            <Text style={{ fontSize: 10, color: C.frost4, maxWidth: 160 }} numberOfLines={1}>
+              {outlook.account_email}
+            </Text>
+          ) : null}
         </View>
-        {isLoading && (
-          <Text style={[S.muted, { fontSize: 13 }]}>Checking Outlook status...</Text>
-        )}
-        {!isLoading && !connected && !needsReauth && (
-          <>
-            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
-              Connect your work Outlook account to scan emails tagged "SafeMail X Scan".
-            </Text>
-            <Pressable
-              onPress={onConnectOutlook}
-              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}
+
+        {/* Step 1: Connect Account */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: connected
+                  ? "rgba(111,217,184,0.15)"
+                  : needsReauth
+                  ? "rgba(232,96,122,0.15)"
+                  : "rgba(255,255,255,0.05)",
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: connected
+                  ? "rgba(111,217,184,0.3)"
+                  : needsReauth
+                  ? "rgba(232,96,122,0.3)"
+                  : "rgba(255,255,255,0.1)",
+              }}
             >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Connect Outlook</Text>
-            </Pressable>
-          </>
-        )}
-        {!isLoading && needsReauth && (
-          <>
-            <Text style={[S.muted, { marginBottom: 8, fontSize: 13, color: C.rose }]}>
-              Outlook session expired. Please reconnect.
-            </Text>
-            <Pressable
-              onPress={onConnectOutlook}
-              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.rose, borderRadius: 8 }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Reconnect Outlook</Text>
-            </Pressable>
-          </>
-        )}
-        {!isLoading && connected && !ready && (
-          <>
-            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
-              Connected as {outlook?.account_email}. Set up Outlook categories to start scanning.
-            </Text>
-            <Pressable
-              onPress={onSetupOutlookCategories}
-              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8, marginBottom: 8 }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Setup Categories</Text>
-            </Pressable>
-            <Pressable
-              onPress={onDisconnectOutlook}
-              style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}
-            >
-              <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 12 }}>Disconnect</Text>
-            </Pressable>
-          </>
-        )}
-        {!isLoading && ready && (
-          <>
-            <Text style={[S.muted, { marginBottom: 8, fontSize: 13 }]}>
-              ✓ Connected: {outlook?.account_email}
-            </Text>
-            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-              <Pressable
-                onPress={onRunOutlookScan}
-                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}
+              <Ionicons
+                name={connected ? "checkmark" : needsReauth ? "alert-circle-outline" : "mail-outline"}
+                size={18}
+                color={connected ? C.emerald : needsReauth ? C.rose : C.frost}
+              />
+            </View>
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>1. Connect Account</Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: connected ? C.emerald : needsReauth ? C.rose : C.frost4,
+                  marginTop: 2,
+                }}
               >
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Scan Now</Text>
-              </Pressable>
+                {needsReauth ? "Session expired" : connected ? "Connected" : "Requires sign in"}
+              </Text>
+            </View>
+          </View>
+
+          {!connected || needsReauth ? (
+            <Pressable
+              onPress={onConnectOutlook}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                backgroundColor: needsReauth ? C.rose : C.violet,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#fff" }}>
+                {needsReauth ? "Reconnect" : "Connect"}
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+              {onRefreshOutlook && (
+                <Pressable onPress={onRefreshOutlook} style={{ padding: 8 }}>
+                  <Ionicons name="refresh" size={18} color={C.frost3} />
+                </Pressable>
+              )}
               <Pressable
                 onPress={onDisconnectOutlook}
-                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.2)",
+                }}
               >
-                <Text style={{ color: C.frost4, fontWeight: "600", fontSize: 12 }}>Disconnect</Text>
+                <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Disconnect</Text>
               </Pressable>
             </View>
-          </>
+          )}
+        </View>
+
+        {/* Step 2: Initialize Categories */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            opacity: connected ? 1 : 0.4,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: ready
+                  ? "rgba(111,217,184,0.15)"
+                  : "rgba(255,255,255,0.05)",
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: ready
+                  ? "rgba(111,217,184,0.3)"
+                  : "rgba(255,255,255,0.1)",
+              }}
+            >
+              <Ionicons
+                name={ready ? "checkmark" : "pricetag-outline"}
+                size={18}
+                color={ready ? C.emerald : C.frost}
+              />
+            </View>
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>2. Initialize Categories</Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: ready ? C.emerald : C.frost4,
+                  marginTop: 2,
+                }}
+              >
+                {ready ? "Ready" : "Pending"}
+              </Text>
+            </View>
+          </View>
+          {connected && !ready && (
+            <Pressable
+              onPress={onSetupOutlookCategories}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                backgroundColor: "rgba(255,255,255,0.1)",
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.2)",
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Setup</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Action: Run Outlook Scan */}
+        {connected && ready && (
+          <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
+            <TmPrimaryBtn
+              label={busy ? "Scanning Outlook..." : "Run Outlook Scan"}
+              onPress={onRunOutlookScan || (() => {})}
+              disabled={busy}
+              icon="shield-checkmark"
+            />
+          </View>
         )}
       </TmCard>
     );
@@ -2623,58 +2719,71 @@ function UnifiedScanScreen({
       </View>
 
       {mode === "email" && (
-        <TmCard style={{ padding: 24, gap: 16 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: connected ? "rgba(111,217,184,0.15)" : "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: connected ? "rgba(111,217,184,0.3)" : "rgba(255,255,255,0.1)" }}>
-                <Ionicons name={connected ? "checkmark" : "logo-google"} size={18} color={connected ? C.emerald : C.frost} />
-              </View>
-              <View>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>1. Connect Account</Text>
-                <Text style={{ fontSize: 10, color: connected ? C.emerald : C.frost4, marginTop: 2 }}>{connected ? "Connected" : "Requires sign in"}</Text>
+        <View style={{ gap: 14 }}>
+          <TmCard style={{ padding: 24, gap: 16 }}>
+            {/* Subtle Provider Header */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="logo-google" size={15} color="#EA4335" />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: C.frost3, letterSpacing: 0.8 }}>
+                  GOOGLE GMAIL
+                </Text>
               </View>
             </View>
-            {!connected ? (
-              <Pressable onPress={onConnectGmail} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}>
-                <Text style={{ fontSize: 11, fontWeight: "600", color: "#fff" }}>Connect</Text>
-              </Pressable>
-            ) : (
-              <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                <Pressable onPress={onRefreshGmail} style={{ padding: 8 }}>
-                  <Ionicons name="refresh" size={18} color={C.frost3} />
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: connected ? "rgba(111,217,184,0.15)" : "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: connected ? "rgba(111,217,184,0.3)" : "rgba(255,255,255,0.1)" }}>
+                  <Ionicons name={connected ? "checkmark" : "logo-google"} size={18} color={connected ? C.emerald : C.frost} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>1. Connect Account</Text>
+                  <Text style={{ fontSize: 10, color: connected ? C.emerald : C.frost4, marginTop: 2 }}>{connected ? "Connected" : "Requires sign in"}</Text>
+                </View>
+              </View>
+              {!connected ? (
+                <Pressable onPress={onConnectGmail} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.violet, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: "#fff" }}>Connect</Text>
                 </Pressable>
-                <Pressable onPress={onConnectGmail} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }}>
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Switch</Text>
+              ) : (
+                <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                  <Pressable onPress={onRefreshGmail} style={{ padding: 8 }}>
+                    <Ionicons name="refresh" size={18} color={C.frost3} />
+                  </Pressable>
+                  <Pressable onPress={onConnectGmail} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Switch</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", opacity: connected ? 1 : 0.4 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: hasLabels ? "rgba(111,217,184,0.15)" : "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: hasLabels ? "rgba(111,217,184,0.3)" : "rgba(255,255,255,0.1)" }}>
+                  <Ionicons name={hasLabels ? "checkmark" : "pricetag-outline"} size={18} color={hasLabels ? C.emerald : C.frost} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>2. Initialize Labels</Text>
+                  <Text style={{ fontSize: 10, color: hasLabels ? C.emerald : C.frost4, marginTop: 2 }}>{hasLabels ? "Ready" : "Pending"}</Text>
+                </View>
+              </View>
+              {connected && !hasLabels && (
+                <Pressable onPress={onSetupGmailLabels} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Setup</Text>
                 </Pressable>
+              )}
+            </View>
+
+            {connected && hasLabels && (
+              <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
+                <TmPrimaryBtn label={busy ? "Scanning Inbox..." : "Run Inbox Scan"} onPress={onRunGmailScan} disabled={busy} icon="shield-checkmark" />
               </View>
             )}
-          </View>
+          </TmCard>
 
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", opacity: connected ? 1 : 0.4 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: hasLabels ? "rgba(111,217,184,0.15)" : "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: hasLabels ? "rgba(111,217,184,0.3)" : "rgba(255,255,255,0.1)" }}>
-                <Ionicons name={hasLabels ? "checkmark" : "pricetag-outline"} size={18} color={hasLabels ? C.emerald : C.frost} />
-              </View>
-              <View>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.frost }}>2. Initialize Labels</Text>
-                <Text style={{ fontSize: 10, color: hasLabels ? C.emerald : C.frost4, marginTop: 2 }}>{hasLabels ? "Ready" : "Pending"}</Text>
-              </View>
-            </View>
-            {connected && !hasLabels && (
-              <Pressable onPress={onSetupGmailLabels} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }}>
-                <Text style={{ fontSize: 11, fontWeight: "600", color: C.frost }}>Setup</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {connected && hasLabels && (
-            <View style={{ paddingTop: 16, borderTopWidth: 1, borderTopColor: C.line }}>
-              <TmPrimaryBtn label={busy ? "Scanning Inbox..." : "Run Inbox Scan"} onPress={onRunGmailScan} disabled={busy} icon="shield-checkmark" />
-            </View>
-          )}
-        </TmCard>
+          <OutlookCard />
+        </View>
       )}
-      <OutlookCard />
 
       {mode === "sms" && (
         <TmCard style={{ padding: 24 }}>
@@ -3163,7 +3272,7 @@ function SettingsScreen({ health, email, password, apiUrl, authState, gmailState
         </Pressable>
       </TmCard>
 
-      <Text style={{ textAlign: "center", color: C.frost4, fontSize: 10, marginBottom: 40 }}>v1.0.8 — Outlook + Gmail Scanning</Text>
+      <Text style={{ textAlign: "center", color: C.frost4, fontSize: 10, marginBottom: 40 }}>v1.0.9 — Outlook + Gmail Scanning</Text>
     </View>
   );
 }
@@ -3342,7 +3451,7 @@ function HelpCenterScreen({ onBack }: { onBack?: () => void }) {
       </TmCard>
 
       <Text style={[S.muted, { textAlign: "center", fontSize: 11, marginTop: 16, fontStyle: "italic" }]}>
-        SafeMail X AI v1.0.8 — Privacy-first threat detection
+        SafeMail X AI v1.0.9 — Privacy-first threat detection
       </Text>
     </View>
   );
