@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -174,3 +176,45 @@ class GraphClient:
                     chunks.append(chunk)
 
         return b"".join(chunks)
+
+
+def initialize_inbox_delta_cursor(client: GraphClient, *, max_pages: int = 100) -> str:
+    """Establish a message-delta cursor at enable time without scanning old mail.
+
+    Outlook message delta does not support the "latest" shortcut used by some
+    other Graph resources. Start with the documented receivedDateTime filter,
+    follow any pages until Graph returns its final deltaLink, and select only
+    IDs/timestamps. Messages received before the protection request are not
+    included in this baseline.
+    """
+    folder = client.get("/me/mailFolders/inbox?$select=id").get("id")
+    if not folder:
+        raise RuntimeError("Outlook Inbox folder lookup returned no ID")
+
+    folder_id = quote(folder, safe="")
+    since = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    filter_value = quote(f"receivedDateTime ge {since}", safe=":-TZ")
+    page_url = (
+        f"/me/mailFolders/{folder_id}/messages/delta"
+        f"?$filter={filter_value}&$select=id,receivedDateTime"
+    )
+
+    for _ in range(max_pages):
+        page = client.get(page_url)
+        next_link = page.get("@odata.nextLink")
+        if next_link:
+            parsed = urlparse(next_link)
+            if parsed.scheme and (parsed.scheme != "https" or parsed.hostname != "graph.microsoft.com"):
+                raise RuntimeError("Outlook delta returned an untrusted continuation URL")
+            page_url = next_link
+            continue
+
+        delta_link = page.get("@odata.deltaLink")
+        if delta_link:
+            parsed = urlparse(delta_link)
+            if parsed.scheme and (parsed.scheme != "https" or parsed.hostname != "graph.microsoft.com"):
+                raise RuntimeError("Outlook delta returned an untrusted cursor URL")
+            return delta_link
+        raise RuntimeError("Outlook delta round ended without a continuation or cursor")
+
+    raise RuntimeError("Outlook delta baseline exceeded the page limit")

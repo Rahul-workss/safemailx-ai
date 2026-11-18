@@ -977,14 +977,31 @@ def outlook_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depen
         raise HTTPException(status_code=409, detail="outlook_reauth_required")
     delta_link = None
     if payload.enabled:
-        from server.outlook_graph import GraphClient
-        client = GraphClient(uid, repository)
-        folder = client.get("/me/mailFolders/inbox?$select=id").get("id", "inbox")
-        from urllib.parse import quote
-        delta = client.get(f"/me/mailFolders/{quote(folder, safe='')}/messages/delta?$deltatoken=latest&$select=id")
-        delta_link = delta.get("@odata.deltaLink")
-        if not delta_link: raise HTTPException(status_code=502, detail="outlook_sync_baseline_failed")
-    repository.set_outlook_protection(uid, payload.enabled, delta_link)
+        try:
+            from server.outlook_graph import GraphClient, initialize_inbox_delta_cursor
+            client = GraphClient(uid, repository)
+            delta_link = initialize_inbox_delta_cursor(client)
+        except Exception as exc:
+            from server.outlook_graph import GraphError
+            status = exc.status if isinstance(exc, GraphError) else None
+            logger.warning(
+                "Outlook protection baseline failed: error_type=%s provider_status=%s",
+                type(exc).__name__, status or "unknown",
+            )
+            if status == 401:
+                raise HTTPException(status_code=409, detail="outlook_reauth_required") from exc
+            if status == 403:
+                raise HTTPException(status_code=409, detail="outlook_access_denied") from exc
+            if status == 429:
+                raise HTTPException(status_code=503, detail="outlook_rate_limited") from exc
+            if isinstance(status, int) and status >= 500:
+                raise HTTPException(status_code=503, detail="outlook_provider_unavailable") from exc
+            raise HTTPException(status_code=502, detail="outlook_sync_baseline_failed") from exc
+    try:
+        repository.set_outlook_protection(uid, payload.enabled, delta_link)
+    except Exception as exc:
+        logger.warning("Outlook protection preference save failed: error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="outlook_protection_storage_failed") from exc
     return {"enabled": payload.enabled}
 
 

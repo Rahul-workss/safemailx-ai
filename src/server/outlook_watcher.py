@@ -201,9 +201,8 @@ def run_outlook_auto_poller() -> None:
                         from server.outlook_graph import GraphError, GraphClient
                         if isinstance(exc, GraphError) and (exc.status == 410 or exc.code.lower() in {"syncstatenotfound", "resyncrequired"}):
                             client = GraphClient(user_id, repository)
-                            folder = client.get("/me/mailFolders/inbox?$select=id").get("id", "inbox")
-                            from urllib.parse import quote
-                            latest = client.get(f"/me/mailFolders/{quote(folder, safe='')}/messages/delta?$deltatoken=latest&$select=id").get("@odata.deltaLink")
+                            from server.outlook_graph import initialize_inbox_delta_cursor
+                            latest = initialize_inbox_delta_cursor(client)
                             if latest: repository.update_outlook_delta_link(user_id, latest)
                     except Exception:
                         pass

@@ -619,7 +619,9 @@ class ScanRepository:
     def set_gmail_protection(self, user_id: str, enabled: bool, history_id: str | None = None) -> None:
         with self._db() as conn:
             sql = "UPDATE gmail_tokens SET auto_protect = ?, history_id = COALESCE(?, history_id) WHERE user_id = ?" if not self.is_postgres else "UPDATE gmail_tokens SET auto_protect = %s, history_id = COALESCE(%s, history_id) WHERE user_id = %s"
-            conn.execute(sql, (bool(enabled) if self.is_postgres else int(enabled), history_id, user_id))
+            # The schema deliberately stores provider preferences as INTEGER
+            # on both SQLite and PostgreSQL; psycopg does not coerce bool to int.
+            conn.execute(sql, (int(bool(enabled)), history_id, user_id))
 
     def list_gmail_protection_users(self) -> list[str]:
         with self._db() as conn:
@@ -760,7 +762,7 @@ class ScanRepository:
     def set_outlook_protection(self, user_id: str, enabled: bool, delta_link: str | None = None) -> None:
         ph = "%s" if self.is_postgres else "?"
         with self._db() as conn:
-            conn.execute(f"UPDATE outlook_tokens SET auto_protect={ph}, delta_link=COALESCE({ph}, delta_link) WHERE user_id={ph}", (bool(enabled) if self.is_postgres else int(enabled), delta_link, user_id))
+            conn.execute(f"UPDATE outlook_tokens SET auto_protect={ph}, delta_link=COALESCE({ph}, delta_link) WHERE user_id={ph}", (int(bool(enabled)), delta_link, user_id))
 
     def list_outlook_protection_users(self) -> list[str]:
         with self._db() as conn:
