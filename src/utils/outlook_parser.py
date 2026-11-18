@@ -86,13 +86,15 @@ def _html_to_text(html: str) -> tuple[str, list[dict[str, Any]], list[str]]:
 # ── Security header parsing ───────────────────────────────────────────────────
 
 def _parse_security_headers(msg: EmailMessage) -> dict[str, Any]:
-    """Extract SPF, DKIM, DMARC, and Authentication-Results info."""
+    """Extract SPF, DKIM, DMARC, Reply-To mismatch, Message-ID mismatch,
+    TLS, and X-Mailer — mirroring Gmail's parse_security_headers() coverage
+    so the LLM receives identical forensic context for both providers."""
     result: dict[str, Any] = {}
 
+    # ── SPF / DKIM / DMARC from Authentication-Results ──────────────────────
     auth_results = msg.get("Authentication-Results", "")
     if auth_results:
         result["authentication_results"] = auth_results[:2000]
-        # Quick pass/fail extraction
         for proto in ("spf", "dkim", "dmarc"):
             m = re.search(rf"{proto}=(\S+)", auth_results, re.IGNORECASE)
             if m:
@@ -108,6 +110,56 @@ def _parse_security_headers(msg: EmailMessage) -> dict[str, Any]:
     dkim_sig = msg.get("DKIM-Signature", "")
     if dkim_sig:
         result["dkim_signature_present"] = True
+
+    # ── TLS detection from Received headers ─────────────────────────────────
+    received_headers = msg.get_all("Received") or []
+    tls_found = False
+    tls_version = None
+    for rcv in received_headers:
+        if "tls" in rcv.lower() or "esmtps" in rcv.lower():
+            tls_found = True
+            m_tls = re.search(r"(TLSv[\d.]+)", rcv, re.IGNORECASE)
+            if m_tls:
+                tls_version = m_tls.group(1)
+            break
+    result["tls"] = tls_found
+    if tls_version:
+        result["tls_version"] = tls_version
+
+    # ── Reply-To mismatch (classic sender-spoofing signal) ───────────────────
+    from_addr = msg.get("From", "")
+    reply_to = msg.get("Reply-To", None)
+    from_domain = ""
+    m_from = re.search(r"@([\w.-]+)", from_addr)
+    if m_from:
+        from_domain = m_from.group(1).lower()
+
+    result["reply_to"] = reply_to
+    reply_to_mismatch = False
+    if reply_to:
+        m_rt = re.search(r"@([\w.-]+)", reply_to)
+        if m_rt and m_rt.group(1).lower() != from_domain:
+            reply_to_mismatch = True
+    result["reply_to_mismatch"] = reply_to_mismatch
+
+    # ── Message-ID domain mismatch ───────────────────────────────────────────
+    message_id = msg.get("Message-ID", "")
+    msg_id_domain = None
+    msg_id_mismatch = False
+    m_mid = re.search(r"@([\w.-]+)", message_id)
+    if m_mid:
+        msg_id_domain = m_mid.group(1).lower()
+        if from_domain and msg_id_domain != from_domain:
+            msg_id_mismatch = True
+    result["message_id_domain"] = msg_id_domain
+    result["message_id_mismatch"] = msg_id_mismatch
+
+    # ── X-Mailer ─────────────────────────────────────────────────────────────
+    x_mailer = msg.get("X-Mailer", None)
+    if x_mailer:
+        result["x_mailer"] = x_mailer
+
+    result["from_raw"] = from_addr
 
     return result
 
