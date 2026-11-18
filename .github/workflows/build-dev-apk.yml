@@ -7,6 +7,12 @@ on:
         description: 'Force rebuild even if no native changes'
         required: false
         default: 'false'
+  push:
+    branches:
+      - main
+    paths:
+      - 'trustmail-mobile/**'
+      - '.github/workflows/build-dev-apk.yml'
 
 jobs:
   build:
