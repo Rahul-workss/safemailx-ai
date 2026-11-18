@@ -3156,7 +3156,7 @@ function SettingsScreen({ health, email, password, apiUrl, authState, gmailState
         </Pressable>
       </TmCard>
 
-      <Text style={{ textAlign: "center", color: C.frost4, fontSize: 10, marginBottom: 40 }}>v1.0.0 (Build 42)</Text>
+      <Text style={{ textAlign: "center", color: C.frost4, fontSize: 10, marginBottom: 40 }}>v1.0.8 — Outlook + Gmail Scanning</Text>
     </View>
   );
 }
@@ -3335,7 +3335,7 @@ function HelpCenterScreen({ onBack }: { onBack?: () => void }) {
       </TmCard>
 
       <Text style={[S.muted, { textAlign: "center", fontSize: 11, marginTop: 16, fontStyle: "italic" }]}>
-        SafeMail X AI v1.0.0 — Privacy-first threat detection
+        SafeMail X AI v1.0.8 — Privacy-first threat detection
       </Text>
     </View>
   );
