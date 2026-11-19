@@ -909,8 +909,9 @@ function App() {
     setBusy(true);
     try {
       const r = await runOutlookScan();
-      showToast(`${r.enqueued} message(s) queued from Outlook`, "success");
       await refresh();
+      switchTab("scans");
+      showToast(`${r.enqueued} message(s) queued from Outlook`, "success");
     } catch (e: any) {
       if (e.message?.includes("reauth")) {
         showToast("Outlook session expired. Please reconnect.");
