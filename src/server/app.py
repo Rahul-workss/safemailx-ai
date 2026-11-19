@@ -511,7 +511,9 @@ def admin_migrate_db():
                             f"""
                             ALTER TABLE {table}
                             ALTER COLUMN {col} TYPE INTEGER
-                            USING CASE WHEN {col} THEN 1 ELSE 0 END
+                            USING CASE WHEN {col} = TRUE THEN 1
+                                       WHEN {col} IS NULL THEN 0
+                                       ELSE ({col}::INTEGER) END
                             """
                         )
                         conn.execute("RELEASE SAVEPOINT fix_col_type")

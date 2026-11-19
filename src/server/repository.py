@@ -286,11 +286,15 @@ class ScanRepository:
         try:
             conn.execute("SAVEPOINT fix_col_type")
             try:
+                # Use CASE WHEN col = TRUE to handle both BOOLEAN and INTEGER columns.
+                # If the column is already INTEGER this ALTER succeeds as a no-op cast.
                 conn.execute(
                     f"""
                     ALTER TABLE {table}
                     ALTER COLUMN {column} TYPE INTEGER
-                    USING CASE WHEN {column} THEN 1 ELSE 0 END
+                    USING CASE WHEN {column} = TRUE THEN 1
+                               WHEN {column} IS NULL THEN 0
+                               ELSE ({column}::INTEGER) END
                     """
                 )
                 conn.execute("RELEASE SAVEPOINT fix_col_type")

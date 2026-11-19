@@ -93,21 +93,28 @@ def process_scan_job(
                 from server.gmail_labels import SAFEMAILX_LABELS, list_gmail_labels
                 by_name={x.get("name"):x.get("id") for x in list_gmail_labels(client)}
                 labels={key:by_name.get(name) for key,name in SAFEMAILX_LABELS.items()}
-                if not all(labels.get(key) for key in ("safe","suspicious","phishing","failed","queued")):
-                    raise RuntimeError("Gmail classification labels are not initialized")
+                labels_ready = all(labels.get(key) for key in ("safe","suspicious","phishing","failed","queued"))
+                if not labels_ready:
+                    # Labels not initialized yet — scan the email anyway but skip Gmail labeling.
+                    # The scan result will still appear in SafeMail X history.
+                    print(f"[WORKER] gmail_automatic_message: classification labels not initialized for user "
+                          f"{user_id[:8]}. Scan will proceed without Gmail mailbox labeling.")
                 msg = client.users().messages().get(userId="me", id=message_id, format="full").execute()
                 parsed = parse_email(client, message_id, msg)
                 # Recheck after network fetch to honor a concurrent OFF request.
                 if not repository.get_gmail_protection(user_id).get("auto_protect"): return None
                 result = service.run_manual_text_scan(subject=parsed.get("subject", ""), sender=parsed.get("sender", ""), body=parsed.get("body", ""), attachments=parsed.get("attachments") or None, link_details_override=parsed.get("links"), security_headers_override=parsed.get("security_headers") or {}, auth_context_override="original_headers", original_sender_override=parsed.get("sender"), source_type="email", scan_id=scan_id, user_id=user_id, retain_content=False, metadata={"source":"automatic_protection","provider":"gmail","message_id":message_id})
                 if repository.get_gmail_protection(user_id).get("auto_protect"):
-                    try:
-                        apply_result_label(client, message_id, result.get("final_label", "failed"), labels)
-                    except Exception as label_exc:
-                        # The analysis result is already persisted. A mailbox
-                        # write failure must not turn a completed scan into a
-                        # zero-score FAILED record.
-                        print(f"[WORKER] Gmail automatic classification update failed: {type(label_exc).__name__}")
+                    if labels_ready:
+                        try:
+                            apply_result_label(client, message_id, result.get("final_label", "failed"), labels)
+                        except Exception as label_exc:
+                            # The analysis result is already persisted. A mailbox
+                            # write failure must not turn a completed scan into a
+                            # zero-score FAILED record.
+                            print(f"[WORKER] Gmail automatic classification update failed: {type(label_exc).__name__}")
+                    else:
+                        print(f"[WORKER] Skipped Gmail label update for {message_id[:12]} — labels not initialized")
             else:
                 conn = repository.get_outlook_connection(user_id)
                 if not conn: raise RuntimeError("Outlook is not connected")
