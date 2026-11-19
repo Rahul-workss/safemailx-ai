@@ -186,7 +186,10 @@ def process_scan_job(
             from server.outlook_graph import GraphClient, GraphError
             from server.outlook_categories import set_message_category
             from utils.outlook_parser import parse_mime_message
-            from utils.content_processor import clean_extracted_text
+            # NOTE: clean_extracted_text is already imported at module level.
+            # Do NOT re-import it here — a local import shadows the module-level
+            # name and causes UnboundLocalError in every other branch of this
+            # function (Python treats the name as local to the entire function).
             client = GraphClient(user_id, repository)
             raw_mime = client.get_mime(message_id)
             parsed = parse_mime_message(raw_mime)
