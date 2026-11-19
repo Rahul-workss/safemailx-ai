@@ -652,9 +652,7 @@ async function automaticProtectionError(provider: "Gmail" | "Outlook", response:
   if (detail === "outlook_rate_limited") return "Outlook is rate-limiting requests. Wait a minute, then try again.";
   if (detail === "outlook_provider_unavailable") return "Outlook is temporarily unavailable. Please try again shortly.";
   if (detail === "outlook_protection_storage_failed") return "SafeMailX could not save this setting. Please try again shortly.";
-  if (detail === "gmail_labels_not_initialized" || detail === "outlook_categories_not_initialized") {
-    return `Finish ${provider} label setup, then try again.`;
-  }
+  if (detail === "gmail_labels_not_initialized") return "Initialize Gmail labels, then try again.";
   if (detail.endsWith("_setup_failed") || detail.endsWith("_baseline_failed")) {
     return `Could not prepare ${provider} protection. Check the connection and try again.`;
   }

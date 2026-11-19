@@ -971,15 +971,28 @@ def outlook_automatic_protection(payload: AutomaticProtectionUpdate, _auth=Depen
     uid = _user_id(_auth)
     conn = repository.get_outlook_connection(uid)
     if not conn: raise HTTPException(status_code=409, detail="outlook_not_connected")
-    if payload.enabled and not conn.get("categories_ready"):
-        raise HTTPException(status_code=409, detail="outlook_categories_not_initialized")
     if conn.get("status") == "reauth_required":
         raise HTTPException(status_code=409, detail="outlook_reauth_required")
     delta_link = None
     if payload.enabled:
         try:
             from server.outlook_graph import GraphClient, initialize_inbox_delta_cursor
+            from server.outlook_categories import SAFEMAILX_CATEGORIES, ensure_safemailx_categories
             client = GraphClient(uid, repository)
+            # Protection must be usable even if the user has not pressed the
+            # separate category setup action. Ensure only our categories, then
+            # verify the provider actually created them before saving enabled.
+            ensure_safemailx_categories(client)
+            categories = client.get("/me/outlook/masterCategories").get("value", [])
+            available = {
+                str(category.get("displayName", "")).casefold()
+                for category in categories
+                if isinstance(category, dict)
+            }
+            required = {name.casefold() for name, _color in SAFEMAILX_CATEGORIES.values()}
+            if not required.issubset(available):
+                raise RuntimeError("SafeMailX categories could not be verified")
+            repository.set_outlook_categories_ready(uid, True)
             delta_link = initialize_inbox_delta_cursor(client)
         except Exception as exc:
             from server.outlook_graph import GraphError

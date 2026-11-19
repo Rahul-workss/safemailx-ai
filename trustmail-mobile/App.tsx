@@ -337,8 +337,11 @@ function App() {
   const [apiUrl, setApiUrl] = useState(getApiBaseUrl());
   const [authState, setAuthState] = useState("Local mode");
   const [gmailState, setGmailState] = useState("not checked");
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailLabelsReady, setGmailLabelsReady] = useState(false);
   const [outlook, setOutlook] = useState<OutlookStatus | null>(null);
   const [gmailAutoProtect, setGmailAutoProtect] = useState(false);
+  const [protectionSaving, setProtectionSaving] = useState({ gmail: false, outlook: false });
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -349,6 +352,7 @@ function App() {
   // keep duplicate deliveries from making a successful sign-in look expired.
   const oauthCodeInFlightRef = useRef(new Set<string>());
   const oauthCodeCompletedRef = useRef(new Set<string>());
+  const protectionInFlightRef = useRef(new Set<"gmail" | "outlook">());
 
   // Blocks rendering login/dashboard until cold-start session restore completes
   // (prevents the login-screen flash on valid session cold start)
@@ -445,7 +449,11 @@ function App() {
   // NOTE: Do NOT call refresh() here — it requires auth and will 401 on fresh installs.
   // The cold-start session-restore effect below handles the first refresh after login.
   useEffect(() => { registerForPushNotifications(); }, []);
-  const onRefresh = React.useCallback(async () => { setRefreshing(true); await refresh(); setRefreshing(false); }, []);
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refresh(), refreshGmailStatus(), refreshOutlookStatus()]);
+    setRefreshing(false);
+  }, []);
 
   // ── Register the global 401 expiry handler (covers ALL API calls, not just cold-start) ──
   useEffect(() => {
@@ -471,6 +479,7 @@ function App() {
           setAuthState("Signed in");
           try {
             await refresh(); // validates token AND loads full dashboard data
+            await Promise.all([refreshGmailStatus(), refreshOutlookStatus()]);
           } catch (err) {
             if (err instanceof UnauthorizedError) {
               // Token expired — clear everything and go to login
@@ -761,6 +770,9 @@ function App() {
     setScans([]);
     setHealth(null);
     setGmailState("not checked");
+    setGmailConnected(false);
+    setGmailLabelsReady(false);
+    setGmailAutoProtect(false);
     setOutlook(null);
     setGoogleBackupUser(null);
     setGoogleBackupSyncTime(null);
@@ -795,18 +807,23 @@ function App() {
     try {
       const status = await fetchGmailOAuthStatus();
       const labelsReady = await AsyncStorage.getItem('gmailLabelsReady');
+      setGmailConnected(Boolean(status.connected));
       if (status.connected) {
         setGmailAutoProtect(Boolean(status.auto_protect));
-        if (labelsReady === 'true') {
+        const isLabelsReady = labelsReady === 'true';
+        setGmailLabelsReady(isLabelsReady);
+        if (isLabelsReady) {
           setGmailState("labels ready");
         } else {
           setGmailState("connected");
         }
       } else {
+        setGmailLabelsReady(false);
+        setGmailAutoProtect(false);
         setGmailState("not connected");
       }
     }
-    catch { setGmailState("sign in required"); }
+    catch { setGmailConnected(false); setGmailLabelsReady(false); setGmailState("sign in required"); }
   }
 
   async function refreshOutlookStatus() {
@@ -819,18 +836,27 @@ function App() {
   }
 
   async function toggleProtection(provider: "gmail" | "outlook", enabled: boolean) {
+    if (protectionInFlightRef.current.has(provider)) return;
+    protectionInFlightRef.current.add(provider);
+    setProtectionSaving(prev => ({ ...prev, [provider]: true }));
+    if (provider === "gmail") setGmailAutoProtect(enabled);
+    else setOutlook(prev => prev ? { ...prev, auto_protect: enabled } : prev);
     try {
       if (provider === "gmail") {
-        await setGmailAutomaticProtection(enabled);
-        setGmailAutoProtect(enabled);
+        const saved = await setGmailAutomaticProtection(enabled);
+        setGmailAutoProtect(saved);
       } else {
-        await setOutlookAutomaticProtection(enabled);
-        await refreshOutlookStatus();
+        const saved = await setOutlookAutomaticProtection(enabled);
+        setOutlook(prev => prev ? { ...prev, auto_protect: saved } : prev);
       }
       showToast(`Automatic ${provider === "gmail" ? "Gmail" : "Outlook"} protection ${enabled ? "enabled" : "disabled"}.`, "success");
     } catch (e: any) {
       showToast(e.message || "Could not update automatic protection");
-      await refreshGmailStatus(); await refreshOutlookStatus();
+      if (provider === "gmail") await refreshGmailStatus();
+      else await refreshOutlookStatus();
+    } finally {
+      protectionInFlightRef.current.delete(provider);
+      setProtectionSaving(prev => ({ ...prev, [provider]: false }));
     }
   }
 
@@ -974,6 +1000,7 @@ function App() {
       const { ensureGmailLabels } = await import("./src/api");
       const l = await ensureGmailLabels(); 
       setGmailState(`labels ready — ${l.scan}`);
+      setGmailLabelsReady(true);
       await AsyncStorage.setItem('gmailLabelsReady', 'true');
       showToast("Gmail labels ready", "success");
     } catch (e: any) { showToast(e.message || "Label setup failed"); }
@@ -1091,7 +1118,9 @@ function App() {
               </View>
               <View style={{ display: activeTab === "new" ? "flex" : "none" }}>
                 <UnifiedScanScreen
-                  gmailState={gmailState} busy={busy}
+                  busy={busy}
+                  gmailConnected={gmailConnected} gmailLabelsReady={gmailLabelsReady}
+                  protectionSaving={protectionSaving}
                   onConnectGmail={connectGmail} onRefreshGmail={refreshGmailStatus}
                   outlook={outlook}
                   onConnectOutlook={connectOutlook}
@@ -2402,14 +2431,16 @@ function SecurityBulletin() {
 
 // ─── Unified Scan Screen ─────────────────────────────────────────────────────────
 function UnifiedScanScreen({
-  gmailState, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
+  gmailConnected, gmailLabelsReady, protectionSaving, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   outlook, onConnectOutlook, onRefreshOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
   gmailAutoProtect, onToggleProtection,
   smsText, setSmsText, smsSender, setSmsSender,
   urlText, setUrlText,
   manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
 }: {
-  gmailState: string; busy: boolean;
+  gmailConnected: boolean; gmailLabelsReady: boolean;
+  protectionSaving: { gmail: boolean; outlook: boolean };
+  busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
   outlook?: OutlookStatus | null;
   onConnectOutlook?: () => void;
@@ -2628,9 +2659,9 @@ function UnifiedScanScreen({
           )}
         </View>
 
-        {connected && ready && <View style={{flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingTop:4}}>
+        {connected && <View style={{flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingTop:4}}>
           <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Outlook emails</Text></View>
-          <Switch value={Boolean(outlook?.auto_protect)} onValueChange={v=>onToggleProtection("outlook",v)} disabled={busy} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+          <Switch value={Boolean(outlook?.auto_protect)} onValueChange={v=>onToggleProtection("outlook",v)} disabled={protectionSaving.outlook} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
         </View>}
 
         {/* Action: Run Outlook Scan */}
@@ -2648,8 +2679,8 @@ function UnifiedScanScreen({
     );
   }
 
-  const connected = gmailState.toLowerCase() !== "not connected" && gmailState.toLowerCase() !== "sign in required";
-  const hasLabels = gmailState.toLowerCase().includes("labels ready");
+  const connected = gmailConnected;
+  const hasLabels = gmailLabelsReady;
   const busy = appBusy || localBusy;
 
   async function handleSmsScan() {
@@ -2803,10 +2834,10 @@ function UnifiedScanScreen({
               )}
             </View>
 
-            {connected && hasLabels && (
+            {connected && (
               <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingTop:4}}>
                 <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Gmail emails</Text></View>
-                <Switch value={gmailAutoProtect} onValueChange={v=>onToggleProtection("gmail",v)} disabled={busy} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+                <Switch value={gmailAutoProtect} onValueChange={v=>onToggleProtection("gmail",v)} disabled={protectionSaving.gmail} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
               </View>
             )}
             {connected && hasLabels && (
