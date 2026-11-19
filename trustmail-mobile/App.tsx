@@ -3372,50 +3372,50 @@ function PrivacyPolicyScreen({ onBack }: { onBack?: () => void }) {
         <Ionicons name="shield-checkmark" size={32} color={C.emerald} />
         <Text style={S.pageTitle}>Privacy Policy</Text>
       </View>
-      <Text style={[S.muted, { fontSize: 13, lineHeight: 20 }]}>Effective Date: January 1, 2025</Text>
+      <Text style={[S.muted, { fontSize: 13, lineHeight: 20 }]}>Effective Date: November 19, 2026</Text>
 
       <TmCard style={{ padding: 20, gap: 16 }}>
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow }]}>1. Data Retention Policy</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow }]}>1. Information We Process</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          SafeMail X AI is designed to minimize retained content. We do not intentionally store raw email bodies or file samples beyond the active scan flow. Scan history keeps verdict metadata, while richer content is processed transiently in memory for analysis.
+          Depending on the features you use, SafeMail X AI processes your account email and profile details; authentication and connected-provider tokens; messages, URLs, text, and files you submit or authorize us to scan; scan verdicts, scores, evidence, and reports; support messages; and device push tokens and notification preferences. We use this information to provide account access, scanning, threat reporting, inbox classification, support, and service security.
         </Text>
 
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>2. Google API Services Usage</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>2. Email Account Access</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          SafeMail X AI's use and transfer to any other app of information received from Google APIs will adhere to the <Text style={{ color: C.emerald }}>Google API Services User Data Policy</Text>, including the Limited Use requirements.
+          Connecting Gmail or Outlook is optional. The provider’s consent screen describes the permissions requested. When you use manual scanning, the app reads messages selected by the SafeMail X scan label or category. When you turn on Automatic Email Protection, the service monitors for new messages, analyzes them, and applies SafeMail X classification labels or categories in your mailbox. It does not delete, permanently move, or hide messages.
           {"\n\n"}
-          When you connect your Gmail account, we only request read-only access to scan emails for phishing threats. Your OAuth tokens are encrypted natively on your device.
+          Provider tokens are handled by the service to maintain your connection and are encrypted at rest when the production encryption configuration is enabled. Disconnecting an account in the app removes the stored connection token from SafeMail X; you can also revoke access with Google or Microsoft.
           {"\n\n"}
-          For quick SMS, URL, and file scans, SafeMail X AI may also query third-party security services such as Google Safe Browsing, VirusTotal, and IPQualityScore when configured. Those checks are limited to URLs, domains, and file hashes rather than raw file bytes.
+          Our use and transfer of information received from Google APIs follows the <Text style={{ color: C.emerald }}>Google API Services User Data Policy</Text>, including its Limited Use requirements. We do not use Google user data for advertising or sell it.
         </Text>
 
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>3. Google Drive Cloud Backup</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>3. Scanning, AI, and Service Providers</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          To provide a seamless cross-device experience without compromising your data, SafeMail X AI utilizes your personal Google Drive account to backup your scanning reports and settings. We do not host your historical threat data; it lives entirely within your designated Drive application folder.
+          Submitted content is sent to SafeMail X services for analysis and may be processed by the configured language-model provider. URL, domain, and file-hash reputation checks may be sent to external threat-intelligence services when configured. The information sent depends on the check; a URL lookup may disclose the URL to that provider. Do not submit information you are not authorized to share with these services. Hosting, database, email delivery, and push notification providers may process data to operate the service. We do not sell personal information or use it for targeted advertising.
         </Text>
 
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>4. Session Security</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>4. Storage and Retention</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          Your login credentials are never stored in plaintext. Session tokens are persisted using your device's hardware-encrypted Keychain (iOS) or Android Keystore — both are hardware-backed encrypted stores that cannot be read by other apps or extracted without device unlock.
+          SafeMail X stores account and service data needed to operate your account. Scan history and reports may include verdicts, scores, message metadata, extracted indicators, and analysis evidence so you can review prior scans. Message or file content may be processed during analysis; we do not promise that all derived content is immediately erased after a scan. Retention depends on the feature and service operation. We do not currently offer account deletion from the app; contact support for data requests. Clearing local cache removes local app cache only, and signing out does not itself delete server-side records.
           {"\n\n"}
-          Sessions automatically expire after 24 hours. You can manually log out at any time from Settings, which immediately clears all stored credentials from secure storage.
+          Passwords are stored as password hashes, not as readable passwords. Session credentials are stored using the app’s secure storage facilities; the exact protection depends on the device and operating system. No storage method can guarantee absolute security.
         </Text>
 
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>5. URL & File Scanning</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>5. Optional Features and Notifications</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          When you scan a URL, it may be fetched in a controlled no-login mode to resolve redirects and inspect lightweight HTML. Only the URL itself is sent to third-party reputation services — no cookies, login sessions, or personal data are transmitted.
+          If you connect Google Drive backup, selected scan reports may be uploaded to your Google Drive. Google processes that data under its own terms and privacy policy. Push notifications require a device token and may include limited scan-alert information. You can change notification preferences in Settings or disable notifications in your device settings.
           {"\n\n"}
-          For file scans (.eml, .pdf, .docx, images), only extracted URLs, domains, and cryptographic file hashes are checked externally. Raw file bytes are never sent to third-party providers. Image-based scans use local OCR to extract text before analysis.
+          URL scans may fetch a submitted URL to inspect redirects or page signals. File scans may extract text and indicators such as URLs and hashes. Data shared with external providers varies by configured integration and scan type; consult the provider’s privacy terms for their handling practices.
         </Text>
 
-        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>6. Push Notifications</Text>
+        <Text style={[S.frost, { fontSize: 16, fontWeight: "700", color: C.violetGlow, marginTop: 12 }]}>6. Your Choices, Security, and Contact</Text>
         <Text style={[S.muted, { fontSize: 14, lineHeight: 22 }]}>
-          If you enable push notifications, only your Expo push token and device platform are stored for delivery purposes. No email content, scan results, or personal data is included in push payloads. You can disable notifications at any time from your device settings.
+          You can use manual scan features without enabling Automatic Email Protection. Turn protection off in Shield to stop future automatic monitoring, and disconnect Gmail or Outlook to remove the SafeMail X connection token. You may request access, correction, or deletion of account data by emailing support@safemailx-ai.tech; requests may require identity verification and some records may need to be retained where law permits or requires. We use access controls and configured encryption to protect data, but no internet service can guarantee perfect security. SafeMail X is not intended for children under 13. We may revise this policy as features change; the effective date above identifies the latest version. Questions: support@safemailx-ai.tech.
         </Text>
       </TmCard>
 
       <Text style={[S.muted, { textAlign: "center", fontSize: 11, marginTop: 24, fontStyle: "italic" }]}>
-        SafeMail X AI is committed to maintaining the highest standard of cybersecurity and user privacy.
+        Security results are informational and may be incorrect. Use your judgment before opening links, files, or messages.
       </Text>
     </View>
   );
@@ -3426,47 +3426,63 @@ function HelpCenterScreen({ onBack }: { onBack?: () => void }) {
   const faqs = [
     {
       q: "How does SafeMail X AI scan my emails?",
-      a: "SafeMail X AI uses a hybrid detection pipeline: fast rule-based heuristics filter obvious threats, then AI scoring and optional external reputation checks improve accuracy. For quick scans, URLs, domains, and file hashes may be checked against providers like Google Safe Browsing, VirusTotal, and IPQualityScore when configured.",
+      a: "SafeMail X analyzes message text, sender and link signals, attachments or extracted indicators, and reputation data when available. Depending on the scan and server configuration, content may be processed by an AI provider and URL, domain, or file-hash indicators may be checked with external threat-intelligence services.",
     },
     {
       q: "Is my data stored or shared?",
-      a: "SafeMail X AI minimizes retained content. Email and file bodies are processed transiently for analysis, scan history stores verdict metadata, and quick-scan privacy notices tell you when URLs, domains, or file hashes may be checked with third-party threat-intelligence providers.",
+      a: "The service stores account information, provider connection tokens, and scan history or reports needed to operate the account. Scans can include message or file content and derived evidence. Configured AI, hosting, database, reputation, email, and push providers may process data to deliver the feature. See Privacy Policy for details; cache clearing and sign-out do not delete server-side scan records.",
     },
     {
       q: "What does the threat score mean?",
-      a: "The threat score (0–100) indicates the likelihood of malicious intent. 0–30 is Legitimate (green), 31–65 is Suspicious (amber), and 66–100 is Phishing/Scam (red). The score combines rule-based signals and AI confidence.",
+      a: "The score summarizes signals found by the available detection pipeline. Labels and thresholds are estimates, not guarantees. A safe result can still be malicious, and a suspicious result can be legitimate. Verify unexpected requests through a trusted channel.",
     },
     {
       q: "Can I scan SMS messages and screenshots?",
-      a: "Yes! Use the Scan tab and switch to SMS or Screenshot mode. For SMS, paste the message text. For screenshots, upload an image and our OCR engine will extract and analyze the text automatically.",
+      a: "Yes. Paste SMS text or submit a screenshot through the supported scan option. Text may be sent to SafeMail X services and configured analysis providers to produce a result.",
     },
     {
       q: "How do I connect my Gmail account?",
-      a: "Go to the Scan tab → Gmail section → tap 'Connect Gmail'. You'll be redirected to Google's OAuth consent screen. We only request read-only access to scan emails you explicitly label for review.",
+      a: "Open Shield, choose Connect Account in the Gmail section, and approve the permissions shown by Google. Manual scanning reads messages with the SafeMail X Scan label. If you enable Automatic Email Protection, SafeMail X monitors new mail and applies SafeMail X result labels. Disconnect from the same section or revoke access in your Google Account settings.",
     },
     {
       q: "What is the Gmail Label Scan feature?",
-      a: "After connecting Gmail, apply the 'SafeMail X Scan' label to any suspicious email directly in your Gmail app. Then tap 'Run Label Scan' in SafeMail X AI to automatically process all labeled emails through our detection pipeline.",
+      a: "Apply the SafeMail X Scan label to messages in Gmail, then tap Run Inbox Scan in Shield. SafeMail X processes those selected messages and applies a result label. This manual workflow is separate from Automatic Email Protection.",
     },
     {
       q: "Why does the app show 'OFFLINE'?",
-      a: "The app periodically checks the backend API health. If you see OFFLINE, ensure your backend server is running and the API URL in Settings is correct. For local development, check that Docker containers are up and the Cloudflare tunnel is active.",
+      a: "OFFLINE means the app could not reach a required service. Check your internet connection and try again. If it continues, contact support@safemailx-ai.tech and include the time and a screenshot; do not include passwords or message contents.",
     },
     {
       q: "Can I scan URLs for phishing?",
-      a: "Yes! Go to the Scan tab and switch to URL mode. Paste any suspicious link and tap 'Check URL'. SafeMail X AI will resolve redirects, inspect the landing page, and check the URL against Google Safe Browsing, VirusTotal, and IPQualityScore to detect phishing, malware, and brand impersonation.",
+      a: "Open the Scan tab, choose URL, paste the link, and start the scan. The service may fetch the URL and query configured reputation providers. This can disclose the URL to those services, so avoid scanning private links unless you accept that sharing.",
     },
     {
       q: "Can I scan files and documents?",
-      a: "Yes! Use the Text/File tab to upload .eml, .pdf, .docx, .xlsx, .pptx files or screenshot images. Files are analyzed locally — only extracted URLs, domains, and file hashes are checked against external threat intelligence. Raw file bytes are never sent to third parties.",
+      a: "Use Text/File to submit a supported file or image. It is uploaded to SafeMail X for extraction and analysis. Extracted content and indicators may be processed by configured AI or reputation services. Do not upload files you are not authorized to share.",
     },
     {
       q: "Does my session persist after closing the app?",
-      a: "Yes. Your login session is securely saved using your device's hardware-encrypted Keychain (iOS) or Android Keystore. You stay logged in until you explicitly log out from Settings or your session expires after 24 hours. Your credentials are never stored in plaintext.",
+      a: "The app can keep your session in platform secure storage so you do not have to sign in each time. Session expiry is controlled by the service and may vary. Sign out from Settings to clear the local session; this does not delete your account or server-side history.",
     },
     {
       q: "What is Google Drive Cloud Backup?",
-      a: "SafeMail X AI can back up your scan reports and settings to your personal Google Drive. Your data stays in your Drive's application folder — we never host your historical threat data on our servers. Connect from Settings → Google Drive Backup.",
+      a: "If Google Drive backup is available and you connect it, selected scan reports may be uploaded to your Drive. Google’s terms and privacy policy apply to data stored there. You can disconnect the backup account from its Settings control.",
+    },
+    {
+      q: "What does Automatic Email Protection do?",
+      a: "When enabled for a connected Gmail or Outlook account, SafeMail X checks newly received messages, analyzes them, and applies a SafeMail X label or category in the original mailbox. It does not delete, move, or hide messages. Turn the switch off in Shield to stop future automatic processing.",
+    },
+    {
+      q: "How do I connect or disconnect Outlook?",
+      a: "Use the Microsoft Outlook section in Shield and approve the permissions Microsoft displays. Manual inbox scanning uses SafeMail X categories; automatic protection monitors new mail and applies a result category. Use Disconnect in the Outlook section to remove the saved SafeMail X connection.",
+    },
+    {
+      q: "How do I request deletion of my data?",
+      a: "The app does not currently provide an account deletion control. To request deletion, email support@safemailx-ai.tech from your account email and identify the account. We may ask for verification. Signing out or clearing cache does not delete server-side account data.",
+    },
+    {
+      q: "Can SafeMail X guarantee a message is safe?",
+      a: "No. Detection can miss new or targeted threats and can flag legitimate content. Treat results as guidance, avoid sharing passwords or verification codes, and contact the sender through a known trusted channel when unsure.",
     },
   ];
 
