@@ -244,7 +244,17 @@ def process_scan_job(
             gmail_service = build_gmail_service_from_blob(
                 token_blob, repository=repository, user_id=user_id
             )
-            label_ids = ensure_safemailx_label_ids(gmail_service)
+            # ensure_safemailx_label_ids can raise on API failures or token
+            # expiry. Treat failure as "labels unavailable" rather than a hard
+            # scan failure — the scan result still appears in SafeMail X.
+            try:
+                label_ids = ensure_safemailx_label_ids(gmail_service)
+                label_ids_ready = bool(label_ids)
+            except Exception as lbl_exc:
+                print(f"[WORKER] gmail_label_message: label setup failed ({type(lbl_exc).__name__}: {lbl_exc}). "
+                      f"Scan will proceed without Gmail mailbox labeling.")
+                label_ids = {}
+                label_ids_ready = False
             message_id = job.get("gmail_message_id")
             if not message_id:
                 raise RuntimeError("Missing Gmail message id")
@@ -284,12 +294,15 @@ def process_scan_job(
                 auth_context_override="original_headers",
                 original_sender_override=parsed.get("sender"),
             )
-            try:
-                apply_result_label(gmail_service, message_id, result["final_label"], label_ids)
-            except Exception as label_exc:
-                # Keep the completed verdict visible in SafeMail X even if
-                # Gmail rejects the optional mailbox label update.
-                print(f"[WORKER] Gmail label update failed: {type(label_exc).__name__}")
+            if label_ids_ready:
+                try:
+                    apply_result_label(gmail_service, message_id, result["final_label"], label_ids)
+                except Exception as label_exc:
+                    # Keep the completed verdict visible in SafeMail X even if
+                    # Gmail rejects the optional mailbox label update.
+                    print(f"[WORKER] Gmail label update failed: {type(label_exc).__name__}")
+            else:
+                print(f"[WORKER] Skipped Gmail label update for {message_id[:12]} — labels not ready")
             print(f"[WORKER] Completed labeled Gmail scan {result['id']}")
             send_push_notifications(
                 repository.list_push_tokens(user_id=user_id),
