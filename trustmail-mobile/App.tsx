@@ -341,7 +341,6 @@ function App() {
   const [gmailLabelsReady, setGmailLabelsReady] = useState(false);
   const [outlook, setOutlook] = useState<OutlookStatus | null>(null);
   const [gmailAutoProtect, setGmailAutoProtect] = useState(false);
-  const [protectionSaving, setProtectionSaving] = useState({ gmail: false, outlook: false });
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -353,6 +352,7 @@ function App() {
   const oauthCodeInFlightRef = useRef(new Set<string>());
   const oauthCodeCompletedRef = useRef(new Set<string>());
   const protectionInFlightRef = useRef(new Set<"gmail" | "outlook">());
+  const protectionDesiredRef = useRef<Partial<Record<"gmail" | "outlook", boolean>>>({});
 
   // Blocks rendering login/dashboard until cold-start session restore completes
   // (prevents the login-screen flash on valid session cold start)
@@ -836,27 +836,45 @@ function App() {
   }
 
   async function toggleProtection(provider: "gmail" | "outlook", enabled: boolean) {
-    if (protectionInFlightRef.current.has(provider)) return;
-    protectionInFlightRef.current.add(provider);
-    setProtectionSaving(prev => ({ ...prev, [provider]: true }));
+    // Reflect every tap immediately. If a save is already in flight, remember
+    // the latest requested value and send it as soon as the current save ends.
+    protectionDesiredRef.current[provider] = enabled;
     if (provider === "gmail") setGmailAutoProtect(enabled);
     else setOutlook(prev => prev ? { ...prev, auto_protect: enabled } : prev);
+    if (protectionInFlightRef.current.has(provider)) return;
+    protectionInFlightRef.current.add(provider);
+    let failed: unknown = null;
+    let settledValue = enabled;
     try {
-      if (provider === "gmail") {
-        const saved = await setGmailAutomaticProtection(enabled);
-        setGmailAutoProtect(saved);
-      } else {
-        const saved = await setOutlookAutomaticProtection(enabled);
-        setOutlook(prev => prev ? { ...prev, auto_protect: saved } : prev);
+      while (protectionDesiredRef.current[provider] !== undefined) {
+        const requested = protectionDesiredRef.current[provider]!;
+        delete protectionDesiredRef.current[provider];
+        try {
+          const saved = provider === "gmail"
+            ? await setGmailAutomaticProtection(requested)
+            : await setOutlookAutomaticProtection(requested);
+          settledValue = saved;
+          if (protectionDesiredRef.current[provider] === undefined) {
+            if (provider === "gmail") setGmailAutoProtect(saved);
+            else setOutlook(prev => prev ? { ...prev, auto_protect: saved } : prev);
+          }
+          failed = null;
+        } catch (error) {
+          failed = error;
+          // A newer tap supersedes this failed request; try that value next.
+          if (protectionDesiredRef.current[provider] === undefined) break;
+        }
       }
-      showToast(`Automatic ${provider === "gmail" ? "Gmail" : "Outlook"} protection ${enabled ? "enabled" : "disabled"}.`, "success");
+      if (failed) throw failed;
+      showToast(`Automatic ${provider === "gmail" ? "Gmail" : "Outlook"} protection ${settledValue ? "enabled" : "disabled"}.`, "success");
     } catch (e: any) {
-      showToast(e.message || "Could not update automatic protection");
-      if (provider === "gmail") await refreshGmailStatus();
-      else await refreshOutlookStatus();
+      showToast(e?.message || "Could not update automatic protection");
+      if (protectionDesiredRef.current[provider] === undefined) {
+        if (provider === "gmail") await refreshGmailStatus();
+        else await refreshOutlookStatus();
+      }
     } finally {
       protectionInFlightRef.current.delete(provider);
-      setProtectionSaving(prev => ({ ...prev, [provider]: false }));
     }
   }
 
@@ -1120,7 +1138,6 @@ function App() {
                 <UnifiedScanScreen
                   busy={busy}
                   gmailConnected={gmailConnected} gmailLabelsReady={gmailLabelsReady}
-                  protectionSaving={protectionSaving}
                   onConnectGmail={connectGmail} onRefreshGmail={refreshGmailStatus}
                   outlook={outlook}
                   onConnectOutlook={connectOutlook}
@@ -2431,7 +2448,7 @@ function SecurityBulletin() {
 
 // ─── Unified Scan Screen ─────────────────────────────────────────────────────────
 function UnifiedScanScreen({
-  gmailConnected, gmailLabelsReady, protectionSaving, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
+  gmailConnected, gmailLabelsReady, busy: appBusy, onConnectGmail, onRefreshGmail, onSetupGmailLabels, onRunGmailScan,
   outlook, onConnectOutlook, onRefreshOutlook, onSetupOutlookCategories, onRunOutlookScan, onDisconnectOutlook,
   gmailAutoProtect, onToggleProtection,
   smsText, setSmsText, smsSender, setSmsSender,
@@ -2439,7 +2456,6 @@ function UnifiedScanScreen({
   manualText, setManualText, onSubmitManual, refreshApp, scrollViewRef, onShowToast, onOpenReport
 }: {
   gmailConnected: boolean; gmailLabelsReady: boolean;
-  protectionSaving: { gmail: boolean; outlook: boolean };
   busy: boolean;
   onConnectGmail: () => void; onRefreshGmail: () => void;
   outlook?: OutlookStatus | null;
@@ -2661,7 +2677,7 @@ function UnifiedScanScreen({
 
         {connected && <View style={{flexDirection:"row", alignItems:"center", justifyContent:"space-between", paddingTop:4}}>
           <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Outlook emails</Text></View>
-          <Switch value={Boolean(outlook?.auto_protect)} onValueChange={v=>onToggleProtection("outlook",v)} disabled={protectionSaving.outlook} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+          <Switch value={Boolean(outlook?.auto_protect)} onValueChange={v=>onToggleProtection("outlook",v)} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
         </View>}
 
         {/* Action: Run Outlook Scan */}
@@ -2837,7 +2853,7 @@ function UnifiedScanScreen({
             {connected && (
               <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingTop:4}}>
                 <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:"600",color:C.frost}}>Automatic Email Protection</Text><Text style={{fontSize:10,color:C.frost4,marginTop:2}}>Scan new Gmail emails</Text></View>
-                <Switch value={gmailAutoProtect} onValueChange={v=>onToggleProtection("gmail",v)} disabled={protectionSaving.gmail} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
+                <Switch value={gmailAutoProtect} onValueChange={v=>onToggleProtection("gmail",v)} trackColor={{false:"rgba(255,255,255,0.15)",true:C.emerald}} thumbColor="#fff" />
               </View>
             )}
             {connected && hasLabels && (
