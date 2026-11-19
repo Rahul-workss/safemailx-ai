@@ -207,6 +207,15 @@ class ScanRepository:
                     ("outlook_tokens", "delta_link", "TEXT"),
                 ):
                     self._ensure_column(conn, table, column, definition)
+                # Repair: if any flag column was previously created as BOOLEAN
+                # (from an older migration), cast it to INTEGER so that plain
+                # integer writes (0/1) are accepted by PostgreSQL.
+                for _fix_table, _fix_col in (
+                    ("outlook_tokens", "categories_ready"),
+                    ("outlook_tokens", "auto_protect"),
+                    ("gmail_tokens", "auto_protect"),
+                ):
+                    self._ensure_int_column(conn, _fix_table, _fix_col)
                 conn.execute("CREATE TABLE IF NOT EXISTS automatic_scan_claims (provider TEXT NOT NULL, user_id TEXT NOT NULL, message_id TEXT NOT NULL, scan_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(provider, user_id, message_id))")
                 conn.execute(
                     """
@@ -264,6 +273,31 @@ class ScanRepository:
             if any(row[1] == column for row in existing):
                 return
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        except Exception:
+            pass
+
+    def _ensure_int_column(self, conn, table: str, column: str) -> None:
+        """On PostgreSQL, guarantee that a column intended to store 0/1 flags
+        is typed as INTEGER, not BOOLEAN.  Rows with an existing BOOLEAN value
+        are cast safely.  On SQLite this is a no-op (all numeric types are
+        stored as INTEGER anyway)."""
+        if not self.is_postgres:
+            return
+        try:
+            conn.execute("SAVEPOINT fix_col_type")
+            try:
+                conn.execute(
+                    f"""
+                    ALTER TABLE {table}
+                    ALTER COLUMN {column} TYPE INTEGER
+                    USING CASE WHEN {column} THEN 1 ELSE 0 END
+                    """
+                )
+                conn.execute("RELEASE SAVEPOINT fix_col_type")
+            except Exception:
+                # Column is already INTEGER or table/column does not exist —
+                # either way safe to ignore.
+                conn.execute("ROLLBACK TO SAVEPOINT fix_col_type")
         except Exception:
             pass
 
@@ -742,7 +776,9 @@ class ScanRepository:
 
     def set_outlook_categories_ready(self, user_id: str, ready: bool) -> None:
         updated_at = datetime.now(timezone.utc).isoformat()
-        # categories_ready is INTEGER (0 or 1) in both PostgreSQL and SQLite DDL
+        # categories_ready is stored as INTEGER (0/1) in both PostgreSQL and SQLite.
+        # We always write the integer form so the value is accepted regardless of
+        # whether the column was previously typed as BOOLEAN or INTEGER on Postgres.
         value = 1 if ready else 0
         placeholder = "%s" if self.is_postgres else "?"
         with self._db() as conn:

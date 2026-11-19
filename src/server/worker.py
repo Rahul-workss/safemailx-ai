@@ -67,8 +67,22 @@ def process_scan_job(
             provider = "gmail" if job_type.startswith("gmail") else "outlook"
             # OFF is authoritative even for jobs already sitting in Redis.
             state = repository.get_gmail_protection(user_id) if provider == "gmail" else repository.get_outlook_connection(user_id) or {}
-            if not state.get("auto_protect"):
-                if scan_id: repository.fail_scan(scan_id, "automatic protection disabled")
+            # auto_protect may be int (0/1) or bool depending on DB column type;
+            # always normalise to bool before checking.
+            auto_protect_on = bool(state.get("auto_protect"))
+            if not auto_protect_on:
+                print(f"[WORKER] {job_type}: automatic protection is OFF for user {user_id[:8]}. Dropping job (scan_id={scan_id}).")
+                if scan_id:
+                    # Remove the queued row entirely — a disabled-protection job
+                    # should not appear as a FAILED scan in the user's history.
+                    try:
+                        with repository._db() as _c:
+                            ph = "%s" if repository.is_postgres else "?"
+                            _c.execute(f"DELETE FROM scans WHERE id={ph} AND user_id={ph}", (scan_id, user_id))
+                            if repository.is_postgres:
+                                _c.execute(f"DELETE FROM automatic_scan_claims WHERE scan_id={ph}", (scan_id,))
+                    except Exception:
+                        repository.fail_scan(scan_id, "automatic protection disabled")
                 return None
             message_id = job.get("gmail_message_id") or job.get("outlook_message_id")
             if not message_id: raise RuntimeError("Missing provider message id")
@@ -283,9 +297,11 @@ def process_scan_job(
                 repository.fail_scan(scan_id, f"Unknown job type: {job_type}")
             return None
     except Exception as exc:
-        print(f"[WORKER] Job failed: {exc}")
         import traceback
-        traceback.print_exc()
+        exc_detail = f"{type(exc).__name__}: {exc}"
+        tb_str = traceback.format_exc()
+        print(f"[WORKER] Job failed ({job_type}, user={user_id[:8] if user_id else '?'}, scan={scan_id}): {exc_detail}")
+        print(f"[WORKER] Traceback:\n{tb_str}")
         if scan_id:
             repository.fail_scan(scan_id, str(exc))
         if job and job.get("type") in {"gmail_automatic_message", "outlook_automatic_message"}:

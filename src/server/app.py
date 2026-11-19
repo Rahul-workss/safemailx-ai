@@ -486,6 +486,48 @@ def health():
     return build_health(redis_status=redis_status, database_status=database_status)
 
 
+@app.post("/api/admin/migrate-db", include_in_schema=False)
+def admin_migrate_db():
+    """One-time repair endpoint: casts any BOOLEAN flag columns to INTEGER on
+    the live PostgreSQL database.  Safe to call repeatedly — idempotent.
+    Does nothing on SQLite (types are flexible there already).
+    """
+    if not repository.is_postgres:
+        return {"status": "skipped", "reason": "not postgres"}
+    repairs: list[str] = []
+    errors: list[str] = []
+    pairs = [
+        ("outlook_tokens", "categories_ready"),
+        ("outlook_tokens", "auto_protect"),
+        ("gmail_tokens",   "auto_protect"),
+    ]
+    try:
+        with repository._db() as conn:
+            for table, col in pairs:
+                try:
+                    conn.execute("SAVEPOINT fix_col_type")
+                    try:
+                        conn.execute(
+                            f"""
+                            ALTER TABLE {table}
+                            ALTER COLUMN {col} TYPE INTEGER
+                            USING CASE WHEN {col} THEN 1 ELSE 0 END
+                            """
+                        )
+                        conn.execute("RELEASE SAVEPOINT fix_col_type")
+                        repairs.append(f"{table}.{col}")
+                    except Exception as col_exc:
+                        conn.execute("ROLLBACK TO SAVEPOINT fix_col_type")
+                        # Column is already INTEGER — that is the desired state
+                        errors.append(f"{table}.{col}: {col_exc}")
+                except Exception as sp_exc:
+                    errors.append(f"savepoint({table}.{col}): {sp_exc}")
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
+    return {"status": "ok", "repaired": repairs, "already_ok": errors}
+
+
+
 @app.get("/api/health/llm")
 def llm_health():
     status, detail = check_llm_health()
