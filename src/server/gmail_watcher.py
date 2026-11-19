@@ -344,11 +344,21 @@ def run_gmail_watcher() -> None:
                                 if "INBOX" not in meta.get("labelIds", []): continue
                                 sid = repository.claim_automatic_scan("gmail", uid, mid)
                                 if sid:
+                                    job = {"type":"gmail_automatic_message","user_id":uid,"scan_id":sid,"gmail_message_id":mid}
                                     try:
-                                        scan_queue.enqueue({"type":"gmail_automatic_message","user_id":uid,"scan_id":sid,"gmail_message_id":mid})
-                                    except Exception:
-                                        repository.release_automatic_scan_claim("gmail", uid, mid)
-                                        raise
+                                        scan_queue.enqueue(job)
+                                    except Exception as queue_exc:
+                                        # Redis is optional for local/small
+                                        # deployments. Keep the claim and run
+                                        # the same job in-process instead of
+                                        # surfacing a false FAILED scan.
+                                        import threading
+                                        from server.worker import process_scan_job
+                                        def _fallback(job=job):
+                                            from server.repository import ScanRepository
+                                            process_scan_job(job, repository=ScanRepository())
+                                        threading.Thread(target=_fallback, daemon=True, name=f"gmail-auto-{sid[:8]}").start()
+                                        print(f"[GMAIL WATCHER] Redis unavailable; started automatic scan fallback ({type(queue_exc).__name__})")
                         page = resp.get("nextPageToken")
                         if not page: break
                     if latest != cursor: repository.set_gmail_protection(uid, True, latest)

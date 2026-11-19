@@ -87,7 +87,13 @@ def process_scan_job(
                 if not repository.get_gmail_protection(user_id).get("auto_protect"): return None
                 result = service.run_manual_text_scan(subject=parsed.get("subject", ""), sender=parsed.get("sender", ""), body=parsed.get("body", ""), attachments=parsed.get("attachments") or None, link_details_override=parsed.get("links"), security_headers_override=parsed.get("security_headers") or {}, auth_context_override="original_headers", original_sender_override=parsed.get("sender"), source_type="email", scan_id=scan_id, user_id=user_id, retain_content=False, metadata={"source":"automatic_protection","provider":"gmail","message_id":message_id})
                 if repository.get_gmail_protection(user_id).get("auto_protect"):
-                    apply_result_label(client, message_id, result.get("final_label", "failed"), labels)
+                    try:
+                        apply_result_label(client, message_id, result.get("final_label", "failed"), labels)
+                    except Exception as label_exc:
+                        # The analysis result is already persisted. A mailbox
+                        # write failure must not turn a completed scan into a
+                        # zero-score FAILED record.
+                        print(f"[WORKER] Gmail automatic classification update failed: {type(label_exc).__name__}")
             else:
                 conn = repository.get_outlook_connection(user_id)
                 if not conn: raise RuntimeError("Outlook is not connected")
@@ -100,7 +106,10 @@ def process_scan_job(
                 result = service.run_manual_text_scan(subject=parsed.get("subject", ""), sender=parsed.get("sender", ""), body=parsed.get("body", ""), attachments=parsed.get("attachments") or None, link_details_override=parsed.get("links"), security_headers_override=parsed.get("security_headers") or {}, auth_context_override="original_headers", original_sender_override=parsed.get("sender"), source_type="email", scan_id=scan_id, user_id=user_id, retain_content=False, metadata={"source":"automatic_protection","provider":"outlook","message_id":message_id})
                 if (repository.get_outlook_connection(user_id) or {}).get("auto_protect"):
                     key={"legitimate":"safe","suspicious":"suspicious","phishing":"phishing"}.get(result.get("final_label"), "failed")
-                    set_message_category(client, message_id, key)
+                    try:
+                        set_message_category(client, message_id, key)
+                    except Exception as category_exc:
+                        print(f"[WORKER] Outlook automatic classification update failed: {type(category_exc).__name__}")
             return result
         if job_type == "manual_text":
             result = service.run_manual_text_scan(
@@ -254,7 +263,12 @@ def process_scan_job(
                 auth_context_override="original_headers",
                 original_sender_override=parsed.get("sender"),
             )
-            apply_result_label(gmail_service, message_id, result["final_label"], label_ids)
+            try:
+                apply_result_label(gmail_service, message_id, result["final_label"], label_ids)
+            except Exception as label_exc:
+                # Keep the completed verdict visible in SafeMail X even if
+                # Gmail rejects the optional mailbox label update.
+                print(f"[WORKER] Gmail label update failed: {type(label_exc).__name__}")
             print(f"[WORKER] Completed labeled Gmail scan {result['id']}")
             send_push_notifications(
                 repository.list_push_tokens(user_id=user_id),

@@ -629,6 +629,10 @@ class ScanRepository:
         return [row["user_id"] if isinstance(row, dict) else row[0] for row in rows]
 
     def claim_automatic_scan(self, provider: str, user_id: str, message_id: str) -> str | None:
+        # Avoid generating a user-visible scan row for an already-claimed
+        # message. The unique constraint below remains the race-safe guard.
+        if self.get_automatic_scan_claim(provider, user_id, message_id):
+            return None
         scan_id = self.create_queued_scan(subject=f"Automatic {provider} scan", sender="automatic_protection", user_id=user_id, evidence={"status":"queued", "source":"automatic_protection", "provider":provider})
         try:
             with self._db() as conn:
@@ -636,7 +640,15 @@ class ScanRepository:
                 conn.execute(f"INSERT INTO automatic_scan_claims(provider,user_id,message_id,scan_id,created_at) VALUES ({ph},{ph},{ph},{ph},{ph})", (provider,user_id,message_id,scan_id,datetime.now(timezone.utc).isoformat()))
             return scan_id
         except Exception:
-            self.fail_scan(scan_id, "duplicate automatic message")
+            # A concurrent poll may win the unique claim after our initial
+            # check. Remove our orphan queued row instead of displaying a
+            # fabricated zero-score FAILED result.
+            try:
+                with self._db() as conn:
+                    ph = "%s" if self.is_postgres else "?"
+                    conn.execute(f"DELETE FROM scans WHERE id={ph} AND user_id={ph}", (scan_id, user_id))
+            except Exception:
+                pass
             return None
 
     def get_automatic_scan_claim(self, provider: str, user_id: str, message_id: str) -> bool:

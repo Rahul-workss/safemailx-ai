@@ -66,14 +66,22 @@ Return ONLY a valid JSON object — no markdown, no preamble, no <think> tags:
 
 
 def _get_llm_cfg():
+    # _get_live_config intentionally exposes only values that can be changed
+    # safely at runtime (model/thinking/token budget). It does not include the
+    # provider endpoint or credentials. Always take those from the canonical
+    # config module; otherwise this path silently falls back to localhost
+    # LM Studio even when production is configured for Cloudflare/OpenAI/etc.
     try:
+        from utils.config import LLM_BASE_URL, LLM_API_KEY, LLM_PROVIDER, LLM_ENABLE_THINKING
         from engines.llm_analyzer import _get_live_config
         cfg = _get_live_config()
         return {
-            "base_url": cfg.get("base_url", "http://127.0.0.1:1234/v1/chat/completions"),
+            "base_url": LLM_BASE_URL,
             "model":    cfg.get("model", "qwen3-8b"),
-            "thinking": cfg.get("thinking", True),
+            "thinking": cfg.get("thinking", LLM_ENABLE_THINKING),
             "max_tokens": min(cfg.get("max_tokens", 4000), 3000),  # enough for thinking + expanded JSON
+            "api_key": LLM_API_KEY,
+            "provider": LLM_PROVIDER,
         }
     except Exception:
         pass

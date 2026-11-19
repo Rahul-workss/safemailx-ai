@@ -187,11 +187,19 @@ def run_outlook_auto_poller() -> None:
                             if not mid or "@removed" in msg: continue
                             sid = repository.claim_automatic_scan("outlook", user_id, mid)
                             if sid:
+                                job = {"type":"outlook_automatic_message","user_id":user_id,"scan_id":sid,"outlook_message_id":mid}
                                 try:
-                                    scan_queue.enqueue({"type":"outlook_automatic_message","user_id":user_id,"scan_id":sid,"outlook_message_id":mid})
-                                except Exception:
-                                    repository.release_automatic_scan_claim("outlook", user_id, mid)
-                                    raise
+                                    scan_queue.enqueue(job)
+                                except Exception as queue_exc:
+                                    # Keep automatic protection usable when
+                                    # Redis is unavailable (local/dev and
+                                    # single-process deployments).
+                                    def _fallback(job=job):
+                                        from server.worker import process_scan_job
+                                        from server.repository import ScanRepository
+                                        process_scan_job(job, repository=ScanRepository())
+                                    threading.Thread(target=_fallback, daemon=True, name=f"outlook-auto-{sid[:8]}").start()
+                                    logger.warning("Redis unavailable; started Outlook automatic scan fallback (%s)", type(queue_exc).__name__)
                         page_url = resp.get("@odata.nextLink")
                         final_link = resp.get("@odata.deltaLink", final_link)
                     if final_link != cursor:
